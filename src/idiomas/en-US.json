@@ -1,0 +1,826 @@
+{
+  "idioma": {
+    "codigo": "en-US",
+    "nome": "English (United States)",
+    "decimal": ".",
+    "separadorDeCoordenadas": ",",
+    "casas": 3
+  },
+  "app": {
+    "nome": "FeatherCAD",
+    "semTitulo": "Untitled"
+  },
+  "titulo": {
+    "desfazer": "Undo (Ctrl+Z)",
+    "refazer": "Redo (Ctrl+Y)",
+    "busca": "Type a command or keyword",
+    "novo": "New (Ctrl+N)",
+    "abrir": "Open (Ctrl+O)",
+    "salvar": "Save (Ctrl+S)",
+    "exportar": "Export the sheets as PDF (A3)"
+  },
+  "ribbon": {
+    "abas": {
+      "inicio": "Home",
+      "inserir": "Insert",
+      "anotar": "Annotate",
+      "parametrico": "Parametric",
+      "exibir": "View",
+      "gerenciar": "Manage",
+      "saida": "Output",
+      "colaborar": "Collaborate"
+    },
+    "paineis": {
+      "desenhar": "Draw",
+      "modificar": "Modify",
+      "anotacao": "Annotation",
+      "camadas": "Layers",
+      "bloco": "Block",
+      "propriedades": "Properties",
+      "grupos": "Groups",
+      "utilitarios": "Utilities",
+      "area_transferencia": "Clipboard"
+    },
+    "botoes": {
+      "linha": {
+        "rotulo": "Line",
+        "dica": "Creates straight line segments (L)"
+      },
+      "polilinha": {
+        "rotulo": "Polyline",
+        "dica": "Creates a 2D polyline: connected straight segments (PL)"
+      },
+      "circulo": {
+        "rotulo": "Circle",
+        "dica": "Creates a circle: center and radius (C)"
+      },
+      "arco": {
+        "rotulo": "Arc",
+        "dica": "Creates an arc by 3 points (A)"
+      },
+      "inserir": {
+        "rotulo": "Insert",
+        "dica": "Inserts a block from the drawing (I)"
+      },
+      "retangulo": {
+        "rotulo": "Rectangle",
+        "dica": "Creates a rectangle from two corners (REC)"
+      },
+      "elipse": {
+        "rotulo": "Ellipse",
+        "dica": "Creates an ellipse: center, axis, other semi-axis (EL)"
+      },
+      "hachura": {
+        "rotulo": "Hatch",
+        "dica": "Hatches a closed boundary: click inside it (H)"
+      },
+      "mover": {
+        "rotulo": "Move",
+        "dica": "Moves objects: base point and destination (M)"
+      },
+      "girar": {
+        "rotulo": "Rotate",
+        "dica": "Rotates objects about a point (RO)"
+      },
+      "aparar": {
+        "rotulo": "Trim",
+        "dica": "Trims the clicked part between cuts (TR)"
+      },
+      "copiar": {
+        "rotulo": "Copy",
+        "dica": "Copies objects, as many times as you like (CO)"
+      },
+      "espelhar": {
+        "rotulo": "Mirror",
+        "dica": "Mirrors objects across a line (MI)"
+      },
+      "concordancia": {
+        "rotulo": "Fillet",
+        "dica": "Fillets two lines with a radius (F)"
+      },
+      "esticar": {
+        "rotulo": "Stretch",
+        "dica": "Stretches what a window crosses (S)"
+      },
+      "escala": {
+        "rotulo": "Scale",
+        "dica": "Scales objects from a point (SC)"
+      },
+      "matriz": {
+        "rotulo": "Array",
+        "dica": "Copies in a grid: rows, columns and spacing (AR)"
+      },
+      "apagar": {
+        "rotulo": "Erase",
+        "dica": "Erases the selected objects (Delete)"
+      },
+      "texto": {
+        "rotulo": "Text",
+        "dica": "Creates single-line text (DT)"
+      },
+      "cota": {
+        "rotulo": "Dimension",
+        "dica": "Linear dimension: two points and the line position (DLI)"
+      },
+      "chamada": {
+        "rotulo": "Leader",
+        "dica": "Leader with arrow and text (LE)"
+      },
+      "tabela": {
+        "rotulo": "Table",
+        "dica": "Table: grid only, with rows and columns (TB)"
+      },
+      "propriedades_camada": {
+        "rotulo": "Layer Properties",
+        "dica": "Opens the Layer Properties Manager"
+      },
+      "tornar_atual": {
+        "rotulo": "Make Current",
+        "dica": "Makes the clicked object's layer current (LAYMCUR)"
+      },
+      "igualar_camada": {
+        "rotulo": "Match Layer",
+        "dica": "Moves objects to another object's layer (LAYMCH)"
+      },
+      "criar_bloco": {
+        "rotulo": "Create",
+        "dica": "Creates a block from the selected objects (B)"
+      },
+      "editar_bloco": {
+        "rotulo": "Edit",
+        "dica": "Edit (coming soon)"
+      },
+      "igualar_propriedades": {
+        "rotulo": "Match Properties",
+        "dica": "Copies layer, color, linetype and lineweight from one object to others (MA)"
+      },
+      "cor": {
+        "rotulo": "Color",
+        "dica": "Color (coming soon)"
+      },
+      "espessura": {
+        "rotulo": "Lineweight",
+        "dica": "Lineweight (coming soon)"
+      },
+      "tipo_linha": {
+        "rotulo": "Linetype",
+        "dica": "Linetype (coming soon)"
+      },
+      "agrupar": {
+        "rotulo": "Group",
+        "dica": "Groups objects (clicking one selects the group); again, ungroups (G)"
+      },
+      "medir": {
+        "rotulo": "Measure",
+        "dica": "Measures distance (2 clicks) or area (A) (MEA)"
+      },
+      "colar": {
+        "rotulo": "Paste",
+        "dica": "Pastes what was copied (Ctrl+V)"
+      },
+      "copiar_area": {
+        "rotulo": "Copy",
+        "dica": "Copies objects to the clipboard (Ctrl+C)"
+      },
+      "recortar": {
+        "rotulo": "Cut",
+        "dica": "Cuts objects to the clipboard (Ctrl+X)"
+      }
+    },
+    "embreve": "This tab will be filled in later."
+  },
+  "abas": {
+    "inicio": "Start",
+    "novo": "New drawing",
+    "fechar": "Close"
+  },
+  "rodape": {
+    "modelo": "MODEL",
+    "orto": "Ortho (F8)",
+    "osnap": "Object snap (F3)",
+    "snap": "Snap (F9)",
+    "fundo": "Background",
+    "fundoNada": "No background",
+    "fundoPontos": "Dots",
+    "fundoGrade": "Grid (F7)",
+    "anguloOrto": "Ortho angle",
+    "osnapModos": "Object snap types",
+    "snapTipos": {
+      "extremidade": "Endpoint",
+      "meio": "Midpoint",
+      "centro": "Center",
+      "quadrante": "Quadrant",
+      "intersecao": "Intersection",
+      "perpendicular": "Perpendicular",
+      "tangente": "Tangent",
+      "no": "Node / insertion",
+      "proximo": "Nearest"
+    }
+  },
+  "entrada": {
+    "distancia": "Dist",
+    "angulo": "Ang"
+  },
+  "comando": {
+    "digite": "Type a command",
+    "desconhecido": "Unknown command: {nome}",
+    "pontoInvalido": "Invalid point: {texto}",
+    "placeholder": "Type a command",
+    "semDirecao": "Move the cursor to show the direction before typing a distance: {texto}",
+    "anguloTravado": "Direction locked at {graus}°: type the distance (or click)."
+  },
+  "linha": {
+    "primeiroPonto": "LINE Specify first point:",
+    "proximoPonto": "LINE Specify next point or [Enter to finish]:"
+  },
+  "desfazer": {
+    "feito": "Undone.",
+    "nada": "Nothing to undo."
+  },
+  "refazer": {
+    "feito": "Redone.",
+    "nada": "Nothing to redo."
+  },
+  "monitor": {
+    "titulo": "{nome} Monitor",
+    "abas": {
+      "memoria": "Memory",
+      "console": "Console",
+      "metricas": "Metrics"
+    },
+    "memoria": {
+      "processos": "Processes",
+      "indisponivel": "Measurement unavailable (installed app on Linux only).",
+      "ultimos": "{teto} — last 2 minutes",
+      "cartoes": {
+        "total": {
+          "rotulo": "Total now",
+          "dica": "Memory of all the app's processes, added up"
+        },
+        "principal": {
+          "rotulo": "App (Rust)",
+          "dica": "The main process: the engine and the files"
+        },
+        "webview": {
+          "rotulo": "Page (WebKit)",
+          "dica": "The interface process: the drawing on screen and JavaScript"
+        },
+        "pico": {
+          "rotulo": "Highest peak",
+          "dica": "The highest use since the app opened (VmHWM)"
+        }
+      },
+      "colunas": {
+        "pid": "PID",
+        "processo": "Process",
+        "agora": "Now",
+        "pico": "Peak"
+      }
+    },
+    "console": {
+      "tudo": "All",
+      "erros": "Errors",
+      "avisos": "Warnings",
+      "info": "Info",
+      "buscar": "Search…",
+      "limpar": "Clear"
+    },
+    "metricas": {
+      "soLentas": "Slow only (≥ {ms} ms)",
+      "ordenar": "Sort by time",
+      "limpar": "Clear",
+      "todasOrigens": "All sources",
+      "colunas": {
+        "hora": "Time",
+        "origem": "Source",
+        "oQueFoi": "What",
+        "tempo": "Duration"
+      }
+    },
+    "overlay": {
+      "titulo": "⚙ Debug console",
+      "filtrar": "Filter text...",
+      "todos": "All",
+      "erros": "Errors",
+      "avisos": "Warnings",
+      "limpar": "Clear",
+      "copiar": "Copy logs",
+      "copiado": "Copied!",
+      "fechar": "✕ Close",
+      "vazio": "No log recorded or matching the filter."
+    }
+  },
+  "inicio": {
+    "abrir": "Open…",
+    "novo": "New",
+    "navegacao": {
+      "recentes": "Recent",
+      "projetos": "Projects"
+    },
+    "recentes": {
+      "titulo": "Recent",
+      "vazio": "No recent drawings. Open or create a drawing and it shows up here."
+    },
+    "somenteApp": "Recent files and projects only exist in the installed app.",
+    "projetos": {
+      "titulo": "Projects",
+      "adicionar": "Add folder…",
+      "remover": "Remove from list (the folder is not deleted)",
+      "vazio": "No project folders yet. Add the folder where you keep your drawings.",
+      "escolha": "Pick a project to see its drawings.",
+      "semDesenhos": "There are no .dxf or .fcdz drawings in this folder."
+    },
+    "colunas": {
+      "nome": "Name",
+      "criadoEm": "Created on",
+      "aberto": "Opened on",
+      "tipo": "Type",
+      "local": "Location"
+    },
+    "tipos": {
+      "dxf": "DXF",
+      "fcdz": "FeatherCAD drawing"
+    },
+    "visao": {
+      "lista": "List",
+      "grade": "Thumbnails"
+    },
+    "tirarDaLista": "Remove from list"
+  },
+  "confirmar": {
+    "titulo": "Unsaved changes",
+    "corpo": "The drawing \"{nome}\" has changes that were not saved.",
+    "salvar": "Save",
+    "descartar": "Don't save",
+    "cancelar": "Cancel"
+  },
+  "erro": {
+    "exportar": "Could not export the PDF: {motivo}",
+    "mudouNoDisco": "\"{nome}\" changed on disk, but there are unsaved changes here. Save to overwrite it, or reopen it to see the disk version.",
+    "abrir": "Could not open the drawing: {motivo}",
+    "salvar": "Could not save the drawing: {motivo}",
+    "motorDesatualizado": "The app engine is out of date with the interface. Close the app and start it again (npm run app:dev) so it recompiles."
+  },
+  "aviso": {
+    "pdfGravado": "PDF saved: {caminho}",
+    "entidadesIgnoradas": "{n} object(s) were left out of the drawing (not supported yet): {tipos}.",
+    "dentroDeBlocos": "{n} object(s) inside blocks were left out (not supported yet): {tipos}.",
+    "hachuraNaoGravada": "{n} hatch(es) were not saved to the DXF (area with an island, or too much detail). Save as .fcdz to keep them.",
+    "espacoPapelIgnorado": "{n} paper space object(s) were ignored.",
+    "corAproximada": "{n} color(s) were approximated to the DXF color table (ACI).",
+    "hachuraDecomposta": "{n} hatch(es) were saved as lines and triangles: the DXF written today (R12) has no hatch. Save as .fcdz to keep true hatches."
+  },
+  "navegacao": {
+    "maisZoom": "Zoom in",
+    "menosZoom": "Zoom out",
+    "ajustar": "Zoom to fit the drawing (double-click the wheel)"
+  },
+  "tema": {
+    "dica": "Theme: {modo} (click to change)",
+    "modos": {
+      "auto": "automatic (follows the system)",
+      "light": "light",
+      "dark": "dark"
+    }
+  },
+  "polilinha": {
+    "primeiroPonto": "PLINE Specify start point:",
+    "proximoPonto": "PLINE Specify next point or [Close/Enter to finish]:",
+    "poucosPontos": "Closing a polyline needs at least 3 points."
+  },
+  "circulo": {
+    "centro": "CIRCLE Specify center point:",
+    "raio": "CIRCLE Specify radius (click or type the value):"
+  },
+  "arco": {
+    "primeiroPonto": "ARC Specify start point of arc:",
+    "segundoPonto": "ARC Specify second point of arc:",
+    "pontoFinal": "ARC Specify end point of arc:",
+    "alinhados": "The three points are collinear: they do not form an arc. Pick another end point."
+  },
+  "insercao": {
+    "nome": "INSERT Enter block name:",
+    "ponto": "INSERT Specify insertion point:",
+    "desconhecido": "There is no block \"{nome}\" in this drawing.",
+    "semBlocos": "This drawing has no blocks to insert."
+  },
+  "vistaCubo": {
+    "dica": "Top view (2D), world coordinate system",
+    "norte": "N",
+    "sul": "S",
+    "oeste": "W",
+    "leste": "E",
+    "topo": "TOP"
+  },
+  "edicao": {
+    "selecionar": "Select objects (click, or two clicks for a window) and press Enter:",
+    "janelaSegundo": "Specify the opposite corner (right to left also picks what it touches):",
+    "esticarJanela": "Select objects to stretch with a 2-click window and press Enter:",
+    "base": "Specify base point:",
+    "destino": "Specify the second point (Enter to finish):",
+    "angulo": "Specify rotation angle (type or click):",
+    "fator": "Specify scale factor (type, or click the distance):",
+    "espelho1": "First point of mirror line:",
+    "espelho2": "Second point of mirror line:",
+    "matriz": "Enter: rows columns row-spacing column-spacing (e.g. 2 3 10 10):",
+    "matrizInvalida": "Invalid array: 4 numbers are needed (rows and columns whole, at least 1).",
+    "nadaSelecionado": "No objects selected.",
+    "selecionados": "{n} object(s) selected.",
+    "apagados": "{n} object(s) erased.",
+    "alterados": "{n} object(s) modified.",
+    "copiados": "{n} copy(ies) created.",
+    "destinoInvalido": "Invalid point for this command.",
+    "espelhoInvalido": "The two mirror-line points are the same.",
+    "alvoCamada": "Click an object on the destination layer:"
+  },
+  "aparar": {
+    "clique": "TRIM Click the part to trim (Enter to finish):",
+    "semCorte": "Nothing crosses this object: there is no cutting edge.",
+    "naoSuporta": "This kind of object (or a polyline with arcs) cannot be trimmed yet."
+  },
+  "concordancia": {
+    "primeira": "FILLET Click the first line (current radius {raio}; type a number to change it):",
+    "segunda": "Click the second line:",
+    "paralelas": "The two lines are parallel.",
+    "raioGrande": "The radius does not fit these lines.",
+    "soLinhas": "Fillet only works between two different straight lines.",
+    "raioNegativo": "The radius cannot be negative."
+  },
+  "retangulo": {
+    "primeiroCanto": "RECTANGLE First corner:",
+    "outroCanto": "Opposite corner:",
+    "invalido": "The rectangle needs width and height."
+  },
+  "elipse": {
+    "centro": "ELLIPSE Ellipse center:",
+    "eixo": "Major axis end point:",
+    "outroEixo": "Distance to the other semi-axis (type or click):",
+    "invalida": "The ellipse axes cannot be zero."
+  },
+  "hachura": {
+    "pontoPadrao": "HATCH Click inside a closed boundary (S = solid, Enter to finish):",
+    "pontoSolida": "HATCH solid Click inside a closed boundary (P = pattern, Enter to finish):",
+    "semContorno": "There is no closed boundary (circle or closed polyline) at this point."
+  },
+  "camadas": {
+    "titulo": "Layer Properties Manager",
+    "nova": "New layer (inherits the selected one)",
+    "excluir": "Delete layer (empty ones only)",
+    "tornarAtual": "Set current",
+    "fechar": "Close",
+    "atual": "Current layer: {nome}",
+    "buscar": "Search for layer",
+    "filtros": "Filters",
+    "filtroTodas": "All",
+    "filtroUsadas": "All Used Layers",
+    "colunas": {
+      "status": "Status",
+      "nome": "Name",
+      "ligada": "On",
+      "congelada": "Freeze",
+      "bloqueada": "Lock",
+      "plotar": "Plot",
+      "cor": "Color",
+      "tipoLinha": "Linetype",
+      "espessura": "Lineweight",
+      "transparencia": "Transp."
+    },
+    "padrao": "Default",
+    "contagem": "All: {exibidas} layers displayed of {totais} total layers",
+    "contagemFiltrada": "Filter: {exibidas} layers displayed of {totais} total layers",
+    "dicaAtual": "Current layer",
+    "dicaUsada": "Layer with objects",
+    "dicaVazia": "Layer with no objects",
+    "dicaNome": "Double-click to rename",
+    "dicaCor": "Click to pick a color",
+    "ligada": "On: layers that are off are not shown",
+    "congelada": "Frozen: disappears from the drawing",
+    "bloqueada": "Locked: shown, but cannot be picked or edited",
+    "plotar": "Plot (kept; there is no printing yet)",
+    "tipos": {
+      "CONTINUOUS": "Continuous",
+      "DASHED": "Dashed",
+      "HIDDEN": "Hidden",
+      "CENTER": "Center",
+      "DOT": "Dotted",
+      "PHANTOM": "Phantom"
+    },
+    "erro": {
+      "nomeVazio": "The layer name cannot be empty.",
+      "nomeInvalido": "The name has an invalid character (< > / \\ \" : ; ? * | = , `).",
+      "nomeRepetido": "A layer with that name already exists.",
+      "camadaZero": "Layer 0 cannot be renamed or deleted.",
+      "camadaAtual": "The current layer cannot be frozen or deleted.",
+      "emUso": "Only layers with no objects can be deleted.",
+      "semCamada": "That layer no longer exists."
+    },
+    "combinada": "Current layer and quick switches"
+  },
+  "propriedades": {
+    "titulo": "Properties",
+    "nenhum": "No selection",
+    "objetos": "{n} object(s) selected",
+    "geral": "General",
+    "camada": "Layer",
+    "cor": "Color",
+    "tipoLinha": "Linetype",
+    "espessura": "Lineweight",
+    "porCamada": "ByLayer",
+    "variado": "*VARIES*",
+    "fechar": "Close",
+    "semCamada": "There is no such layer.",
+    "corInvalida": "Invalid color: use #rrggbb or ByLayer.",
+    "tipoInvalido": "Invalid linetype.",
+    "espessuraInvalida": "Invalid lineweight (0 to 2.11 mm).",
+    "dica": "Properties of the selected objects (Ctrl+1)",
+    "cores": {
+      "vermelho": "Red",
+      "amarelo": "Yellow",
+      "verde": "Green",
+      "ciano": "Cyan",
+      "azul": "Blue",
+      "magenta": "Magenta",
+      "branco": "White",
+      "personalizada": "Custom…"
+    }
+  },
+  "texto": {
+    "ponto": "TEXT Specify start point:",
+    "altura": "Text height (type, click the distance, or Enter for the default):",
+    "conteudo": "Enter text (empty Enter cancels):",
+    "alturaInvalida": "The height must be a number greater than zero."
+  },
+  "cota": {
+    "primeiro": "DIMENSION First point to measure:",
+    "segundo": "Second point to measure:",
+    "posicao": "Dimension line position (above/below = horizontal; beside = vertical):",
+    "nula": "The measurement is zero in that direction: pick another point."
+  },
+  "chamada": {
+    "ponta": "LEADER Arrow tip:",
+    "pouso": "Where the line ends (the text goes beside it):",
+    "texto": "Enter the leader text (Enter with no text keeps only the line):"
+  },
+  "tabela": {
+    "ponto": "TABLE Top-left corner:",
+    "dados": "Enter: rows columns [row-height column-width] (e.g. 3 4):",
+    "invalida": "Invalid table: whole rows and columns (1 to 500) and positive sizes."
+  },
+  "medir": {
+    "primeiro": "MEASURE First point (A = area):",
+    "segundo": "Second point:",
+    "areaPonto": "Next corner of the area (Enter closes and measures; D = distance):",
+    "distancia": "Distance = {distancia}, angle = {angulo}°, ΔX = {dx}, ΔY = {dy}",
+    "area": "Area = {area}, perimeter = {perimetro}",
+    "poucosPontos": "The area needs at least 3 points.",
+    "demais": "Too many points for an area."
+  },
+  "colar": {
+    "ponto": "PASTE Insertion point (Enter to finish):",
+    "vazia": "Nothing has been copied: use Copy (Ctrl+C) first.",
+    "feito": "{n} object(s) pasted."
+  },
+  "tornarAtual": {
+    "clique": "Click an object on the layer to make current:",
+    "feito": "The current layer is now \"{nome}\"."
+  },
+  "igualar": {
+    "origem": "MATCH PROPERTIES Click the source object:",
+    "destino": "Click the destination objects (Enter to finish):"
+  },
+  "prancheta": {
+    "copiados": "{n} object(s) copied.",
+    "recortados": "{n} object(s) cut."
+  },
+  "agrupar": {
+    "criado": "{n} object(s) grouped: clicking one selects the group.",
+    "desfeito": "Group dissolved ({n} objects)."
+  },
+  "bloco": {
+    "nome": "Enter the block name:",
+    "criado": "Block \"{nome}\" created.",
+    "erro": {
+      "nomeVazio": "The block name cannot be empty.",
+      "nomeInvalido": "Invalid block name (no < > / \\ \" : ; ? * | = , ` and not starting with *).",
+      "nomeRepetido": "A block with that name already exists.",
+      "semObjetos": "There are no free objects selected."
+    }
+  },
+  "config": {
+    "titulo": "Settings",
+    "fechar": "Close",
+    "abrir": "Settings (Ctrl+,)",
+    "secoes": {
+      "aparencia": "Appearance",
+      "desenho": "Drawing",
+      "salvamento": "Saving",
+      "idioma": "Language",
+      "apelidos": "Command aliases",
+      "mcp": "MCP (AI)",
+      "sobre": "About"
+    },
+    "tema": {
+      "rotulo": "Theme",
+      "dica": "Automatic follows the system.",
+      "auto": "Automatic",
+      "claro": "Light",
+      "escuro": "Dark"
+    },
+    "destaque": {
+      "rotulo": "Accent color",
+      "dica": "Selection, toggled buttons and focus."
+    },
+    "cores": {
+      "azul": "Blue",
+      "verde": "Green",
+      "roxo": "Purple",
+      "laranja": "Orange",
+      "rosa": "Pink",
+      "grafite": "Graphite"
+    },
+    "fonte": {
+      "rotulo": "Interface font",
+      "dica": "Menus, panels and the command line.",
+      "sans": "Sans-serif",
+      "serif": "Serif",
+      "mono": "Monospace"
+    },
+    "corpo": {
+      "rotulo": "Font size",
+      "dica": "Default size, in pixels."
+    },
+    "fundo": {
+      "rotulo": "Drawing background",
+      "dica": "What shows behind the objects.",
+      "nada": "None",
+      "pontos": "Dots",
+      "grade": "Grid"
+    },
+    "desenho": {
+      "snap": {
+        "rotulo": "Snap (F9)",
+        "dica": "The cursor jumps step by step along the grid."
+      },
+      "orto": {
+        "rotulo": "Ortho (F8)",
+        "dica": "Locks drawing to horizontal and vertical."
+      },
+      "osnap": {
+        "rotulo": "Object snap (F3)",
+        "dica": "The cursor sticks to endpoints, midpoints and centers."
+      }
+    },
+    "salvamento": {
+      "rotulo": "Save",
+      "aberto": "Open file: {nome}",
+      "nenhum": "No drawing open.",
+      "agora": "Save now",
+      "como": "Save as…",
+      "formato": {
+        "rotulo": "Format for new files",
+        "dica": ".dxf opens in any CAD; .fcdz is the native format and keeps everything."
+      },
+      "nota": "FeatherCAD has no account or cloud: the file stays wherever you save it, on your machine."
+    },
+    "idioma": {
+      "rotulo": "Language and regional settings",
+      "dica": "Decimal \"{decimal}\", coordinate separator \"{separador}\", {casas} decimal places.",
+      "nota": "The interface reloads when the language changes; save your drawing first."
+    },
+    "apelidos": {
+      "rotulo": "Typed aliases",
+      "dica": "Add the abbreviations you want on the command line, separated by commas.",
+      "restaurar": "Restore defaults",
+      "exemplo": "e.g. G",
+      "padrao": "Existing: {lista}",
+      "conflito": "{apelido} already belongs to {comando}."
+    },
+    "sobre": {
+      "texto": "FeatherCAD — 2D CAD of the FeatherOffice suite. Everything runs on your machine: no drawing data leaves it.",
+      "monitor": "Monitor (F12)",
+      "monitorDica": "Memory, console and metrics of the app, in a separate window.",
+      "abrirMonitor": "Open Monitor"
+    },
+    "cota": {
+      "rotulo": "Dimension size",
+      "dica": "Height of the dimension text, in {unidade}; the arrow follows. Empty = automatic (proportional to the drawing).",
+      "automatico": "Automatic"
+    },
+    "orto": {
+      "rotulo": "Ortho angle",
+      "dica": "Ortho locks drawing to multiples of this angle from the previous point: 90° = horizontal and vertical only; 45° = diagonals too; 60°, 30° and 15° lock to those steps. Also applies when dragging and moving.",
+      "outro": "Other angle"
+    },
+    "mcp": {
+      "texto": "MCP lets an AI (Claude Code, for example) see, measure and draw in this program: it gets an image of the drawing with coordinates, exact measurements, and the drawing as compact text. The server is a separate program, started by the AI client; FeatherCAD opens no network port.",
+      "programa": "MCP program",
+      "estadoOk": "found",
+      "estadoFalta": "not found",
+      "encontrado": "Ready to use. The button checks that it answers.",
+      "naoEncontrado": "Not built yet. Run `npm run mcp:build` inside the feathercad folder (the command below already uses the expected path).",
+      "semApp": "This window is the browser: the path below is only a template. Replace it with the path of the `feathercad-mcp` program.",
+      "caminhoGenerico": "<path>/feathercad-mcp",
+      "claude": "Claude Code",
+      "claudeDica": "Paste in the terminal to register the server.",
+      "outros": "Other clients (JSON)",
+      "outrosDica": "For clients that read an `mcpServers` config file (Claude Desktop, Cursor…).",
+      "copiar": "Copy",
+      "copiado": "Copied ✓",
+      "testar": "Test",
+      "testando": "Testing…",
+      "testeOk": "Working: the program answered and listed {n} tools.",
+      "testeErro": "Did not work: {motivo}",
+      "ferramentas": "What the AI can do",
+      "ferramentasLista": "See (image with coordinates), list and measure entities, find closed areas, check gaps, create and edit shapes, layers, hatch, undo, and read/write the drawing as compact text (.fct) using few tokens.",
+      "privacidade": "Everything runs on this machine. The server only opens and writes .dxf, .fcdz and .fct files, and never overwrites an existing file unless the AI explicitly asks."
+    }
+  },
+  "exportar": {
+    "titulo": "Export PDF",
+    "corpo": "Pick the paper, the orientation and which sheets go into the PDF. Each sheet becomes a page.",
+    "papel": "Paper",
+    "orientacao": "Orientation",
+    "orientacoes": { "automatica": "Automatic", "horizontal": "Landscape", "vertical": "Portrait" },
+    "folhas": "Sheets",
+    "todas": "All",
+    "nenhuma": "None",
+    "folha": "Sheet {n}",
+    "semFolhas": "The drawing has no sheets (closed rectangles on the FOLHA layer): one page with the whole drawing is exported.",
+    "cores": "Keep the screen colors (otherwise black on white)",
+    "exportar": "Export",
+    "cancelar": "Cancel"
+  },
+  "unidade": {
+    "titulo": "Drawing units",
+    "corpo": "Which unit will this drawing be worked in? It is saved in the file, and the .dxf carries it to other CAD programs.",
+    "nomes": {
+      "mm": "millimeters",
+      "cm": "centimeters",
+      "m": "meters"
+    },
+    "cancelar": "Cancel",
+    "rotulo": "Drawing units",
+    "dica": "Only changes what the numbers mean; objects are not resized.",
+    "semUnidade": "This file did not say its unit. Pick the one it uses.",
+    "dicaRodape": "Drawing units: {nome}",
+    "uso": {
+      "mm": "Parts, mechanics, small details",
+      "cm": "Woodworking, furniture, interiors",
+      "m": "Floor plans, land, large works"
+    },
+    "regua": {
+      "mm": "10 mm",
+      "cm": "10 cm",
+      "m": "1 m"
+    },
+    "trocarDepois": "You can change it later in Settings. Keys: 1, 2, 3 · Esc cancels."
+  },
+  "menu": {
+    "repetir": "Repeat {nome}",
+    "item": {
+      "enter": "Enter",
+      "cancelar": "Cancel",
+      "fechar": "Close",
+      "mover": "Move",
+      "copiar": "Copy",
+      "girar": "Rotate",
+      "escala": "Scale",
+      "espelhar": "Mirror",
+      "esticar": "Stretch",
+      "matriz": "Array",
+      "recortar": "Cut",
+      "copiar_area": "Copy to clipboard",
+      "colar": "Paste",
+      "criar_bloco": "Create block",
+      "agrupar": "Group",
+      "apagar": "Erase",
+      "desfazer": "Undo",
+      "refazer": "Redo",
+      "propriedades": "Properties",
+      "zoom_ajustar": "Zoom to fit drawing",
+      "configuracoes": "Settings…",
+      "snap": "Snap",
+      "orto": "Ortho",
+      "osnap": "Object snap",
+      "grade": "Grid",
+      "linha": "Line",
+      "polilinha": "Polyline",
+      "circulo": "Circle",
+      "arco": "Arc",
+      "inserir": "Insert block",
+      "aparar": "Trim",
+      "concordancia": "Fillet",
+      "retangulo": "Rectangle",
+      "elipse": "Ellipse",
+      "hachura": "Hatch",
+      "texto": "Text",
+      "cota": "Dimension",
+      "chamada": "Leader",
+      "tabela": "Table",
+      "medir": "Measure",
+      "tornar_atual": "Make layer current",
+      "igualar_propriedades": "Match properties",
+      "igualar_camada": "Match layer"
+    }
+  }
+}

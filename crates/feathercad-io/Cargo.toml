@@ -1,0 +1,22 @@
+[package]
+name = "feathercad-io"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+description = "Ler e gravar os arquivos do FeatherCAD: DXF e .fcdz."
+
+# `zip` (feature `deflate`, Rust puro, sem C) e `serde_json`: o .fcdz é um ZIP
+# com JSON dentro (contrato em `FORMATO.md`; o Git embutido ainda não entrou).
+# O DXF é texto e não pede dependência.
+[dependencies]
+feathercad-core = { path = "../feathercad-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+zip = { version = "4.2.0", default-features = false, features = ["deflate"] }
+
+[lib]
+name = "feathercad_io"
+
+[lints.clippy]
+too_many_lines = "deny"
+cognitive_complexity = "deny"

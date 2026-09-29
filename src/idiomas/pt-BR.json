@@ -1,0 +1,826 @@
+{
+  "idioma": {
+    "codigo": "pt-BR",
+    "nome": "Português (Brasil)",
+    "decimal": ",",
+    "separadorDeCoordenadas": ";",
+    "casas": 3
+  },
+  "app": {
+    "nome": "FeatherCAD",
+    "semTitulo": "Sem título"
+  },
+  "titulo": {
+    "desfazer": "Desfazer (Ctrl+Z)",
+    "refazer": "Refazer (Ctrl+Y)",
+    "busca": "Digite um comando ou palavra-chave",
+    "novo": "Novo (Ctrl+N)",
+    "abrir": "Abrir (Ctrl+O)",
+    "salvar": "Salvar (Ctrl+S)",
+    "exportar": "Exportar as folhas em PDF (A3)"
+  },
+  "ribbon": {
+    "abas": {
+      "inicio": "Início",
+      "inserir": "Inserir",
+      "anotar": "Anotar",
+      "parametrico": "Paramétrico",
+      "exibir": "Exibir",
+      "gerenciar": "Gerenciar",
+      "saida": "Saída",
+      "colaborar": "Colaborar"
+    },
+    "paineis": {
+      "desenhar": "Desenhar",
+      "modificar": "Modificar",
+      "anotacao": "Anotação",
+      "camadas": "Camadas",
+      "bloco": "Bloco",
+      "propriedades": "Propriedades",
+      "grupos": "Grupos",
+      "utilitarios": "Utilitários",
+      "area_transferencia": "Área de transferência"
+    },
+    "botoes": {
+      "linha": {
+        "rotulo": "Linha",
+        "dica": "Cria segmentos de linha reta (L)"
+      },
+      "polilinha": {
+        "rotulo": "Polilinha",
+        "dica": "Cria uma polilinha 2D: trechos retos ligados (PL)"
+      },
+      "circulo": {
+        "rotulo": "Círculo",
+        "dica": "Cria um círculo: centro e raio (C)"
+      },
+      "arco": {
+        "rotulo": "Arco",
+        "dica": "Cria um arco por 3 pontos (A)"
+      },
+      "inserir": {
+        "rotulo": "Inserir",
+        "dica": "Insere um bloco do desenho (I)"
+      },
+      "retangulo": {
+        "rotulo": "Retângulo",
+        "dica": "Cria um retângulo por dois cantos (REC)"
+      },
+      "elipse": {
+        "rotulo": "Elipse",
+        "dica": "Cria uma elipse: centro, eixo e outro semi-eixo (EL)"
+      },
+      "hachura": {
+        "rotulo": "Hachura",
+        "dica": "Hachura um contorno fechado: clique dentro dele (H)"
+      },
+      "mover": {
+        "rotulo": "Mover",
+        "dica": "Move os objetos: ponto base e destino (M)"
+      },
+      "girar": {
+        "rotulo": "Girar",
+        "dica": "Gira os objetos em torno de um ponto (GI)"
+      },
+      "aparar": {
+        "rotulo": "Aparar",
+        "dica": "Apara o trecho clicado entre os cortes (PA)"
+      },
+      "copiar": {
+        "rotulo": "Copiar",
+        "dica": "Copia os objetos, quantas vezes quiser (CO)"
+      },
+      "espelhar": {
+        "rotulo": "Espelhar",
+        "dica": "Espelha os objetos em relação a uma linha (ES)"
+      },
+      "concordancia": {
+        "rotulo": "Concordância",
+        "dica": "Concorda duas linhas com um raio (CONC)"
+      },
+      "esticar": {
+        "rotulo": "Esticar",
+        "dica": "Estica o que uma janela pega (ET)"
+      },
+      "escala": {
+        "rotulo": "Escala",
+        "dica": "Muda o tamanho dos objetos a partir de um ponto (ESC)"
+      },
+      "matriz": {
+        "rotulo": "Matriz",
+        "dica": "Copia em grade: linhas, colunas e espaços (MZ)"
+      },
+      "apagar": {
+        "rotulo": "Apagar",
+        "dica": "Apaga os objetos selecionados (Delete)"
+      },
+      "texto": {
+        "rotulo": "Texto",
+        "dica": "Cria um texto de uma linha (TX)"
+      },
+      "cota": {
+        "rotulo": "Cota",
+        "dica": "Cota linear: dois pontos e a posição da linha (COT)"
+      },
+      "chamada": {
+        "rotulo": "Chamada",
+        "dica": "Chamada com seta e texto (CH)"
+      },
+      "tabela": {
+        "rotulo": "Tabela",
+        "dica": "Tabela: só a grade, com linhas e colunas (TAB)"
+      },
+      "propriedades_camada": {
+        "rotulo": "Propriedades de camada",
+        "dica": "Abre o gerenciador de propriedades de camadas"
+      },
+      "tornar_atual": {
+        "rotulo": "Tornar atual",
+        "dica": "Torna atual a camada do objeto clicado (TA)"
+      },
+      "igualar_camada": {
+        "rotulo": "Igualar camada",
+        "dica": "Leva os objetos para a camada de outro objeto (IC)"
+      },
+      "criar_bloco": {
+        "rotulo": "Criar",
+        "dica": "Cria um bloco com os objetos selecionados (BL)"
+      },
+      "editar_bloco": {
+        "rotulo": "Editar",
+        "dica": "Editar (em breve)"
+      },
+      "igualar_propriedades": {
+        "rotulo": "Igualar propriedades",
+        "dica": "Copia camada, cor, tipo e espessura de um objeto para outros (IP)"
+      },
+      "cor": {
+        "rotulo": "Cor",
+        "dica": "Cor (em breve)"
+      },
+      "espessura": {
+        "rotulo": "Espessura de linha",
+        "dica": "Espessura de linha (em breve)"
+      },
+      "tipo_linha": {
+        "rotulo": "Tipo de linha",
+        "dica": "Tipo de linha (em breve)"
+      },
+      "agrupar": {
+        "rotulo": "Agrupar",
+        "dica": "Agrupa os objetos (clicar num seleciona o grupo); de novo, desagrupa (AG)"
+      },
+      "medir": {
+        "rotulo": "Medir",
+        "dica": "Mede distância (2 cliques) ou área (A) (MD)"
+      },
+      "colar": {
+        "rotulo": "Colar",
+        "dica": "Cola o que foi copiado (Ctrl+V)"
+      },
+      "copiar_area": {
+        "rotulo": "Copiar",
+        "dica": "Copia os objetos para a prancheta (Ctrl+C)"
+      },
+      "recortar": {
+        "rotulo": "Recortar",
+        "dica": "Recorta os objetos para a prancheta (Ctrl+X)"
+      }
+    },
+    "embreve": "Esta aba ainda será preenchida."
+  },
+  "abas": {
+    "inicio": "Início",
+    "novo": "Novo desenho",
+    "fechar": "Fechar"
+  },
+  "rodape": {
+    "modelo": "MODELO",
+    "orto": "Orto (F8)",
+    "osnap": "Snap ao objeto (F3)",
+    "snap": "Snap (F9)",
+    "fundo": "Fundo",
+    "fundoNada": "Sem fundo",
+    "fundoPontos": "Pontos",
+    "fundoGrade": "Grade (F7)",
+    "anguloOrto": "Ângulo do Orto",
+    "osnapModos": "Tipos de snap ao objeto",
+    "snapTipos": {
+      "extremidade": "Extremidade",
+      "meio": "Ponto médio",
+      "centro": "Centro",
+      "quadrante": "Quadrante",
+      "intersecao": "Interseção",
+      "perpendicular": "Perpendicular",
+      "tangente": "Tangente",
+      "no": "Ponto / inserção",
+      "proximo": "Mais próximo"
+    }
+  },
+  "entrada": {
+    "distancia": "Dist",
+    "angulo": "Âng"
+  },
+  "comando": {
+    "digite": "Digite um comando",
+    "desconhecido": "Comando desconhecido: {nome}",
+    "pontoInvalido": "Ponto inválido: {texto}",
+    "placeholder": "Digite um comando",
+    "semDirecao": "Digite a distância depois de mover o cursor para indicar a direção: {texto}",
+    "anguloTravado": "Direção travada em {graus}°: digite a distância (ou clique)."
+  },
+  "linha": {
+    "primeiroPonto": "LINHA Especifique o primeiro ponto:",
+    "proximoPonto": "LINHA Especifique o próximo ponto ou [Enter para terminar]:"
+  },
+  "desfazer": {
+    "feito": "Desfeito.",
+    "nada": "Nada a desfazer."
+  },
+  "refazer": {
+    "feito": "Refeito.",
+    "nada": "Nada a refazer."
+  },
+  "monitor": {
+    "titulo": "Monitor do {nome}",
+    "abas": {
+      "memoria": "Memória",
+      "console": "Console",
+      "metricas": "Métricas"
+    },
+    "memoria": {
+      "processos": "Processos",
+      "indisponivel": "Medição indisponível (só no aplicativo instalado, no Linux).",
+      "ultimos": "{teto} — últimos 2 minutos",
+      "cartoes": {
+        "total": {
+          "rotulo": "Total agora",
+          "dica": "Soma da memória de todos os processos do aplicativo"
+        },
+        "principal": {
+          "rotulo": "Aplicativo (Rust)",
+          "dica": "O processo principal: o motor e os arquivos"
+        },
+        "webview": {
+          "rotulo": "Página (WebKit)",
+          "dica": "O processo da interface: o desenho na tela e o JavaScript"
+        },
+        "pico": {
+          "rotulo": "Maior pico",
+          "dica": "O maior uso desde que o aplicativo abriu (VmHWM)"
+        }
+      },
+      "colunas": {
+        "pid": "PID",
+        "processo": "Processo",
+        "agora": "Agora",
+        "pico": "Pico"
+      }
+    },
+    "console": {
+      "tudo": "Tudo",
+      "erros": "Erros",
+      "avisos": "Avisos",
+      "info": "Info",
+      "buscar": "Buscar…",
+      "limpar": "Limpar"
+    },
+    "metricas": {
+      "soLentas": "Só as lentas (≥ {ms} ms)",
+      "ordenar": "Ordenar pelo tempo",
+      "limpar": "Limpar",
+      "todasOrigens": "Todas as origens",
+      "colunas": {
+        "hora": "Hora",
+        "origem": "Origem",
+        "oQueFoi": "O que foi",
+        "tempo": "Tempo"
+      }
+    },
+    "overlay": {
+      "titulo": "⚙ Console de Depuração",
+      "filtrar": "Filtrar texto...",
+      "todos": "Todos",
+      "erros": "Erros",
+      "avisos": "Avisos",
+      "limpar": "Limpar",
+      "copiar": "Copiar Logs",
+      "copiado": "Copiado!",
+      "fechar": "✕ Fechar",
+      "vazio": "Nenhum log gravado ou correspondente ao filtro."
+    }
+  },
+  "inicio": {
+    "abrir": "Abrir…",
+    "novo": "Novo",
+    "navegacao": {
+      "recentes": "Recentes",
+      "projetos": "Projetos"
+    },
+    "recentes": {
+      "titulo": "Recentes",
+      "vazio": "Nenhum desenho recente. Abra ou crie um desenho e ele aparece aqui."
+    },
+    "somenteApp": "Os recentes e os projetos só existem no aplicativo instalado.",
+    "projetos": {
+      "titulo": "Projetos",
+      "adicionar": "Adicionar pasta…",
+      "remover": "Tirar da lista (a pasta não é apagada)",
+      "vazio": "Nenhuma pasta de projeto ainda. Adicione a pasta onde você guarda seus desenhos.",
+      "escolha": "Escolha um projeto para ver os desenhos dele.",
+      "semDesenhos": "Não há desenhos .dxf ou .fcdz nesta pasta."
+    },
+    "colunas": {
+      "nome": "Nome",
+      "criadoEm": "Criado em",
+      "aberto": "Aberto em",
+      "tipo": "Tipo",
+      "local": "Local"
+    },
+    "tipos": {
+      "dxf": "DXF",
+      "fcdz": "Desenho FeatherCAD"
+    },
+    "visao": {
+      "lista": "Lista",
+      "grade": "Miniaturas"
+    },
+    "tirarDaLista": "Tirar da lista"
+  },
+  "confirmar": {
+    "titulo": "Alterações não salvas",
+    "corpo": "O desenho \"{nome}\" tem alterações que não foram salvas.",
+    "salvar": "Salvar",
+    "descartar": "Não salvar",
+    "cancelar": "Cancelar"
+  },
+  "erro": {
+    "exportar": "Não consegui exportar o PDF: {motivo}",
+    "mudouNoDisco": "O arquivo \"{nome}\" mudou no disco, mas há alterações não salvas aqui. Salve para sobrescrever ou reabra para ver a versão do disco.",
+    "abrir": "Não consegui abrir o desenho: {motivo}",
+    "salvar": "Não consegui salvar o desenho: {motivo}",
+    "motorDesatualizado": "O motor do aplicativo está desatualizado em relação à interface. Feche o aplicativo e abra de novo (npm run app:dev) para ele recompilar."
+  },
+  "aviso": {
+    "pdfGravado": "PDF gravado: {caminho}",
+    "entidadesIgnoradas": "{n} objeto(s) ficaram de fora do desenho (ainda não suportados): {tipos}.",
+    "dentroDeBlocos": "{n} objeto(s) dentro de blocos ficaram de fora (ainda não suportados): {tipos}.",
+    "hachuraNaoGravada": "{n} hachura(s) não foram gravadas no DXF (área com ilha, ou detalhe demais). Salve como .fcdz para não perdê-las.",
+    "espacoPapelIgnorado": "{n} objeto(s) do espaço do papel foram ignorados.",
+    "corAproximada": "{n} cor(es) foram aproximadas para a tabela de cores do DXF (ACI).",
+    "hachuraDecomposta": "{n} hachura(s) foram gravadas como linhas e triângulos: o DXF gravado hoje (R12) não tem hachura. Salve como .fcdz para manter a hachura de verdade."
+  },
+  "navegacao": {
+    "maisZoom": "Aproximar",
+    "menosZoom": "Afastar",
+    "ajustar": "Enquadrar o desenho (duplo clique na roda)"
+  },
+  "tema": {
+    "dica": "Tema: {modo} (clique para trocar)",
+    "modos": {
+      "auto": "automático (segue o sistema)",
+      "light": "claro",
+      "dark": "escuro"
+    }
+  },
+  "polilinha": {
+    "primeiroPonto": "PLINHA Especifique o ponto inicial:",
+    "proximoPonto": "PLINHA Especifique o próximo ponto ou [Fechar/Enter para terminar]:",
+    "poucosPontos": "Para fechar a polilinha são precisos ao menos 3 pontos."
+  },
+  "circulo": {
+    "centro": "CIRCULO Especifique o centro do círculo:",
+    "raio": "CIRCULO Especifique o raio (clique ou digite o valor):"
+  },
+  "arco": {
+    "primeiroPonto": "ARCO Especifique o ponto inicial do arco:",
+    "segundoPonto": "ARCO Especifique um ponto sobre o arco:",
+    "pontoFinal": "ARCO Especifique o ponto final do arco:",
+    "alinhados": "Os três pontos estão alinhados: não formam um arco. Escolha outro ponto final."
+  },
+  "insercao": {
+    "nome": "INSERIR Digite o nome do bloco:",
+    "ponto": "INSERIR Especifique o ponto de inserção:",
+    "desconhecido": "Não existe o bloco \"{nome}\" neste desenho.",
+    "semBlocos": "Este desenho não tem blocos para inserir."
+  },
+  "vistaCubo": {
+    "dica": "Vista de cima (2D), sistema de coordenadas do mundo",
+    "norte": "N",
+    "sul": "S",
+    "oeste": "O",
+    "leste": "L",
+    "topo": "TOPO"
+  },
+  "edicao": {
+    "selecionar": "Selecione os objetos (clique, ou dois cliques para uma janela) e pressione Enter:",
+    "janelaSegundo": "Especifique o canto oposto da janela (da direita para a esquerda pega o que toca):",
+    "esticarJanela": "Selecione o que esticar com uma janela de 2 cliques e pressione Enter:",
+    "base": "Especifique o ponto base:",
+    "destino": "Especifique o ponto de destino (Enter termina):",
+    "angulo": "Especifique o ângulo de rotação (digite ou clique):",
+    "fator": "Especifique o fator de escala (digite ou clique a distância):",
+    "espelho1": "Primeiro ponto da linha de espelho:",
+    "espelho2": "Segundo ponto da linha de espelho:",
+    "matriz": "Digite: linhas colunas espaço-entre-linhas espaço-entre-colunas (ex.: 2 3 10 10):",
+    "matrizInvalida": "Matriz inválida: são 4 números (linhas e colunas inteiros, pelo menos 1).",
+    "nadaSelecionado": "Nenhum objeto selecionado.",
+    "selecionados": "{n} objeto(s) selecionado(s).",
+    "apagados": "{n} objeto(s) apagado(s).",
+    "alterados": "{n} objeto(s) alterado(s).",
+    "copiados": "{n} cópia(s) criada(s).",
+    "destinoInvalido": "Ponto inválido para este comando.",
+    "espelhoInvalido": "Os dois pontos da linha de espelho são iguais.",
+    "alvoCamada": "Clique num objeto da camada de destino:"
+  },
+  "aparar": {
+    "clique": "APARAR Clique no trecho a aparar (Enter termina):",
+    "semCorte": "Nada cruza este objeto: não há onde cortar.",
+    "naoSuporta": "Este tipo de objeto (ou polilinha com arco) ainda não pode ser aparado."
+  },
+  "concordancia": {
+    "primeira": "CONCORDÂNCIA Clique na primeira linha (raio atual {raio}; digite um número para mudar):",
+    "segunda": "Clique na segunda linha:",
+    "paralelas": "As duas linhas são paralelas.",
+    "raioGrande": "O raio não cabe nestas linhas.",
+    "soLinhas": "A concordância só funciona entre duas linhas retas diferentes.",
+    "raioNegativo": "O raio não pode ser negativo."
+  },
+  "retangulo": {
+    "primeiroCanto": "RETÂNGULO Primeiro canto:",
+    "outroCanto": "Canto oposto:",
+    "invalido": "O retângulo precisa de largura e altura."
+  },
+  "elipse": {
+    "centro": "ELIPSE Centro da elipse:",
+    "eixo": "Ponta do eixo maior:",
+    "outroEixo": "Distância do outro semi-eixo (digite ou clique):",
+    "invalida": "Os eixos da elipse não podem ser nulos."
+  },
+  "hachura": {
+    "pontoPadrao": "HACHURA Clique dentro de um contorno fechado (S = sólida, Enter termina):",
+    "pontoSolida": "HACHURA sólida Clique dentro de um contorno fechado (P = padrão, Enter termina):",
+    "semContorno": "Não há contorno fechado (círculo ou polilinha fechada) neste ponto."
+  },
+  "camadas": {
+    "titulo": "Gerenciador de propriedades de camadas",
+    "nova": "Nova camada (herda as propriedades da selecionada)",
+    "excluir": "Excluir camada (só as vazias)",
+    "tornarAtual": "Tornar atual",
+    "fechar": "Fechar",
+    "atual": "Camada atual: {nome}",
+    "buscar": "Pesquisar camada",
+    "filtros": "Filtros",
+    "filtroTodas": "Todas",
+    "filtroUsadas": "Todas as usadas",
+    "colunas": {
+      "status": "Status",
+      "nome": "Nome",
+      "ligada": "Ativada",
+      "congelada": "Congelar",
+      "bloqueada": "Bloquear",
+      "plotar": "Plotar",
+      "cor": "Cor",
+      "tipoLinha": "Tipo de linha",
+      "espessura": "Espessura de linha",
+      "transparencia": "Transp."
+    },
+    "padrao": "Padrão",
+    "contagem": "Todos: {exibidas} camadas exibidas de {totais} camadas totais",
+    "contagemFiltrada": "Filtro: {exibidas} camadas exibidas de {totais} camadas totais",
+    "dicaAtual": "Camada atual",
+    "dicaUsada": "Camada com objetos",
+    "dicaVazia": "Camada sem objetos",
+    "dicaNome": "Duplo clique para renomear",
+    "dicaCor": "Clique para escolher a cor",
+    "ligada": "Ativada: as camadas desativadas não aparecem",
+    "congelada": "Congelada: some do desenho",
+    "bloqueada": "Bloqueada: aparece, mas não se escolhe nem se edita",
+    "plotar": "Plotar (guardado; ainda não há impressão)",
+    "tipos": {
+      "CONTINUOUS": "Contínua",
+      "DASHED": "Tracejada",
+      "HIDDEN": "Oculta",
+      "CENTER": "Eixo",
+      "DOT": "Pontilhada",
+      "PHANTOM": "Fantasma"
+    },
+    "erro": {
+      "nomeVazio": "O nome da camada não pode ficar vazio.",
+      "nomeInvalido": "O nome tem caractere que não vale (< > / \\ \" : ; ? * | = , `).",
+      "nomeRepetido": "Já existe uma camada com esse nome.",
+      "camadaZero": "A camada 0 não se renomeia nem se exclui.",
+      "camadaAtual": "A camada atual não se congela nem se exclui.",
+      "emUso": "Só se excluem camadas sem objetos.",
+      "semCamada": "Essa camada não existe mais."
+    },
+    "combinada": "Camada atual e suas chaves rápidas"
+  },
+  "propriedades": {
+    "titulo": "Propriedades",
+    "nenhum": "Nenhuma seleção",
+    "objetos": "{n} objeto(s) selecionado(s)",
+    "geral": "Geral",
+    "camada": "Camada",
+    "cor": "Cor",
+    "tipoLinha": "Tipo de linha",
+    "espessura": "Espessura de linha",
+    "porCamada": "PorCamada",
+    "variado": "*VARIADO*",
+    "fechar": "Fechar",
+    "semCamada": "Não existe essa camada.",
+    "corInvalida": "Cor inválida: use #rrggbb ou PorCamada.",
+    "tipoInvalido": "Tipo de linha inválido.",
+    "espessuraInvalida": "Espessura inválida (0 a 2,11 mm).",
+    "dica": "Propriedades dos objetos selecionados (Ctrl+1)",
+    "cores": {
+      "vermelho": "Vermelho",
+      "amarelo": "Amarelo",
+      "verde": "Verde",
+      "ciano": "Ciano",
+      "azul": "Azul",
+      "magenta": "Magenta",
+      "branco": "Branco",
+      "personalizada": "Personalizada…"
+    }
+  },
+  "texto": {
+    "ponto": "TEXTO Especifique o ponto de inserção:",
+    "altura": "Altura do texto (digite, clique a distância, ou Enter para a padrão):",
+    "conteudo": "Digite o texto (Enter vazio cancela):",
+    "alturaInvalida": "A altura precisa ser um número maior que zero."
+  },
+  "cota": {
+    "primeiro": "COTA Primeiro ponto a medir:",
+    "segundo": "Segundo ponto a medir:",
+    "posicao": "Posição da linha de cota (acima/abaixo = horizontal; ao lado = vertical):",
+    "nula": "A medida é zero nessa direção: escolha outro ponto."
+  },
+  "chamada": {
+    "ponta": "CHAMADA Ponta da seta:",
+    "pouso": "Ponto onde a linha termina (o texto fica ao lado):",
+    "texto": "Digite o texto da chamada (Enter sem texto deixa só a linha):"
+  },
+  "tabela": {
+    "ponto": "TABELA Canto superior esquerdo:",
+    "dados": "Digite: linhas colunas [altura-da-linha largura-da-coluna] (ex.: 3 4):",
+    "invalida": "Tabela inválida: linhas e colunas inteiros (1 a 500) e tamanhos positivos."
+  },
+  "medir": {
+    "primeiro": "MEDIR Primeiro ponto (A = área):",
+    "segundo": "Segundo ponto:",
+    "areaPonto": "Próximo canto da área (Enter fecha e mede; D = distância):",
+    "distancia": "Distância = {distancia}, ângulo = {angulo}°, ΔX = {dx}, ΔY = {dy}",
+    "area": "Área = {area}, perímetro = {perimetro}",
+    "poucosPontos": "A área precisa de pelo menos 3 pontos.",
+    "demais": "Pontos demais para uma área."
+  },
+  "colar": {
+    "ponto": "COLAR Ponto de inserção (Enter termina):",
+    "vazia": "Não há nada copiado: use Copiar (Ctrl+C) primeiro.",
+    "feito": "{n} objeto(s) colado(s)."
+  },
+  "tornarAtual": {
+    "clique": "Clique num objeto da camada que vai ficar atual:",
+    "feito": "A camada atual é agora \"{nome}\"."
+  },
+  "igualar": {
+    "origem": "IGUALAR PROPRIEDADES Clique no objeto de origem:",
+    "destino": "Clique nos objetos de destino (Enter termina):"
+  },
+  "prancheta": {
+    "copiados": "{n} objeto(s) copiado(s).",
+    "recortados": "{n} objeto(s) recortado(s)."
+  },
+  "agrupar": {
+    "criado": "{n} objeto(s) agrupado(s): clicar em um seleciona o grupo.",
+    "desfeito": "Grupo desfeito ({n} objetos)."
+  },
+  "bloco": {
+    "nome": "Digite o nome do bloco:",
+    "criado": "Bloco \"{nome}\" criado.",
+    "erro": {
+      "nomeVazio": "O nome do bloco não pode ficar vazio.",
+      "nomeInvalido": "Nome de bloco inválido (sem < > / \\ \" : ; ? * | = , ` e sem começar por *).",
+      "nomeRepetido": "Já existe um bloco com esse nome.",
+      "semObjetos": "Não há objetos livres selecionados."
+    }
+  },
+  "config": {
+    "titulo": "Configurações",
+    "fechar": "Fechar",
+    "abrir": "Configurações (Ctrl+,)",
+    "secoes": {
+      "aparencia": "Aparência",
+      "desenho": "Desenho",
+      "salvamento": "Salvamento",
+      "idioma": "Idioma",
+      "apelidos": "Apelidos de comando",
+      "mcp": "MCP (IA)",
+      "sobre": "Sobre"
+    },
+    "tema": {
+      "rotulo": "Tema",
+      "dica": "Automático acompanha o sistema.",
+      "auto": "Automático",
+      "claro": "Claro",
+      "escuro": "Escuro"
+    },
+    "destaque": {
+      "rotulo": "Cor de destaque",
+      "dica": "Seleção, botões ligados e foco."
+    },
+    "cores": {
+      "azul": "Azul",
+      "verde": "Verde",
+      "roxo": "Roxo",
+      "laranja": "Laranja",
+      "rosa": "Rosa",
+      "grafite": "Grafite"
+    },
+    "fonte": {
+      "rotulo": "Letra da interface",
+      "dica": "Menus, painéis e linha de comando.",
+      "sans": "Sem serifa",
+      "serif": "Com serifa",
+      "mono": "Monoespaçada"
+    },
+    "corpo": {
+      "rotulo": "Corpo da letra",
+      "dica": "Tamanho padrão, em pixels."
+    },
+    "fundo": {
+      "rotulo": "Fundo do desenho",
+      "dica": "O que aparece atrás dos objetos.",
+      "nada": "Nada",
+      "pontos": "Pontos",
+      "grade": "Grade"
+    },
+    "desenho": {
+      "snap": {
+        "rotulo": "Snap (F9)",
+        "dica": "O cursor salta de passo em passo pela grade."
+      },
+      "orto": {
+        "rotulo": "Orto (F8)",
+        "dica": "Trava o traçado na horizontal e na vertical."
+      },
+      "osnap": {
+        "rotulo": "Snap ao objeto (F3)",
+        "dica": "O cursor gruda em extremos, meios e centros dos objetos."
+      }
+    },
+    "salvamento": {
+      "rotulo": "Salvar",
+      "aberto": "Arquivo aberto: {nome}",
+      "nenhum": "Nenhum desenho aberto.",
+      "agora": "Salvar agora",
+      "como": "Salvar como…",
+      "formato": {
+        "rotulo": "Formato do arquivo novo",
+        "dica": ".dxf abre em qualquer CAD; .fcdz é o formato próprio, que guarda tudo."
+      },
+      "nota": "O FeatherCAD não tem conta nem nuvem: o arquivo fica onde você salvar, na sua máquina."
+    },
+    "idioma": {
+      "rotulo": "Idioma e regionalização",
+      "dica": "Decimal \"{decimal}\", separador de coordenadas \"{separador}\", {casas} casas.",
+      "nota": "A interface recarrega ao trocar o idioma; salve o desenho antes."
+    },
+    "apelidos": {
+      "rotulo": "Apelidos digitados",
+      "dica": "Acrescente as abreviações que você quer usar na linha de comando, separadas por vírgula.",
+      "restaurar": "Restaurar padrões",
+      "exemplo": "ex.: G",
+      "padrao": "Já existentes: {lista}",
+      "conflito": "{apelido} já é de {comando}."
+    },
+    "sobre": {
+      "texto": "FeatherCAD — CAD 2D da suíte FeatherOffice. Tudo roda na sua máquina: nenhum dado do desenho sai daqui.",
+      "monitor": "Monitor (F12)",
+      "monitorDica": "Memória, console e métricas do aplicativo, numa janela à parte.",
+      "abrirMonitor": "Abrir Monitor"
+    },
+    "cota": {
+      "rotulo": "Tamanho da cota",
+      "dica": "Altura do texto da cota, em {unidade}; a seta acompanha. Vazio = automático (proporcional ao desenho).",
+      "automatico": "Automático"
+    },
+    "orto": {
+      "rotulo": "Ângulo do Orto",
+      "dica": "O Orto trava o traçado nos múltiplos deste ângulo, a partir do ponto anterior: 90° = só horizontal e vertical; 45° = também as diagonais; 60°, 30° e 15° travam nesses passos. Vale também ao arrastar e ao mover.",
+      "outro": "Outro ângulo"
+    },
+    "mcp": {
+      "texto": "O MCP deixa uma IA (o Claude Code, por exemplo) enxergar, medir e desenhar neste programa: ela recebe uma imagem do desenho com coordenadas, medidas exatas e o desenho em texto compacto. O servidor é um programa à parte, aberto pelo cliente de IA; o FeatherCAD não abre nenhuma porta de rede.",
+      "programa": "Programa do MCP",
+      "estadoOk": "encontrado",
+      "estadoFalta": "não encontrado",
+      "encontrado": "Pronto para usar. O botão testa se ele responde.",
+      "naoEncontrado": "Ainda não foi compilado. Rode `npm run mcp:build` dentro da pasta feathercad (o comando abaixo já usa o caminho esperado).",
+      "semApp": "Esta janela é o navegador: o caminho abaixo é só um modelo. Troque pelo do programa `feathercad-mcp`.",
+      "caminhoGenerico": "<caminho>/feathercad-mcp",
+      "claude": "Claude Code",
+      "claudeDica": "Cole no terminal para registrar o servidor.",
+      "outros": "Outros clientes (JSON)",
+      "outrosDica": "Para clientes que leem um arquivo de configuração `mcpServers` (Claude Desktop, Cursor…).",
+      "copiar": "Copiar",
+      "copiado": "Copiado ✓",
+      "testar": "Testar",
+      "testando": "Testando…",
+      "testeOk": "Funcionando: o programa respondeu e listou {n} ferramentas.",
+      "testeErro": "Não funcionou: {motivo}",
+      "ferramentas": "O que a IA pode fazer",
+      "ferramentasLista": "Ver (imagem com coordenadas), listar e medir entidades, achar áreas fechadas, verificar folgas, criar e editar formas, camadas, hachura, desfazer, e ler/escrever o desenho em texto compacto (.fct) gastando poucos tokens.",
+      "privacidade": "Tudo roda nesta máquina. O servidor só abre e grava arquivos .dxf, .fcdz e .fct, e não sobrescreve arquivo existente sem a IA pedir explicitamente."
+    }
+  },
+  "exportar": {
+    "titulo": "Exportar PDF",
+    "corpo": "Escolha o papel, a orientação e quais folhas entram no PDF. Cada folha vira uma página.",
+    "papel": "Papel",
+    "orientacao": "Orientação",
+    "orientacoes": { "automatica": "Automática", "horizontal": "Horizontal", "vertical": "Vertical" },
+    "folhas": "Folhas",
+    "todas": "Todas",
+    "nenhuma": "Nenhuma",
+    "folha": "Folha {n}",
+    "semFolhas": "O desenho não tem folhas (retângulos fechados na camada FOLHA): sai uma página com o desenho inteiro.",
+    "cores": "Manter as cores da tela (senão sai em preto sobre branco)",
+    "exportar": "Exportar",
+    "cancelar": "Cancelar"
+  },
+  "unidade": {
+    "titulo": "Unidade do desenho",
+    "corpo": "Em que unidade este desenho vai ser trabalhado? Fica gravada no arquivo, e o .dxf leva a informação para outros programas de CAD.",
+    "nomes": {
+      "mm": "milímetros",
+      "cm": "centímetros",
+      "m": "metros"
+    },
+    "cancelar": "Cancelar",
+    "rotulo": "Unidade do desenho",
+    "dica": "Só muda o que os números significam; os objetos não são redimensionados.",
+    "semUnidade": "Este arquivo não dizia a unidade. Escolha a que ele usa.",
+    "dicaRodape": "Unidade do desenho: {nome}",
+    "uso": {
+      "mm": "Peças, mecânica, detalhes pequenos",
+      "cm": "Marcenaria, móveis, interiores",
+      "m": "Plantas, terrenos, obras grandes"
+    },
+    "regua": {
+      "mm": "10 mm",
+      "cm": "10 cm",
+      "m": "1 m"
+    },
+    "trocarDepois": "Dá para mudar depois em Configurações. Teclas: 1, 2, 3 · Esc cancela."
+  },
+  "menu": {
+    "repetir": "Repetir {nome}",
+    "item": {
+      "enter": "Enter",
+      "cancelar": "Cancelar",
+      "fechar": "Fechar",
+      "mover": "Mover",
+      "copiar": "Copiar",
+      "girar": "Girar",
+      "escala": "Escala",
+      "espelhar": "Espelhar",
+      "esticar": "Esticar",
+      "matriz": "Matriz",
+      "recortar": "Recortar",
+      "copiar_area": "Copiar para a prancheta",
+      "colar": "Colar",
+      "criar_bloco": "Criar bloco",
+      "agrupar": "Agrupar",
+      "apagar": "Apagar",
+      "desfazer": "Desfazer",
+      "refazer": "Refazer",
+      "propriedades": "Propriedades",
+      "zoom_ajustar": "Ajustar zoom ao desenho",
+      "configuracoes": "Configurações…",
+      "snap": "Snap",
+      "orto": "Orto",
+      "osnap": "Snap ao objeto",
+      "grade": "Grade",
+      "linha": "Linha",
+      "polilinha": "Polilinha",
+      "circulo": "Círculo",
+      "arco": "Arco",
+      "inserir": "Inserir bloco",
+      "aparar": "Aparar",
+      "concordancia": "Concordância",
+      "retangulo": "Retângulo",
+      "elipse": "Elipse",
+      "hachura": "Hachura",
+      "texto": "Texto",
+      "cota": "Cota",
+      "chamada": "Chamada",
+      "tabela": "Tabela",
+      "medir": "Medir",
+      "tornar_atual": "Tornar camada atual",
+      "igualar_propriedades": "Igualar propriedades",
+      "igualar_camada": "Igualar camada"
+    }
+  }
+}

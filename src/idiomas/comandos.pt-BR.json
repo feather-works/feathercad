@@ -1,0 +1,157 @@
+{
+  "comandos": {
+    "linha": [
+      "LINHA",
+      "L"
+    ],
+    "polilinha": [
+      "PLINHA",
+      "PL"
+    ],
+    "circulo": [
+      "CIRCULO",
+      "C"
+    ],
+    "arco": [
+      "ARCO",
+      "A"
+    ],
+    "inserir": [
+      "INSERIR",
+      "I"
+    ],
+    "desfazer": [
+      "DESFAZER",
+      "U"
+    ],
+    "refazer": [
+      "REFAZER"
+    ],
+    "apagar": [
+      "APAGAR",
+      "AP"
+    ],
+    "mover": [
+      "MOVER",
+      "M",
+      "GRAB"
+    ],
+    "copiar": [
+      "COPIAR",
+      "CO",
+      "CP"
+    ],
+    "girar": [
+      "GIRAR",
+      "GI"
+    ],
+    "escala": [
+      "ESCALA",
+      "ESC"
+    ],
+    "espelhar": [
+      "ESPELHAR",
+      "ES"
+    ],
+    "esticar": [
+      "ESTICAR",
+      "ET"
+    ],
+    "matriz": [
+      "MATRIZ",
+      "MZ"
+    ],
+    "aparar": [
+      "APARAR",
+      "PA"
+    ],
+    "concordancia": [
+      "CONCORDANCIA",
+      "CONC"
+    ],
+    "retangulo": [
+      "RETANGULO",
+      "RET"
+    ],
+    "elipse": [
+      "ELIPSE",
+      "EL"
+    ],
+    "hachura": [
+      "HACHURA",
+      "H"
+    ],
+    "texto": [
+      "TEXTO",
+      "TX"
+    ],
+    "cota": [
+      "COTA",
+      "COT"
+    ],
+    "chamada": [
+      "CHAMADA",
+      "CH"
+    ],
+    "tabela": [
+      "TABELA",
+      "TAB"
+    ],
+    "medir": [
+      "MEDIR",
+      "MD"
+    ],
+    "colar": [
+      "COLAR",
+      "CL"
+    ],
+    "tornar_atual": [
+      "TORNARATUAL",
+      "TA"
+    ],
+    "igualar_propriedades": [
+      "IGUALARPROP",
+      "IP"
+    ],
+    "copiar_area": [
+      "COPIARAREA"
+    ],
+    "recortar": [
+      "RECORTAR"
+    ],
+    "igualar_camada": [
+      "IGUALARCAMADA",
+      "IC"
+    ],
+    "criar_bloco": [
+      "CRIARBLOCO",
+      "BL"
+    ],
+    "agrupar": [
+      "AGRUPAR",
+      "AG"
+    ]
+  },
+  "opcoes": {
+    "fechar": [
+      "FECHAR",
+      "F"
+    ],
+    "solida": [
+      "SOLIDA",
+      "S"
+    ],
+    "padrao": [
+      "PADRAO",
+      "P"
+    ],
+    "area": [
+      "AREA",
+      "A"
+    ],
+    "distancia": [
+      "DISTANCIA",
+      "D"
+    ]
+  }
+}

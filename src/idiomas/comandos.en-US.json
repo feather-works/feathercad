@@ -1,0 +1,155 @@
+{
+  "comandos": {
+    "linha": [
+      "LINE",
+      "L"
+    ],
+    "polilinha": [
+      "PLINE",
+      "PL"
+    ],
+    "circulo": [
+      "CIRCLE",
+      "C"
+    ],
+    "arco": [
+      "ARC",
+      "A"
+    ],
+    "inserir": [
+      "INSERT",
+      "I"
+    ],
+    "desfazer": [
+      "UNDO",
+      "U"
+    ],
+    "refazer": [
+      "REDO"
+    ],
+    "apagar": [
+      "ERASE",
+      "E"
+    ],
+    "mover": [
+      "MOVE",
+      "M",
+      "GRAB"
+    ],
+    "copiar": [
+      "COPY",
+      "CO",
+      "CP"
+    ],
+    "girar": [
+      "ROTATE",
+      "RO"
+    ],
+    "escala": [
+      "SCALE",
+      "SC"
+    ],
+    "espelhar": [
+      "MIRROR",
+      "MI"
+    ],
+    "esticar": [
+      "STRETCH",
+      "S"
+    ],
+    "matriz": [
+      "ARRAY",
+      "AR"
+    ],
+    "aparar": [
+      "TRIM",
+      "TR"
+    ],
+    "concordancia": [
+      "FILLET",
+      "F"
+    ],
+    "retangulo": [
+      "RECTANGLE",
+      "REC"
+    ],
+    "elipse": [
+      "ELLIPSE",
+      "EL"
+    ],
+    "hachura": [
+      "HATCH",
+      "H"
+    ],
+    "texto": [
+      "TEXT",
+      "DT"
+    ],
+    "cota": [
+      "DIMLINEAR",
+      "DLI"
+    ],
+    "chamada": [
+      "LEADER",
+      "LE"
+    ],
+    "tabela": [
+      "TABLE",
+      "TB"
+    ],
+    "medir": [
+      "MEASUREGEOM",
+      "MEA"
+    ],
+    "colar": [
+      "PASTE",
+      "PASTECLIP"
+    ],
+    "tornar_atual": [
+      "LAYMCUR"
+    ],
+    "igualar_propriedades": [
+      "MATCHPROP",
+      "MA"
+    ],
+    "copiar_area": [
+      "COPYCLIP"
+    ],
+    "recortar": [
+      "CUTCLIP"
+    ],
+    "igualar_camada": [
+      "LAYMCH"
+    ],
+    "criar_bloco": [
+      "BLOCK",
+      "B"
+    ],
+    "agrupar": [
+      "GROUP",
+      "G"
+    ]
+  },
+  "opcoes": {
+    "fechar": [
+      "CLOSE",
+      "C"
+    ],
+    "solida": [
+      "SOLID",
+      "S"
+    ],
+    "padrao": [
+      "PATTERN",
+      "P"
+    ],
+    "area": [
+      "AREA",
+      "A"
+    ],
+    "distancia": [
+      "DISTANCE",
+      "D"
+    ]
+  }
+}
