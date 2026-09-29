@@ -69,7 +69,11 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
     else void inicio.atualizar();
   };
 
-  const falhou = (chave: 'abrir' | 'salvar' | 'exportar', e: unknown): void => avisar(texto(`erro.${chave}`, { motivo: e instanceof Error ? e.message : String(e) }));
+  const falhou = (chave: 'abrir' | 'salvar' | 'exportar', e: unknown): void => {
+    const motivo = e instanceof Error ? e.message : String(e);
+    console.error(`[erro] ${chave}: ${motivo}`); // o console leva o erro ao Monitor
+    avisar(texto(`erro.${chave}`, { motivo }));
+  };
 
   /** Salva (ou "salvar como"). `true` se gravou; `false` se cancelou ou deu erro. */
   async function salvar(como: boolean): Promise<boolean> {
