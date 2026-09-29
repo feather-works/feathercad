@@ -279,3 +279,72 @@ def detalhe_disjuntores(d, x, y):
         a, b = saida.split("|")
         d.T(px + larg / 2 - len(a) * 3.2, y + 34 + 16, 8, a, AMARELO)
         d.T(px + larg / 2 - len(b) * 3.2, y + 34 + 5, 8, b, AMARELO)
+
+
+# ---------------------------------------------------------------------------------------------------------------- transformador
+# Transformador de distribuição a óleo (13,8 kV / 380-220 V), em TAMANHO REAL (mm), vistas de CORTE/elevação para cabines e
+# subestações. `d` é qualquer objeto com L/R/C/T (Desenho, ou o Pg do gerar_subestacao); (x, y) é o canto inferior esquerdo da
+# peça e `k` a ampliação (0,05 = 1:20 em mm de papel). Medidas de um 300 kVA: 1500 x 1000 x 1550 mm (com radiadores e sobre trilhos).
+# Versão 0 (29/09/2026) — vai ser melhorada: falta conservador, comutador, válvula de alívio, olhais e variações por kVA.
+MT_COR, BT_COR = "#D02020", "#1F6FD0"
+
+
+def bucha_mt(d, x, y, k=1.0, cor=MT_COR):
+    """Isolador passante de MT 15 kV: base, quatro saias e terminal. (x, y) = centro da base."""
+    d.R(x - 18 * k, y, 36 * k, 24 * k, cor)
+    for i in range(4):
+        yy, w = y + 24 * k + i * 32 * k, (64 - i * 6) * k
+        d.L(x - w, yy, x + w, yy, cor); d.L(x - w, yy, x - w + 10 * k, yy + 26 * k, cor); d.L(x + w, yy, x + w - 10 * k, yy + 26 * k, cor)
+    d.R(x - 18 * k, y + 152 * k, 36 * k, 40 * k, cor)
+    d.C(x, y + 192 * k, 18 * k, cor)
+
+
+def bucha_bt(d, x, y, k=1.0, cor=BT_COR):
+    d.R(x - 18 * k, y, 36 * k, 68 * k, cor)
+    d.C(x, y + 68 * k, 18 * k, cor)
+
+
+def _corpo_do_transformador(d, x, y, k, cor, largura_tanque=1100.0):
+    """Trilho, rodas, tanque, tampa e radiadores (vista lateral: 1500 mm de largura total)."""
+    d.R(x, y, 1500 * k, 120 * k, cor)                                          # base/trilho
+    for cx in (200, 1300):
+        d.C(x + cx * k, y + 120 * k + 40 * k, 40 * k, cor)                      # rodas
+    d.R(x + 200 * k, y + 150 * k, largura_tanque * k, 1300 * k, cor)            # tanque
+    d.R(x + 170 * k, y + 1450 * k, (largura_tanque + 60) * k, 100 * k, cor)     # tampa/flange
+    for x0 in (0, 1300):                                                        # radiadores (2 aletas de 4 tubos)
+        d.R(x + x0 * k, y + 280 * k, 200 * k, 1050 * k, cor)
+        for j in range(1, 4):
+            d.L(x + (x0 + j * 50) * k, y + 280 * k, x + (x0 + j * 50) * k, y + 1330 * k, cor)
+
+
+def transformador_lateral(d, x, y, k=1.0, kva=300, mt=MT_COR, bt=BT_COR, texto=True):
+    """Transformador em elevação lateral: tanque, radiadores, 3 buchas MT, 4 buchas BT (3 fases + neutro), placa e termômetro."""
+    _corpo_do_transformador(d, x, y, k, mt)
+    d.R(x + 430 * k, y + 550 * k, 550 * k, 300 * k, mt)                          # placa de identificação
+    d.C(x + 1200 * k, y + 1250 * k, 36 * k, mt)                                  # termômetro
+    for cx in (330, 630, 930):
+        bucha_mt(d, x + cx * k, y + 1550 * k, k, mt)
+    for cx in (1070, 1150, 1230, 1310):
+        bucha_bt(d, x + cx * k, y + 1550 * k, k, bt)
+    if texto:
+        d.T(x + 450 * k, y + 700 * k, 40 * k, f"{kva} kVA", mt)
+        d.T(x + 1160 * k, y + 1236 * k, 28 * k, "26", mt)
+
+
+def transformador_frontal(d, x, y, k=1.0, kva=300, mt=MT_COR, bt=BT_COR, texto=True):
+    """Transformador em elevação frontal/corte transversal: tanque, buchas e placa (radiadores ficam de lado, fora desta vista)."""
+    d.R(x, y, 1500 * k, 120 * k, mt)
+    for cx in (200, 1300):
+        d.C(x + cx * k, y + 120 * k + 40 * k, 40 * k, mt)
+    d.R(x + 200 * k, y + 150 * k, 1100 * k, 1300 * k, mt)
+    d.R(x + 170 * k, y + 1450 * k, 1160 * k, 100 * k, mt)
+    d.R(x + 430 * k, y + 550 * k, 640 * k, 300 * k, mt)
+    d.C(x + 750 * k, y + 1250 * k, 36 * k, mt)
+    for cx in (500, 750, 1000):
+        bucha_mt(d, x + cx * k, y + 1550 * k, k, mt)
+    bucha_bt(d, x + 1150 * k, y + 1550 * k, k, bt); bucha_bt(d, x + 1230 * k, y + 1550 * k, k, bt)
+    if texto:
+        d.T(x + 470 * k, y + 700 * k, 40 * k, f"{kva} kVA", mt)
+        d.T(x + 470 * k, y + 1000 * k, 32 * k, "Dyn1  13,8 kV / 380-220 V", mt)
+        d.T(x + 715 * k, y + 1236 * k, 28 * k, "26", mt)
+
