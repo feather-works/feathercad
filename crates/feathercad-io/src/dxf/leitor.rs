@@ -584,10 +584,11 @@ fn hachura(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
             let angulo = r.pegar(53)?;
             let base = r.ponto(43, 44)?;
             let (dx, dy) = (r.pegar(45)?, r.pegar(46)?);
+            let mut tracos = Vec::new();
             for _ in 0..r.pegar(79)? as usize {
-                r.pegar(49);
+                tracos.extend(r.pegar(49));
             }
-            padrao.push(LinhaDePadrao { angulo, base, dx, dy });
+            padrao.push(LinhaDePadrao { angulo, base, dx, dy, tracos });
         }
     }
     Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Hachura { contornos, padrao, nome }, props: props_da(o) })

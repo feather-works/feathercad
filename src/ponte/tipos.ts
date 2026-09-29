@@ -8,7 +8,7 @@ export interface Ponto {
 /** A janela por onde se olha o desenho. Toda conta sobre ela é do Rust. */
 /** O que o diálogo de exportação pede ao motor (o Rust valida e monta o PDF). */
 export interface OpcoesPdf {
-  papel: 'A4' | 'A3' | 'A2' | 'A1' | 'A0' | 'FOLHA';
+  papel: 'A4' | 'A3' | 'A2' | 'A1' | 'A0' | '2A0' | '4A0' | '8A0' | '16A0' | 'FOLHA';
   orientacao: 'automatica' | 'horizontal' | 'vertical';
   /** `true` mantém as cores da tela; `false` é o modo papel (preto sobre branco). */
   cores: boolean;
@@ -250,3 +250,59 @@ export interface MarcasDoFundo {
 export type Quadro =
   | { tipo: 'igual' }
   | { tipo: 'novo'; versao: number; xs: Float32Array; cores: Uint32Array; espessuras: Float32Array; textos: TextoDoQuadro[]; preenchimentos: Preenchimento[]; fundoX: MarcasDoFundo; fundoY: MarcasDoFundo };
+
+/** Uma folha (prancheta) do desenho, como o motor a descreve. */
+export interface InfoFolha {
+  indice: number;
+  id: number;
+  nome: string;
+  papel: string;
+  largura_mm: number;
+  altura_mm: number;
+  /** O denominador (100 = 1:100). */
+  escala: number;
+  escala_texto: string;
+  min: { x: number; y: number };
+  max: { x: number; y: number };
+}
+
+/** As folhas do desenho, os papéis e as escalas que o motor oferece (com o texto de cada uma). */
+export interface FolhasDoMotor {
+  folhas: InfoFolha[];
+  papeis: string[];
+  escalas: Array<[number, string]>;
+}
+
+export interface CamposFolha {
+  cliente: string;
+  fase: string;
+  disciplina: string;
+  titulo: string;
+  subtitulo: string;
+  numero: string;
+  revisao: string;
+  /** O número da folha no carimbo; vazio = a ordem em que foi criada. */
+  folha: string;
+  /** A linha no meio da folha (duas vistas). */
+  divisoria: boolean;
+}
+
+export interface PedidoFolhaNova {
+  papel: string;
+  /** Nada = a menor escala em que o desenho cabe. */
+  escala?: number;
+  campos: CamposFolha;
+}
+
+export interface RespostaFolha {
+  folha: InfoFolha;
+  estado: Estado;
+}
+
+/** Os padrões de hachura que o motor oferece e o que está escolhido (`SOLID` = sólida). */
+export interface OpcoesDeHachura {
+  padroes: string[];
+  atual: string;
+  escala: number;
+  escalas: Array<[number, string]>;
+}

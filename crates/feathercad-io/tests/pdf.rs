@@ -150,3 +150,28 @@ fn miniatura_e_svg_com_tracos_e_desenho_vazio_nao_tem() {
     assert!(svg.starts_with("<svg") && svg.ends_with("</svg>") && svg.contains("<path"), "{svg}");
     assert!(feathercad_io::pdf::miniatura_svg(&Documento::default(), 320.0, 200.0).is_none());
 }
+
+#[test]
+fn papeis_acima_do_a0_cabem_no_limite_do_pdf() {
+    use feathercad_io::pdf::Papel;
+    for nome in ["2A0", "4A0", "8A0", "16A0"] {
+        let p = Papel::de_nome(nome).expect(nome);
+        assert!(p.altura_mm.max(p.largura_mm) / 25.4 * 72.0 <= 14400.0, "{nome} passa dos 200 pol. do PDF");
+    }
+    let pdf = exportar_folhas(&com_folhas(1), &Opcoes { papel: Papel::A4A0, ..Opcoes::default() }).unwrap();
+    assert!(contem(&pdf, b"MediaBox [0 0 6740.7"), "4A0 deitado = 2378 x 1682 mm (6741 x 4768 pt)");
+}
+
+#[test]
+fn folha_inserida_pelo_motor_vira_uma_pagina_do_papel_certo() {
+    use feathercad_core::folha::Campos;
+    use feathercad_io::pdf::Papel;
+    let mut doc = Documento::default().com_unidade(Some(Unidade::Metro));
+    doc.adicionar_linha(Ponto::novo(0.0, 0.0), Ponto::novo(300.0, 100.0));
+    doc.folha_inserir("A1", Some(500.0), &Campos::default()).unwrap();
+    doc.folha_inserir("A1", Some(1000.0), &Campos::default()).unwrap();
+    let pdf = exportar_folhas(&doc, &Opcoes { papel: Papel::A1, ..Opcoes::default() }).unwrap();
+    let texto = String::from_utf8_lossy(&pdf);
+    assert_eq!(texto.matches("/Type /Page ").count(), 2, "uma página por folha inserida");
+    assert!(contem(&pdf, b"MediaBox [0 0 2383.937 1683.78]"), "A1 deitada");
+}

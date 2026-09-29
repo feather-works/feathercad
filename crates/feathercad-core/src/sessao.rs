@@ -103,6 +103,8 @@ pub enum Ferramenta {
     Colar,
     /// Tornar atual a camada do objeto clicado.
     TornarAtual,
+    /// Contar iguais: cada clique num objeto seleciona todos os iguais a ele e diz quantos são.
+    Contar,
     /// Igualar propriedades: primeiro o objeto de origem, depois os de destino.
     IgualarPropriedades { origem: Option<Id> },
 }
@@ -128,6 +130,7 @@ impl Ferramenta {
             Ferramenta::Chamada { .. } => "chamada",
             Ferramenta::Tabela { .. } => "tabela",
             Ferramenta::Medir { .. } => "medir",
+            Ferramenta::Contar => "contar",
             Ferramenta::Colar => "colar",
             Ferramenta::TornarAtual => "tornar_atual",
             Ferramenta::IgualarPropriedades { .. } => "igualar_propriedades",
@@ -158,6 +161,9 @@ pub struct Sessao {
     pub(crate) raio_concordancia: f64,
     /// Hachura sólida (senão, linhas a 45°).
     pub(crate) hachura_solida: bool,
+    /// O padrão da biblioteca (`padroes::NOMES`) e a escala dele para a próxima hachura (a sólida vale `hachura_solida`).
+    pub(crate) hachura_padrao: String,
+    pub(crate) hachura_escala: f64,
     /// O que se copiou ou recortou (a área de transferência do aplicativo; nada vai para o sistema).
     pub(crate) prancheta: Option<Prancheta>,
     /// A altura do último texto (`None` = 1/150 da diagonal do desenho).
@@ -205,6 +211,8 @@ impl Default for Sessao {
             ultima_janela: None,
             raio_concordancia: 0.0,
             hachura_solida: false,
+            hachura_padrao: crate::padroes::PADRAO_DE_FABRICA.to_string(),
+            hachura_escala: 1.0,
             prancheta: None,
             altura_texto: None,
             altura_cota: None,
@@ -315,6 +323,25 @@ impl Sessao {
     }
 
     /// Escreve uma mensagem no histórico da linha de comando.
+    /// Escolhe o padrão de hachura (`SOLID` ou um de `padroes::NOMES`) e a escala dele. Erro se o nome não existe.
+    pub fn definir_hachura(&mut self, nome: &str, escala: f64) -> Result<(), String> {
+        let canonico = crate::padroes::reconhecer(nome).ok_or_else(|| format!("padrão de hachura `{nome}` não existe"))?;
+        if !(escala.is_finite() && escala > 0.0 && escala <= 100.0) {
+            return Err(format!("escala de hachura inválida: {escala}"));
+        }
+        self.hachura_solida = canonico == crate::padroes::SOLIDA;
+        if !self.hachura_solida {
+            self.hachura_padrao = canonico.to_string();
+        }
+        self.hachura_escala = escala;
+        Ok(())
+    }
+
+    /// O padrão escolhido (`SOLID` se a sólida) e a escala.
+    pub fn hachura_escolhida(&self) -> (&str, f64) {
+        (if self.hachura_solida { crate::padroes::SOLIDA } else { &self.hachura_padrao }, self.hachura_escala)
+    }
+
     pub fn dizer(&mut self, m: Mensagem) {
         self.registrar(Entrada::Mensagem(m));
     }

@@ -34,7 +34,7 @@ const ALCANCE_OSNAP_PX: f64 = 12.0;
 const ALCANCE_DA_ESCOLHA_PX: f64 = 6.0;
 
 /// Os nomes de comando que a ponte atende (o teste confere contra o TypeScript).
-pub const COMANDOS_DA_PONTE: [&str; 42] = [
+pub const COMANDOS_DA_PONTE: [&str; 51] = [
     "estado",
     "comandos",
     "comandos_da_ponte",
@@ -73,6 +73,15 @@ pub const COMANDOS_DA_PONTE: [&str; 42] = [
     "documento_gravar",
     "documento_exportar_pdf",
     "documento_folhas",
+    "folha_listar",
+    "folha_inserir",
+    "folha_escala",
+    "folha_ajustar",
+    "folha_campos",
+    "folha_campos_definir",
+    "hachura_opcoes",
+    "hachura_definir",
+    "hachura_previa",
     "documento_arquivo_definir",
     "documento_arquivo",
     "quadro",
@@ -116,6 +125,61 @@ struct Idioma {
 #[derive(Deserialize)]
 struct PedidoFormato {
     formato: String,
+}
+
+#[derive(Deserialize)]
+struct PedidoFolhaNova {
+    papel: String,
+    #[serde(default)]
+    escala: Option<f64>,
+    #[serde(default)]
+    campos: feathercad_core::folha::Campos,
+}
+
+#[derive(Deserialize)]
+struct PedidoFolhaEscala {
+    indice: usize,
+    escala: f64,
+}
+
+#[derive(Deserialize)]
+struct PedidoFolhaIndice {
+    indice: usize,
+}
+
+#[derive(Deserialize)]
+struct PedidoFolhaCampos {
+    indice: usize,
+    campos: feathercad_core::folha::Campos,
+}
+
+#[derive(Deserialize)]
+struct PedidoHachura {
+    padrao: String,
+    #[serde(default)]
+    escala: Option<f64>,
+}
+
+#[derive(Serialize)]
+struct OpcoesDeHachura {
+    padroes: Vec<String>,
+    atual: String,
+    escala: f64,
+    escalas: Vec<(f64, String)>,
+}
+
+#[derive(Serialize)]
+struct FolhasDaPonte {
+    folhas: Vec<feathercad_core::folha::InfoFolha>,
+    papeis: Vec<String>,
+    /// (denominador, texto) — `[100, "1:100"]`.
+    escalas: Vec<(f64, String)>,
+}
+
+#[derive(Serialize)]
+struct RespostaFolha {
+    folha: feathercad_core::folha::InfoFolha,
+    estado: serde_json::Value,
 }
 
 /// Exportar em PDF: o papel (`A4`, `A3`, `A2`, `A1`) e se as cores do desenho ficam como estão (`cores`).
@@ -430,6 +494,25 @@ impl Ponte {
             "documento_gravar" => self.documento_gravar(corpo),
             "documento_exportar_pdf" => self.documento_exportar_pdf(corpo),
             "documento_folhas" => json(&feathercad_io::pdf::descrever_folhas(&self.doc)),
+            "folha_listar" => json(&self.folhas_da_ponte()),
+            "folha_inserir" => self.folha_inserir(corpo),
+            "folha_escala" => self.folha_escala(corpo),
+            "folha_ajustar" => self.folha_ajustar(corpo),
+            "folha_campos" => {
+                let p: PedidoFolhaIndice = ler("folha_campos", corpo)?;
+                json(&self.doc.folha_campos(p.indice)?)
+            }
+            "folha_campos_definir" => self.folha_campos_definir(corpo),
+            "hachura_opcoes" => json(&self.hachura_opcoes()),
+            "hachura_definir" => {
+                let p: PedidoHachura = ler("hachura_definir", corpo)?;
+                self.sessao.definir_hachura(&p.padrao, p.escala.unwrap_or_else(|| self.sessao.hachura_escolhida().1))?;
+                json(&self.hachura_opcoes())
+            }
+            "hachura_previa" => {
+                let p: PedidoHachura = ler("hachura_previa", corpo)?;
+                json(&feathercad_core::padroes::previa_svg(&p.padrao, p.escala.unwrap_or(1.0), 220.0, 120.0))
+            }
             "documento_arquivo_definir" => self.documento_arquivo_definir(corpo),
             "documento_arquivo" => json(&self.arquivo),
             "quadro" => self.quadro(corpo),
@@ -735,6 +818,51 @@ impl Ponte {
     }
 
     /// Troca a unidade do desenho já criado (conta como alteração).
+    /// As folhas inseridas e as escalas oferecidas, para o diálogo (o texto de cada escala vem daqui, não da interface).
+    fn folhas_da_ponte(&self) -> FolhasDaPonte {
+        FolhasDaPonte {
+            folhas: self.doc.folhas_inseridas(),
+            papeis: feathercad_core::folha::PAPEIS.iter().map(|(n, _, _)| (*n).to_string()).collect(),
+            escalas: feathercad_core::folha::ESCALAS.iter().map(|e| (*e, feathercad_core::folha::texto_da_escala(*e))).collect(),
+        }
+    }
+
+    /// Insere uma folha (`papel`, `escala` ou nada = a que cabe, campos do carimbo) e devolve o que mudou.
+    fn folha_inserir(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
+        let p: PedidoFolhaNova = ler("folha_inserir", corpo)?;
+        let folha = self.doc.folha_inserir(&p.papel, p.escala, &p.campos)?;
+        json(&RespostaFolha { folha, estado: serde_json::from_slice(&self.estado()?).map_err(|e| e.to_string())? })
+    }
+
+    fn folha_escala(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
+        let p: PedidoFolhaEscala = ler("folha_escala", corpo)?;
+        let folha = self.doc.folha_escala(p.indice, p.escala)?;
+        json(&RespostaFolha { folha, estado: serde_json::from_slice(&self.estado()?).map_err(|e| e.to_string())? })
+    }
+
+    /// A lista de padrões de hachura, o escolhido e as escalas oferecidas (o texto de cada um vem dos arquivos de língua).
+    fn hachura_opcoes(&self) -> OpcoesDeHachura {
+        let (atual, escala) = self.sessao.hachura_escolhida();
+        OpcoesDeHachura {
+            padroes: std::iter::once(feathercad_core::padroes::SOLIDA).chain(feathercad_core::padroes::NOMES).map(str::to_string).collect(),
+            atual: atual.to_string(),
+            escala,
+            escalas: feathercad_core::padroes::ESCALAS.iter().map(|(v, t)| (*v, (*t).to_string())).collect(),
+        }
+    }
+
+    fn folha_campos_definir(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
+        let p: PedidoFolhaCampos = ler("folha_campos_definir", corpo)?;
+        let folha = self.doc.folha_campos_definir(p.indice, &p.campos)?;
+        json(&RespostaFolha { folha, estado: serde_json::from_slice(&self.estado()?).map_err(|e| e.to_string())? })
+    }
+
+    fn folha_ajustar(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
+        let p: PedidoFolhaIndice = ler("folha_ajustar", corpo)?;
+        let folha = self.doc.folha_ajustar(p.indice)?;
+        json(&RespostaFolha { folha, estado: serde_json::from_slice(&self.estado()?).map_err(|e| e.to_string())? })
+    }
+
     fn documento_unidade_definir(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
         let p: PedidoUnidade = ler("documento_unidade_definir", corpo)?;
         let unidade = match p.unidade.as_deref() {
@@ -762,7 +890,7 @@ impl Ponte {
     /// O PDF do documento, uma página por folha (camada `FOLHA`; sem folhas, o desenho inteiro).
     fn documento_exportar_pdf(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
         let p: PedidoPdf = ler("documento_exportar_pdf", corpo)?;
-        let papel = feathercad_io::pdf::Papel::de_nome(&p.papel).ok_or_else(|| format!("papel `{}` não existe (A4, A3, A2, A1, A0 ou FOLHA)", p.papel))?;
+        let papel = feathercad_io::pdf::Papel::de_nome(&p.papel).ok_or_else(|| format!("papel `{}` não existe (A4, A3, A2, A1, A0, 2A0, 4A0, 8A0, 16A0 ou FOLHA)", p.papel))?;
         let orientacao = match &p.orientacao {
             Some(o) => feathercad_io::pdf::Orientacao::de_nome(o).ok_or_else(|| format!("orientação `{o}` não existe (automatica, horizontal ou vertical)"))?,
             None => feathercad_io::pdf::Orientacao::Automatica,

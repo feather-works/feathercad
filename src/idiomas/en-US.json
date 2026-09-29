@@ -39,7 +39,8 @@
       "propriedades": "Properties",
       "grupos": "Groups",
       "utilitarios": "Utilities",
-      "area_transferencia": "Clipboard"
+      "area_transferencia": "Clipboard",
+      "folha": "Sheet"
     },
     "botoes": {
       "linha": {
@@ -185,6 +186,26 @@
       "recortar": {
         "rotulo": "Cut",
         "dica": "Cuts objects to the clipboard (Ctrl+X)"
+      },
+      "folha_inserir": {
+        "rotulo": "Insert sheet",
+        "dica": "Inserts the title frame and block at the chosen scale"
+      },
+      "folha_escala": {
+        "rotulo": "Sheet scale",
+        "dica": "Changes the sheet scale or fits it to the drawing"
+      },
+      "folha_carimbo": {
+        "rotulo": "Edit title block",
+        "dica": "Edits client, title, number and revision of the sheet's title block"
+      },
+      "hachura_padrao": {
+        "rotulo": "Pattern",
+        "dica": "Picks the hatch pattern: concrete, earth, sand, brick…"
+      },
+      "contar": {
+        "rotulo": "Count",
+        "dica": "Click an object: selects every object equal to it and tells how many there are (CNT)"
       }
     },
     "embreve": "This tab will be filled in later."
@@ -359,7 +380,8 @@
     "mudouNoDisco": "\"{nome}\" changed on disk, but there are unsaved changes here. Save to overwrite it, or reopen it to see the disk version.",
     "abrir": "Could not open the drawing: {motivo}",
     "salvar": "Could not save the drawing: {motivo}",
-    "motorDesatualizado": "The app engine is out of date with the interface. Close the app and start it again (npm run app:dev) so it recompiles."
+    "motorDesatualizado": "The app engine is out of date with the interface. Close the app and start it again (npm run app:dev) so it recompiles.",
+    "folha": "Could not change the sheet: {motivo}"
   },
   "aviso": {
     "pdfGravado": "PDF saved: {caminho}",
@@ -460,7 +482,30 @@
   "hachura": {
     "pontoPadrao": "HATCH Click inside a closed boundary (S = solid, Enter to finish):",
     "pontoSolida": "HATCH solid Click inside a closed boundary (P = pattern, Enter to finish):",
-    "semContorno": "There is no closed boundary (circle or closed polyline) at this point."
+    "semContorno": "There is no closed boundary (circle or closed polyline) at this point.",
+    "padroes": {
+      "SOLID": "Solid",
+      "ANSI31": "45° lines (masonry/general)",
+      "ANSI32": "Steel (line pairs)",
+      "ANSI37": "45° cross-hatch",
+      "HORIZONTAL": "Horizontal lines",
+      "VERTICAL": "Vertical lines",
+      "GRADE": "Grid",
+      "PONTOS": "Dots",
+      "CONCRETO": "Concrete (stipple)",
+      "AREIA": "Sand",
+      "BRITA": "Gravel",
+      "TERRA": "Earth (soil)",
+      "TIJOLO": "Brick (courses)"
+    },
+    "escolha": {
+      "titulo": "Hatch pattern",
+      "corpo": "Pick the pattern and scale of the next hatch (command H). A bigger scale spaces the lines further apart.",
+      "padrao": "Pattern",
+      "escala": "Pattern scale",
+      "aplicar": "Use this pattern",
+      "cancelar": "Cancel"
+    }
   },
   "camadas": {
     "titulo": "Layer Properties Manager",
@@ -740,7 +785,11 @@
     "corpo": "Pick the paper, the orientation and which sheets go into the PDF. Each sheet becomes a page.",
     "papel": "Paper",
     "orientacao": "Orientation",
-    "orientacoes": { "automatica": "Automatic", "horizontal": "Landscape", "vertical": "Portrait" },
+    "orientacoes": {
+      "automatica": "Automatic",
+      "horizontal": "Landscape",
+      "vertical": "Portrait"
+    },
     "folhas": "Sheets",
     "todas": "All",
     "nenhuma": "None",
@@ -820,7 +869,52 @@
       "medir": "Measure",
       "tornar_atual": "Make layer current",
       "igualar_propriedades": "Match properties",
-      "igualar_camada": "Match layer"
+      "igualar_camada": "Match layer",
+      "contar": "Count equals"
     }
+  },
+  "folha": {
+    "painel": "Sheet",
+    "inserir": {
+      "titulo": "Insert sheet",
+      "corpo": "Pick the paper and the scale. The sheet is the drawing's title frame (border, title block, notes and legend); the drawing stays full size and the sheet grows with the scale.",
+      "papel": "Paper",
+      "escala": "Scale",
+      "automatica": "Automatic (the smallest scale where the drawing fits)",
+      "carimbo": "Title block (may be left empty)",
+      "cliente": "Client",
+      "fase": "Project phase",
+      "disciplina": "Discipline",
+      "tituloDesenho": "Drawing title",
+      "subtitulo": "Subtitle",
+      "numero": "Drawing no.",
+      "revisao": "Revision",
+      "inserir": "Insert",
+      "cancelar": "Cancel",
+      "divisoria": "Dividing line across the middle (two views)",
+      "numeroDaFolha": "Sheet no. (empty = automatic)"
+    },
+    "escala": {
+      "titulo": "Sheet scale",
+      "corpo": "Change the sheet's scale (it keeps framing the same region) or let the program pick the smallest scale where the whole drawing fits.",
+      "qual": "Sheet",
+      "escala": "New scale",
+      "aplicar": "Apply scale",
+      "ajustar": "Fit to drawing",
+      "fechar": "Close",
+      "semFolhas": "The drawing has no sheets yet. Use \"Insert sheet\"."
+    },
+    "item": "Sheet {n} - {papel} - {escala}",
+    "carimbo": {
+      "titulo": "Edit title block",
+      "corpo": "Change the sheet's title block fields. An empty field goes back to the model's guide text.",
+      "salvar": "Save",
+      "cancelar": "Cancel"
+    }
+  },
+  "contar": {
+    "clique": "COUNT Click an object to count the ones equal to it (Enter ends):",
+    "resultado": "{n} object(s) equal to this one (same type and size, 1 % tolerance) — by layer: {camadas}. They are selected.",
+    "nenhum": "There is no object at this point."
   }
 }

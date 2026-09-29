@@ -19,6 +19,12 @@ export const CAIXA_EXPORTAR_CSS = `
 .exportar .grupo button { padding: 6px 14px; background: var(--fundo-faixa); color: var(--texto); border: 1.5px solid var(--borda); border-radius: 8px; cursor: pointer; }
 .exportar .grupo button:hover { border-color: var(--destaque); }
 .exportar .grupo button[aria-pressed='true'] { background: var(--destaque-suave); border-color: var(--destaque); }
+.exportar input[type='text'] { width: 100%; box-sizing: border-box; padding: 6px 10px; background: var(--fundo-faixa); color: var(--texto); border: 1.5px solid var(--borda); border-radius: 8px; font: inherit; }
+.exportar input[type='text']:focus { border-color: var(--destaque); outline: none; }
+.exportar .duas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.exportar .duas fieldset { margin: 0; }
+.exportar select { width: 100%; padding: 7px 10px; background: var(--fundo-faixa); color: var(--texto); border: 1.5px solid var(--borda); border-radius: 8px; font: inherit; cursor: pointer; }
+.exportar select:hover, .exportar select:focus { border-color: var(--destaque); outline: none; }
 .exportar .folhas { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow: auto; }
 .exportar label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .exportar .folhas .medida { margin-left: auto; color: var(--texto-suave); font-size: 12px; }
@@ -30,7 +36,7 @@ export const CAIXA_EXPORTAR_CSS = `
 .exportar .pe button.principal { background: var(--destaque); color: var(--fundo-painel); border-color: var(--destaque); }
 `;
 
-const PAPEIS: OpcoesPdf['papel'][] = ['A4', 'A3', 'A2', 'A1', 'A0', 'FOLHA'];
+const PAPEIS: OpcoesPdf['papel'][] = ['A4', 'A3', 'A2', 'A1', 'A0', '2A0', '4A0', '8A0', '16A0', 'FOLHA'];
 const ORIENTACOES: OpcoesPdf['orientacao'][] = ['automatica', 'horizontal', 'vertical'];
 
 /** Um grupo de botões de escolha única; `aoMudar` guarda o valor. */
@@ -50,7 +56,15 @@ function grupo<T extends string>(valores: T[], rotulo: (v: T) => string, inicial
   return div;
 }
 
-function campo(titulo: string, conteudo: HTMLElement): HTMLFieldSetElement {
+/** Uma lista suspensa de escolha única; `aoMudar` guarda o valor. */
+export function listaSuspensa<T extends string>(valores: T[], rotulo: (v: T) => string, inicial: T, aoMudar: (v: T) => void): HTMLSelectElement {
+  const sel = document.createElement('select');
+  for (const v of valores) sel.append(Object.assign(document.createElement('option'), { value: v, textContent: rotulo(v), selected: v === inicial }));
+  sel.addEventListener('change', () => aoMudar(sel.value as T));
+  return sel;
+}
+
+export function campo(titulo: string, conteudo: HTMLElement): HTMLFieldSetElement {
   const f = document.createElement('fieldset');
   f.append(Object.assign(document.createElement('legend'), { textContent: titulo }), conteudo);
   return f;
@@ -91,7 +105,7 @@ export function perguntarExportacao(t: Textos, folhas: Array<[number, number]>, 
     };
 
     caixa.append(Object.assign(document.createElement('h2'), { textContent: t.exportar.titulo }), Object.assign(document.createElement('p'), { textContent: t.exportar.corpo }));
-    caixa.append(campo(t.exportar.papel, grupo(PAPEIS, (p) => p, escolha.papel, (v) => (escolha.papel = v))));
+    caixa.append(campo(t.exportar.papel, listaSuspensa(PAPEIS, (p) => p, escolha.papel, (v) => (escolha.papel = v))));
     caixa.append(campo(t.exportar.orientacao, grupo(ORIENTACOES, (o) => t.exportar.orientacoes[o], escolha.orientacao, (v) => (escolha.orientacao = v))));
 
     const lista = document.createElement('div');

@@ -97,6 +97,7 @@
       "TABELA",
       "TAB"
     ],
+    "contar": ["CONTAR", "QTD"],
     "medir": [
       "MEDIR",
       "MD"

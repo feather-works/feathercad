@@ -46,6 +46,7 @@ pub fn transformar(geo: &Geometria, t: &Transf) -> Geometria {
                     base: t.aplicar(l.base),
                     dx: t.a * l.dx + t.c * l.dy,
                     dy: t.b * l.dx + t.d * l.dy,
+                    tracos: l.tracos.iter().map(|d| d * t.escala_media()).collect(),
                 })
                 .collect(),
             nome: nome.clone(),

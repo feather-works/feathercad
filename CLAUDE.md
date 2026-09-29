@@ -129,6 +129,14 @@ cd src-tauri && cargo clippy
   (DXF/`.fcdz` ⇄ `.fct` no disco, sem passar pela conversa; devolve os tamanhos antes e depois). Criar/editar valida tudo antes e
   vira **um** passo de desfazer. Só grava `.dxf/.fcdz/.fct` e não sobrescreve sem `sobrescrever: true`. Registrar no Claude Code:
   `claude mcp add feathercad -- <caminho>/feathercad/crates/feathercad-mcp/target/release/feathercad-mcp`.
+- **MCP: folha, PDF, contagem e hachura (29-30/09/2026, `crates/feathercad-mcp/src/folhas.rs`, feito, testado, não commitado):**
+  `cad_folha` (`listar`, `inserir` com papel/escala/campos/origem, `escala`, `ajustar`, `campos`, `campos_definir` — o mesmo
+  `Documento::folha_*` do botão do app), `cad_pdf` (PDF vetorial por folha, papel A4…16A0/FOLHA, cores, páginas escolhidas),
+  `cad_contar` (`igual_a` um id, ou `tipo`+`medida`+`tolerancia`), `cad_hachurar` com `padrao` e `escala` (biblioteca de
+  `padroes.rs`), forma `hachura` e `raio` de cantos em `cad_criar`, e `cad_editar` com `operacao: texto`. **Depois de
+  `npm run mcp:build` é preciso reconectar o MCP no Claude Code (`/mcp`)**: o processo antigo continua com o binário velho.
+  O servidor MCP tem o **desenho dele na memória, separado do app**: o app só vê o que for gravado no arquivo que ele tem
+  aberto (recarrega em ~1 s se não há alteração pendente). Ligar o MCP ao motor do app ao vivo ainda não existe.
 - **Botão direito = menu** (`menu-contexto.ts`; a lista é do motor, `menu_contexto.rs`): comando em
   andamento → Enter/Cancelar/Fechar + interruptores; objetos selecionados → Mover, Copiar, Girar…
   Apagar, Propriedades; nada → Repetir último comando, Colar, Desfazer/Refazer, Zoom, interruptores,
@@ -302,6 +310,19 @@ raio/ângulo, texto com várias linhas na criação, propriedades por entidade "
 **Desempenho:** suspeita — o `npm run app:dev` compila o Rust em debug (10–50× mais lento nas contas). Se o mouse continuar lerdo no dev e bom no
 build, otimizar os crates no perfil dev (`[profile.dev.package.feathercad-core] opt-level = 3` etc. em `src-tauri/Cargo.toml`).
 (Um teste de tempo do cursor chegou a ser esboçado e foi removido sem terminar: medir antes de mexer no perfil.)
+
+## ✅ Folhas (pranchetas) e escala (29/09/2026) — feito, testado, **não commitado**
+
+`crates/feathercad-core/src/folha.rs`: a folha é **um bloco** `FOLHA-n` desenhado em mm de papel (moldura, marcas de centro, faixa
+de notas/legenda/revisões e carimbo — a prancheta do escritório, base A1, proporcional nos outros papéis A4…16A0) e inserido com a
+escala do desenho (`escala_x = 1:S ÷ mm da unidade`). Trocar a escala = trocar a escala da inserção (e o texto `1:S` do carimbo).
+`Documento::{folha_inserir, folha_escala, folha_ajustar, folhas_inseridas}`; sem escala pedida o motor escolhe a menor de
+`ESCALAS` em que o desenho cabe; a 1ª folha se centra no desenho, as seguintes vão à direita. Um Ctrl+Z por operação
+(`Passo::Tudo`). O PDF (`pdf.rs::folhas`) exporta uma página por folha inserida (além dos retângulos da camada `FOLHA`).
+Ponte: `folha_listar|folha_inserir|folha_escala|folha_ajustar`. Interface: aba **Inserir → painel Folha** (`caixa-folha.ts`:
+"Inserir folha" e "Escala da folha"/"Ajustar ao desenho"). **Limites:** só deitada; os campos do carimbo são texto fixo do bloco
+(editar depois = refazer a folha); a linha divisória do meio é opcional; sem "janela de vista" (viewport) com escala própria por
+vista dentro da mesma folha.
 
 ## Fila de trabalho
 

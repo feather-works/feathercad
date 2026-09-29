@@ -1,7 +1,7 @@
 //! Aparar, concordância (fillet) e o contorno de uma hachura por ponto interno. Só geometria: devolve
 //! as `Mudanca`s que a sessão aplica como um passo de desfazer.
 
-use crate::documento::{Documento, Geometria, Id, LinhaDePadrao, Mudanca, NovaEntidade};
+use crate::documento::{Documento, Geometria, Id, Mudanca, NovaEntidade};
 use crate::edicao::{caixa_da_entidade, pontos_da_polilinha};
 use crate::geom::{normalizar_graus, varredura_graus, Ponto, Vertice};
 use crate::regiao::regiao_em;
@@ -330,6 +330,11 @@ fn contem(laco: &[Ponto], p: Ponto) -> bool {
 /// A hachura do menor contorno fechado (círculo ou polilinha fechada) que contém `p`; os contornos
 /// fechados que ficam dentro dele viram ilhas (par-ímpar). `solida` decide sólida ou linhas a 45°.
 pub fn hachura_no_ponto(doc: &Documento, p: Ponto, solida: bool) -> Result<Geometria, Recusa> {
+    hachura_com_padrao(doc, p, if solida { crate::padroes::SOLIDA } else { crate::padroes::PADRAO_DE_FABRICA }, 1.0)
+}
+
+/// Como `hachura_no_ponto`, com o padrão da biblioteca (`padroes::NOMES`, ou `SOLID`) e a escala dele.
+pub fn hachura_com_padrao(doc: &Documento, p: Ponto, nome: &str, escala: f64) -> Result<Geometria, Recusa> {
     let mut candidatos: Vec<(Vec<Vertice>, Vec<Ponto>)> = doc
         .entidades()
         .iter()
@@ -355,16 +360,8 @@ pub fn hachura_no_ponto(doc: &Documento, p: Ponto, solida: bool) -> Result<Geome
         .ok_or(Recusa::SemContorno)?;
     let mut contornos = vec![externo.clone()];
     contornos.extend(candidatos.iter().filter(|(v, pts)| v != externo && pts.first().is_some_and(|q| contem(pts_externo, *q)) && area_do_laco(pts) < area_do_laco(pts_externo)).map(|(v, _)| v.clone()));
-    let (min, max) = pts_externo.iter().fold((pts_externo[0], pts_externo[0]), |(mn, mx), q| (Ponto::novo(mn.x.min(q.x), mn.y.min(q.y)), Ponto::novo(mx.x.max(q.x), mx.y.max(q.y))));
-    let padrao = if solida {
-        Vec::new()
-    } else {
-        // Linhas a 45°, cerca de 40 por dimensão do contorno.
-        let passo = ((max.x - min.x).max(max.y - min.y) / 40.0).max(1e-9);
-        let (s, c) = 45f64.to_radians().sin_cos();
-        vec![LinhaDePadrao { angulo: 45.0, base: min, dx: -passo * s, dy: passo * c }]
-    };
-    Ok(Geometria::Hachura { contornos, padrao, nome: if solida { "SOLID".into() } else { "ANSI31".into() } })
+    let (padrao, nome) = crate::padroes::para_contornos(nome, escala, &contornos);
+    Ok(Geometria::Hachura { contornos, padrao, nome })
 }
 
 /// A caixa de uma seleção de ids (para enquadrar/mostrar).

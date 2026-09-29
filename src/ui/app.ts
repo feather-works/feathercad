@@ -12,6 +12,8 @@ import { comandosDe, regionalDe, texto, textos } from '../idiomas/index.ts';
 import { criarAbasArquivo, type AbaAtiva } from './abas-arquivo.ts';
 import { registrarAvisos } from './avisos.ts';
 import { perguntarExportacao } from './caixa-exportar.ts';
+import { escolherHachura } from './caixa-hachura.ts';
+import { perguntarCarimbo, perguntarEscalaDaFolha, perguntarFolhaNova } from './caixa-folha.ts';
 import { abrirDesenho, exportarPdf, novoDesenho, salvarDesenho } from './arquivos.ts';
 import { criarAreaDesenho } from './area-desenho.ts';
 import { confirmarAlteracoes } from './caixa-confirmar.ts';
@@ -69,7 +71,7 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
     else void inicio.atualizar();
   };
 
-  const falhou = (chave: 'abrir' | 'salvar' | 'exportar', e: unknown): void => {
+  const falhou = (chave: 'abrir' | 'salvar' | 'exportar' | 'folha', e: unknown): void => {
     const motivo = e instanceof Error ? e.message : String(e);
     console.error(`[erro] ${chave}: ${motivo}`); // o console leva o erro ao Monitor
     avisar(texto(`erro.${chave}`, { motivo }));
@@ -109,6 +111,49 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
       if (onde) avisar(texto('aviso.pdfGravado', { caminho: onde }));
     } catch (e) {
       falhou('exportar', e);
+    }
+  }
+
+  /** Insere uma folha (prancheta): o motor escolhe onde ela fica e, sem escala pedida, a menor em que o desenho cabe. */
+  async function inserirFolha(): Promise<void> {
+    if (!temDesenho) return;
+    try {
+      const pedido = await perguntarFolhaNova(t, motor.folhaListar());
+      if (!pedido) return;
+      aplicar(medir('ação', 'folha_inserir', () => motor.folhaInserir(pedido)).estado);
+      area.ajustar();
+    } catch (e) {
+      falhou('folha', e);
+    }
+  }
+
+  /** Troca a escala de uma folha, ou a ajusta ao desenho; a caixa fica aberta para se ver o efeito. */
+  async function escalaDaFolha(): Promise<void> {
+    if (!temDesenho) return;
+    try {
+      await perguntarEscalaDaFolha(t, motor.folhaListar(), (escolha) => {
+        try {
+          const r = 'ajustar' in escolha ? motor.folhaAjustar(escolha.indice) : motor.folhaEscala(escolha.indice, escolha.escala);
+          aplicar(r.estado);
+          area.ajustar();
+        } catch (e) {
+          falhou('folha', e);
+        }
+        return motor.folhaListar();
+      });
+    } catch (e) {
+      falhou('folha', e);
+    }
+  }
+
+  /** Edita os campos do carimbo de uma folha (cliente, título, revisão…). */
+  async function carimboDaFolha(): Promise<void> {
+    if (!temDesenho) return;
+    try {
+      const r = await perguntarCarimbo(t, motor.folhaListar(), (i) => motor.folhaCampos(i));
+      if (r) aplicar(motor.folhaCamposDefinir(r.indice, r.campos).estado);
+    } catch (e) {
+      falhou('folha', e);
     }
   }
 
@@ -174,6 +219,10 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
     (acao) => {
       if (acao === 'camadas') painelCamadas.alternar();
       else if (acao === 'propriedades') painelProps.alternar();
+      else if (acao === 'folha_inserir') void inserirFolha();
+      else if (acao === 'folha_escala') void escalaDaFolha();
+      else if (acao === 'folha_carimbo') void carimboDaFolha();
+      else if (acao === 'hachura_padrao') void escolherHachura(t, motor).catch((e) => falhou('folha', e));
     },
     criarWidgetsDaRibbon(t, motor, aplicar),
   );

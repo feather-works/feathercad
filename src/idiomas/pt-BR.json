@@ -39,7 +39,8 @@
       "propriedades": "Propriedades",
       "grupos": "Grupos",
       "utilitarios": "Utilitários",
-      "area_transferencia": "Área de transferência"
+      "area_transferencia": "Área de transferência",
+      "folha": "Folha"
     },
     "botoes": {
       "linha": {
@@ -185,6 +186,26 @@
       "recortar": {
         "rotulo": "Recortar",
         "dica": "Recorta os objetos para a prancheta (Ctrl+X)"
+      },
+      "folha_inserir": {
+        "rotulo": "Inserir folha",
+        "dica": "Insere a prancheta (moldura e carimbo) na escala escolhida"
+      },
+      "folha_escala": {
+        "rotulo": "Escala da folha",
+        "dica": "Troca a escala da folha ou ajusta ao desenho"
+      },
+      "folha_carimbo": {
+        "rotulo": "Editar carimbo",
+        "dica": "Edita cliente, título, número e revisão do carimbo da folha"
+      },
+      "hachura_padrao": {
+        "rotulo": "Padrão",
+        "dica": "Escolhe o padrão de hachura: concreto, terra, areia, tijolo…"
+      },
+      "contar": {
+        "rotulo": "Contar",
+        "dica": "Clique num objeto: seleciona todos os iguais a ele e diz quantos são (QTD)"
       }
     },
     "embreve": "Esta aba ainda será preenchida."
@@ -359,7 +380,8 @@
     "mudouNoDisco": "O arquivo \"{nome}\" mudou no disco, mas há alterações não salvas aqui. Salve para sobrescrever ou reabra para ver a versão do disco.",
     "abrir": "Não consegui abrir o desenho: {motivo}",
     "salvar": "Não consegui salvar o desenho: {motivo}",
-    "motorDesatualizado": "O motor do aplicativo está desatualizado em relação à interface. Feche o aplicativo e abra de novo (npm run app:dev) para ele recompilar."
+    "motorDesatualizado": "O motor do aplicativo está desatualizado em relação à interface. Feche o aplicativo e abra de novo (npm run app:dev) para ele recompilar.",
+    "folha": "Não consegui mexer na folha: {motivo}"
   },
   "aviso": {
     "pdfGravado": "PDF gravado: {caminho}",
@@ -460,7 +482,30 @@
   "hachura": {
     "pontoPadrao": "HACHURA Clique dentro de um contorno fechado (S = sólida, Enter termina):",
     "pontoSolida": "HACHURA sólida Clique dentro de um contorno fechado (P = padrão, Enter termina):",
-    "semContorno": "Não há contorno fechado (círculo ou polilinha fechada) neste ponto."
+    "semContorno": "Não há contorno fechado (círculo ou polilinha fechada) neste ponto.",
+    "padroes": {
+      "SOLID": "Sólida",
+      "ANSI31": "Linhas a 45° (alvenaria/geral)",
+      "ANSI32": "Aço (pares de linhas)",
+      "ANSI37": "Cruzada a 45°",
+      "HORIZONTAL": "Linhas horizontais",
+      "VERTICAL": "Linhas verticais",
+      "GRADE": "Grade (quadriculado)",
+      "PONTOS": "Pontos",
+      "CONCRETO": "Concreto (pontilhado)",
+      "AREIA": "Areia",
+      "BRITA": "Brita / cascalho",
+      "TERRA": "Terra (solo)",
+      "TIJOLO": "Tijolo (fiadas)"
+    },
+    "escolha": {
+      "titulo": "Padrão de hachura",
+      "corpo": "Escolha o padrão e a escala da próxima hachura (comando H). Escala maior = linhas mais espaçadas.",
+      "padrao": "Padrão",
+      "escala": "Escala do padrão",
+      "aplicar": "Usar este padrão",
+      "cancelar": "Cancelar"
+    }
   },
   "camadas": {
     "titulo": "Gerenciador de propriedades de camadas",
@@ -740,7 +785,11 @@
     "corpo": "Escolha o papel, a orientação e quais folhas entram no PDF. Cada folha vira uma página.",
     "papel": "Papel",
     "orientacao": "Orientação",
-    "orientacoes": { "automatica": "Automática", "horizontal": "Horizontal", "vertical": "Vertical" },
+    "orientacoes": {
+      "automatica": "Automática",
+      "horizontal": "Horizontal",
+      "vertical": "Vertical"
+    },
     "folhas": "Folhas",
     "todas": "Todas",
     "nenhuma": "Nenhuma",
@@ -820,7 +869,52 @@
       "medir": "Medir",
       "tornar_atual": "Tornar camada atual",
       "igualar_propriedades": "Igualar propriedades",
-      "igualar_camada": "Igualar camada"
+      "igualar_camada": "Igualar camada",
+      "contar": "Contar iguais"
     }
+  },
+  "folha": {
+    "painel": "Folha",
+    "inserir": {
+      "titulo": "Inserir folha",
+      "corpo": "Escolha o papel e a escala. A folha é a prancheta do desenho (moldura, carimbo, notas e legenda); o desenho fica em tamanho real e a folha cresce com a escala.",
+      "papel": "Papel",
+      "escala": "Escala",
+      "automatica": "Automática (a menor em que o desenho cabe)",
+      "carimbo": "Carimbo (pode deixar em branco)",
+      "cliente": "Cliente",
+      "fase": "Fase do projeto",
+      "disciplina": "Disciplina",
+      "tituloDesenho": "Título do desenho",
+      "subtitulo": "Subtítulo",
+      "numero": "Nº do desenho",
+      "revisao": "Revisão",
+      "inserir": "Inserir",
+      "cancelar": "Cancelar",
+      "divisoria": "Linha divisória no meio da folha (duas vistas)",
+      "numeroDaFolha": "Nº da folha (vazio = automático)"
+    },
+    "escala": {
+      "titulo": "Escala da folha",
+      "corpo": "Troque a escala da folha (ela continua enquadrando a mesma região) ou deixe o programa escolher a menor escala em que o desenho todo cabe.",
+      "qual": "Folha",
+      "escala": "Nova escala",
+      "aplicar": "Aplicar escala",
+      "ajustar": "Ajustar ao desenho",
+      "fechar": "Fechar",
+      "semFolhas": "O desenho ainda não tem folhas. Use \"Inserir folha\"."
+    },
+    "item": "Folha {n} - {papel} - {escala}",
+    "carimbo": {
+      "titulo": "Editar carimbo",
+      "corpo": "Mude os campos do carimbo da folha. Campo vazio volta ao texto-guia do modelo.",
+      "salvar": "Salvar",
+      "cancelar": "Cancelar"
+    }
+  },
+  "contar": {
+    "clique": "CONTAR Clique num objeto para contar os iguais a ele (Enter termina):",
+    "resultado": "{n} objeto(s) iguais a este (mesmo tipo e medida, folga de 1 %) — por camada: {camadas}. Estão selecionados.",
+    "nenhum": "Não há objeto neste ponto."
   }
 }

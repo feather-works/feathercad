@@ -67,6 +67,10 @@ pub struct LinhaDePadrao {
     pub base: Ponto,
     pub dx: f64,
     pub dy: f64,
+    /// Traço e vão ao longo da linha (como o `.pat` do AutoCAD): positivo = traço, negativo = vão, `0` = ponto.
+    /// Vazio = linha contínua. A fase de cada linha da família anda `dx·cos + dy·sen` (o deslocamento ao longo dela).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tracos: Vec<f64>,
 }
 
 /// A forma de uma entidade.

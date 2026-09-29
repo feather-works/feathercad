@@ -37,10 +37,15 @@ impl Papel {
     pub const A2: Papel = Papel { largura_mm: 420.0, altura_mm: 594.0 };
     pub const A1: Papel = Papel { largura_mm: 594.0, altura_mm: 841.0 };
     pub const A0: Papel = Papel { largura_mm: 841.0, altura_mm: 1189.0 };
+    /// Acima do A0 (ISO 216: cada um tem o dobro da área do anterior). O PDF aceita até 5080 mm por lado.
+    pub const A2A0: Papel = Papel { largura_mm: 1189.0, altura_mm: 1682.0 };
+    pub const A4A0: Papel = Papel { largura_mm: 1682.0, altura_mm: 2378.0 };
+    pub const A8A0: Papel = Papel { largura_mm: 2378.0, altura_mm: 3364.0 };
+    pub const A16A0: Papel = Papel { largura_mm: 3364.0, altura_mm: 4756.0 };
     /// Sem papel fixo: cada página tem o tamanho da folha, 1 unidade do desenho = 1 mm (máximo do PDF: 5 m).
     pub const DA_FOLHA: Papel = Papel { largura_mm: 0.0, altura_mm: 0.0 };
 
-    /// `A4`, `A3`, `A2`, `A1`, `A0` ou `FOLHA` (sem diferenciar maiúscula).
+    /// `A4`…`A0`, `2A0`, `4A0`, `8A0`, `16A0` ou `FOLHA` (sem diferenciar maiúscula).
     pub fn de_nome(nome: &str) -> Option<Self> {
         match nome.trim().to_ascii_uppercase().as_str() {
             "A4" => Some(Self::A4),
@@ -48,6 +53,10 @@ impl Papel {
             "A2" => Some(Self::A2),
             "A1" => Some(Self::A1),
             "A0" => Some(Self::A0),
+            "2A0" => Some(Self::A2A0),
+            "4A0" => Some(Self::A4A0),
+            "8A0" => Some(Self::A8A0),
+            "16A0" => Some(Self::A16A0),
             "FOLHA" => Some(Self::DA_FOLHA),
             _ => None,
         }
@@ -93,7 +102,8 @@ impl Default for Opcoes {
 
 type Caixa = (Ponto, Ponto);
 
-/// As folhas do desenho: retângulos fechados da camada `FOLHA` que não estão dentro de outro, da esquerda para a direita.
+/// As folhas do desenho: as inseridas pelo botão (blocos `FOLHA-n`) e os retângulos fechados da camada `FOLHA` que não estão
+/// dentro de outro, da esquerda para a direita.
 /// Sem nenhuma, uma folha só, com o desenho inteiro.
 pub fn folhas(doc: &Documento) -> Vec<Caixa> {
     let mut retangulos: Vec<Caixa> = doc
@@ -105,6 +115,7 @@ pub fn folhas(doc: &Documento) -> Vec<Caixa> {
             _ => None,
         })
         .collect();
+    retangulos.extend(doc.folhas_inseridas().iter().map(|f| (f.min, f.max)));
     let copia = retangulos.clone();
     retangulos.retain(|(a, b)| !copia.iter().any(|(c, d)| (c, d) != (a, b) && c.x <= a.x && c.y <= a.y && d.x >= b.x && d.y >= b.y && (d.x - c.x) * (d.y - c.y) > (b.x - a.x) * (b.y - a.y)));
     retangulos.sort_by(|(a, _), (b, _)| a.x.total_cmp(&b.x).then(b.y.total_cmp(&a.y)));

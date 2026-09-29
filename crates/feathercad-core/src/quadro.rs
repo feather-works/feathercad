@@ -79,8 +79,9 @@ pub fn tracos(geo: &Geometria, vista: &Vista) -> Vec<((f64, f64), (f64, f64))> {
 }
 
 /// Uma linha quebrada em segmentos de reta: os pares de pontos consecutivos.
-fn cordas(pontos: &[Ponto], fora: &mut Vec<(Ponto, Ponto)>) {
-    fora.extend(pontos.windows(2).map(|w| (w[0], w[1])));
+/// As cordas que tocam a janela: uma polilinha (ou um círculo) grande que atravessa a tela só entrega os trechos visíveis.
+fn cordas(pontos: &[Ponto], area: (Ponto, Ponto), fora: &mut Vec<(Ponto, Ponto)>) {
+    fora.extend(pontos.windows(2).filter(|w| toca(area, w[0], w[1])).map(|w| (w[0], w[1])));
 }
 
 /// Os segmentos (em unidades do desenho) que uma entidade desenha, se a caixa dela toca a janela.
@@ -95,7 +96,7 @@ fn segmentos_da(geo: &Geometria, area: (Ponto, Ponto), tolerancia: f64, fora: &m
                 Geometria::Arco { inicio, fim, .. } => (inicio.to_radians(), varredura_graus(*inicio, *fim).to_radians()),
                 _ => (0.0, std::f64::consts::TAU),
             };
-            cordas(&amostrar_arco(*centro, *raio, inicio, varredura, tolerancia), fora);
+            cordas(&amostrar_arco(*centro, *raio, inicio, varredura, tolerancia), area, fora);
         }
         Geometria::Linha { a, b } => {
             if toca(area, *a, *b) {
@@ -118,7 +119,7 @@ fn segmentos_da(geo: &Geometria, area: (Ponto, Ponto), tolerancia: f64, fora: &m
             for i in 0..trechos {
                 let (de, ate) = (&vertices[i], &vertices[(i + 1) % n]);
                 let pts = segmento_com_bulge(de.p, ate.p, de.bulge, tolerancia);
-                fora.extend(pts.windows(2).map(|w| (w[0], w[1])));
+                cordas(&pts, area, fora);
             }
         }
         Geometria::Texto { .. } | Geometria::Insercao { .. } | Geometria::Hachura { .. } | Geometria::Ponto { .. } => {}
@@ -189,6 +190,8 @@ struct Contexto<'a> {
     area: (Ponto, Ponto),
     tolerancia: f64,
     fundo_claro: bool,
+    /// Tela: descarta o que não se enxerga (`sem_traco_invisivel`). Impressão (PDF) não: o leitor dá zoom.
+    simplificar: bool,
 }
 
 /// A cor de um objeto selecionado.
@@ -357,6 +360,33 @@ fn preencher(saida: &mut Saida, ctx: &Contexto<'_>, lacos: &[Vec<Ponto>], t: &Tr
     saida.np += 1;
 }
 
+/// Uma família com mais traços que isto (por causa de pontos e vãos) não se desenha: vira preenchimento.
+const TRACOS_MAXIMOS_DE_UMA_FAMILIA: f64 = 60000.0;
+
+/// Corta o trecho `x0..x1` (ao longo da linha) pelo padrão de traço e vão, com o padrão começando em `fase`.
+/// Ponto (`0`) vira um risco curto (12 % do espaço entre as linhas). `false` se o padrão é degenerado ou gera demais.
+fn cortar_em_tracos(x0: f64, x1: f64, tracos: &[f64], fase: f64, passo: f64, saida: &mut impl FnMut(f64, f64)) -> bool {
+    let periodo: f64 = tracos.iter().map(|t| t.abs()).sum();
+    if periodo.is_nan() || periodo <= 1e-9 || (x1 - x0) / periodo > TRACOS_MAXIMOS_DE_UMA_FAMILIA {
+        return false;
+    }
+    let ponto = 0.12 * passo;
+    let mut s = fase + ((x0 - fase) / periodo).floor() * periodo;
+    while s < x1 {
+        for t in tracos {
+            let (ini, fim) = (s, s + if *t == 0.0 { ponto } else { t.abs() });
+            if *t >= 0.0 && fim > x0 && ini < x1 {
+                saida(ini.max(x0), fim.min(x1));
+            }
+            s += t.abs();
+            if s >= x1 {
+                break;
+            }
+        }
+    }
+    true
+}
+
 /// Espaço perpendicular entre as linhas de uma família.
 fn passo_do_padrao(l: &LinhaDePadrao) -> f64 {
     let (seno, cosseno) = l.angulo.to_radians().sin_cos();
@@ -397,7 +427,15 @@ fn linhas_do_padrao(lacos: &[Vec<Ponto>], l: &LinhaDePadrao, maximo: f64) -> Opt
         xs.sort_by(f64::total_cmp);
         for par in xs.chunks_exact(2) {
             let ponto = |x: f64| Ponto::novo(l.base.x + x * u.0 + c * v.0, l.base.y + x * u.1 + c * v.1);
-            fora.push((ponto(par[0]), ponto(par[1])));
+            if l.tracos.is_empty() {
+                fora.push((ponto(par[0]), ponto(par[1])));
+            } else {
+                // A fase da linha `k` anda `k · (deslocamento ao longo da linha)`, como no `.pat` do AutoCAD.
+                let fase = k * (l.dx * cosseno + l.dy * seno);
+                if !cortar_em_tracos(par[0], par[1], &l.tracos, fase, passo, &mut |a, b| fora.push((ponto(a), ponto(b)))) || fora.len() as f64 > TRACOS_MAXIMOS_DE_UMA_FAMILIA {
+                    return None;
+                }
+            }
         }
         k += 1.0;
     }
@@ -453,6 +491,20 @@ fn desenhar_hachura(ctx: &Contexto<'_>, contornos: &[Vec<crate::geom::Vertice>],
     }
 }
 
+/// Trecho menor que isto (em pixels ao quadrado) não se enxerga: com o desenho todo na tela, o lado curto de cada dormente
+/// (0,24 m) são milhares de riscos de meio pixel. Se a forma inteira é miúda, fica como está (não some).
+const TRACO_MINIMO_PX2: f64 = 0.12;
+
+fn sem_traco_invisivel(tracos: &mut Vec<TracoPx>) {
+    let comprido = |((x1, y1), (x2, y2)): &TracoPx| {
+        let (dx, dy) = (*x2 - *x1, *y2 - *y1);
+        dx * dx + dy * dy >= TRACO_MINIMO_PX2
+    };
+    if tracos.len() > 1 && tracos.iter().any(comprido) {
+        tracos.retain(comprido);
+    }
+}
+
 /// Desenha uma entidade (do desenho ou de dentro de um bloco).
 fn desenhar(ctx: &Contexto<'_>, peca: &Peca<'_>, nivel: &Nivel, saida: &mut Saida) {
     let Some(c) = ctx.doc.camadas().get(peca.camada) else { return };
@@ -480,7 +532,10 @@ fn desenhar(ctx: &Contexto<'_>, peca: &Peca<'_>, nivel: &Nivel, saida: &mut Said
             let (area, tolerancia) = if t.eh_identidade() { (ctx.area, ctx.tolerancia) } else { (PLANO_TODO, ctx.tolerancia / t.escala_maxima().max(1e-12)) };
             let mut pedacos = Vec::new();
             segmentos_da(geo, area, tolerancia, &mut pedacos);
-            let em_pixels: Vec<_> = pedacos.iter().map(|(a, b)| (ctx.vista.para_tela(t.aplicar(*a)), ctx.vista.para_tela(t.aplicar(*b)))).collect();
+            let mut em_pixels: Vec<_> = pedacos.iter().map(|(a, b)| (ctx.vista.para_tela(t.aplicar(*a)), ctx.vista.para_tela(t.aplicar(*b)))).collect();
+            if ctx.simplificar {
+                sem_traco_invisivel(&mut em_pixels);
+            }
             escrever_tracos(saida, &em_pixels, cor_na_tela, espessura_em_px(peca.props.espessura.or(c.espessura)), peca.props.tipo_linha.unwrap_or(c.tipo_linha));
         }
     }
@@ -496,7 +551,7 @@ pub fn montar(doc: &Documento, vista: &Vista, versao_conhecida: Option<u64>, fun
 /// Como `montar`, para impressão: arcos e círculos com `tolerancia_px` de erro (a tela usa 0,5 px; o papel pede bem menos,
 /// senão um círculo pequeno sai como um octógono). Sempre é um quadro novo, sem fundo.
 pub fn montar_fino(doc: &Documento, vista: &Vista, fundo_claro: bool, tolerancia_px: f64) -> Vec<u8> {
-    let ctx = Contexto { doc, vista, area: vista.area_visivel(), tolerancia: tolerancia_px / vista.escala, fundo_claro };
+    let ctx = Contexto { doc, vista, area: vista.area_visivel(), tolerancia: tolerancia_px / vista.escala, fundo_claro, simplificar: false };
     let mut dentro = Saida::default();
     let raiz = Nivel { t: Transf::IDENTIDADE, herdada: None, profundidade: 0, destaque: false };
     for e in doc.entidades() {
@@ -519,7 +574,7 @@ pub fn montar_arrastando(doc: &Documento, vista: &Vista, versao_conhecida: Optio
     if versao_conhecida == Some(versao) {
         return MAGIA_IGUAL.to_vec();
     }
-    let ctx = Contexto { doc, vista, area: vista.area_visivel(), tolerancia: TOLERANCIA_DO_ARCO_PX / vista.escala, fundo_claro };
+    let ctx = Contexto { doc, vista, area: vista.area_visivel(), tolerancia: TOLERANCIA_DO_ARCO_PX / vista.escala, fundo_claro, simplificar: true };
     let mut dentro = Saida::default();
     let raiz = Nivel { t: Transf::IDENTIDADE, herdada: None, profundidade: 0, destaque: false };
     for e in doc.entidades() {
@@ -535,7 +590,7 @@ pub fn montar_arrastando(doc: &Documento, vista: &Vista, versao_conhecida: Optio
 /// Só os objetos `selecao`, movidos de `(dx, dy)`, na cor de seleção e sem fundo: a camada do arrasto ao vivo.
 /// Sempre é um quadro novo (a versão não importa: muda a cada movimento do mouse).
 pub fn montar_deslocado(doc: &Documento, vista: &Vista, fundo_claro: bool, selecao: &BTreeSet<Id>, dx: f64, dy: f64) -> Vec<u8> {
-    let ctx = Contexto { doc, vista, area: vista.area_visivel(), tolerancia: TOLERANCIA_DO_ARCO_PX / vista.escala, fundo_claro };
+    let ctx = Contexto { doc, vista, area: vista.area_visivel(), tolerancia: TOLERANCIA_DO_ARCO_PX / vista.escala, fundo_claro, simplificar: true };
     let mut dentro = Saida::default();
     let raiz = Nivel { t: Transf::mover(dx, dy), herdada: None, profundidade: 0, destaque: false };
     for e in doc.entidades().iter().filter(|e| selecao.contains(&e.id)) {

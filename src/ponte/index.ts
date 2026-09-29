@@ -6,7 +6,7 @@
 
 import { canalMedido } from './metricas.ts';
 import { chamarJson, type Canal } from './canal.ts';
-import type { ConsultaDeCamadas, OpcoesPdf, TipoDeSnap, Estado, Fundo, RespostaDeMenu, Unidade, MarcasDoFundo, PedidoDeCamada, RespostaDeCamada, ResumoDePropriedades, TabelaDeCamadas, Ponto, Preenchimento, Quadro, Regional, RespostaCursor, TextoDoQuadro, Vista } from './tipos.ts';
+import type { CamposFolha, OpcoesDeHachura, ConsultaDeCamadas, FolhasDoMotor, OpcoesPdf, PedidoFolhaNova, RespostaFolha, TipoDeSnap, Estado, Fundo, RespostaDeMenu, Unidade, MarcasDoFundo, PedidoDeCamada, RespostaDeCamada, ResumoDePropriedades, TabelaDeCamadas, Ponto, Preenchimento, Quadro, Regional, RespostaCursor, TextoDoQuadro, Vista } from './tipos.ts';
 
 export type { Canal } from './canal.ts';
 export type * from './tipos.ts';
@@ -144,6 +144,15 @@ export const COMANDOS_DA_PONTE_ESPERADOS: readonly string[] = [
   'documento_gravar',
   'documento_exportar_pdf',
   'documento_folhas',
+  'folha_listar',
+  'folha_inserir',
+  'folha_escala',
+  'folha_ajustar',
+  'folha_campos',
+  'folha_campos_definir',
+  'hachura_opcoes',
+  'hachura_definir',
+  'hachura_previa',
   'documento_arquivo_definir',
   'documento_arquivo',
   'quadro',
@@ -345,6 +354,51 @@ export class Motor {
   /** As folhas do desenho (largura × altura, em unidades do desenho), na ordem em que saem no PDF. */
   documentoFolhas(): Array<[number, number]> {
     return this.json('documento_folhas');
+  }
+
+  /** As folhas inseridas, os papéis e as escalas oferecidas. */
+  folhaListar(): FolhasDoMotor {
+    return this.json('folha_listar');
+  }
+
+  /** Insere uma folha (o Rust valida papel e escala e escolhe onde ela fica). */
+  folhaInserir(pedido: PedidoFolhaNova): RespostaFolha {
+    return this.json('folha_inserir', pedido);
+  }
+
+  /** Troca a escala de uma folha (o centro da área útil fica no lugar). */
+  folhaEscala(indice: number, escala: number): RespostaFolha {
+    return this.json('folha_escala', { indice, escala });
+  }
+
+  /** Escolhe a menor escala em que o desenho todo cabe na folha e a centra nele. */
+  folhaAjustar(indice: number): RespostaFolha {
+    return this.json('folha_ajustar', { indice });
+  }
+
+  /** Os campos do carimbo de uma folha, como estão (vazio = o texto-guia do modelo). */
+  folhaCampos(indice: number): CamposFolha {
+    return this.json('folha_campos', { indice });
+  }
+
+  /** Reescreve os campos do carimbo (vazio volta ao texto-guia). */
+  folhaCamposDefinir(indice: number, campos: CamposFolha): RespostaFolha {
+    return this.json('folha_campos_definir', { indice, campos });
+  }
+
+  /** Os padrões de hachura, o escolhido e as escalas oferecidas. */
+  hachuraOpcoes(): OpcoesDeHachura {
+    return this.json('hachura_opcoes');
+  }
+
+  /** Escolhe o padrão (e a escala) da próxima hachura; o Rust valida o nome. */
+  hachuraDefinir(padrao: string, escala?: number): OpcoesDeHachura {
+    return this.json('hachura_definir', { padrao, ...(escala === undefined ? {} : { escala }) });
+  }
+
+  /** Uma amostra do padrão em SVG, desenhada pelo motor. */
+  hachuraPrevia(padrao: string, escala: number): string {
+    return this.json('hachura_previa', { padrao, escala });
   }
 
   /** Onde o desenho está no disco (`null` se ainda não foi salvo). */

@@ -97,6 +97,7 @@
       "TABLE",
       "TB"
     ],
+    "contar": ["COUNT", "CNT"],
     "medir": [
       "MEASUREGEOM",
       "MEA"

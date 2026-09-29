@@ -4,7 +4,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::aparar::{aparar, concordar, hachura_no_ponto, Recusa};
+use crate::aparar::{aparar, concordar, hachura_com_padrao, Recusa};
 use crate::documento::{Documento, Geometria, Id, Mudanca, NovaEntidade};
 use crate::edicao::{elipse, escolher, escolher_na_janela, esticar, matriz, retangulo, transformar};
 use crate::geom::{Ponto, Transf};
@@ -206,6 +206,7 @@ impl Sessao {
                 _ => "elipse.outroEixo",
             },
             Ferramenta::Hachura => return Mensagem::nova(if self.hachura_solida { "hachura.pontoSolida" } else { "hachura.pontoPadrao" }),
+            Ferramenta::Contar => "contar.clique",
             outra => return self.prompt_da_anotacao(outra),
         };
         Mensagem::nova(chave)
@@ -272,6 +273,7 @@ impl Sessao {
             "retangulo" => self.ferramenta = Ferramenta::Retangulo { canto: None },
             "elipse" => self.ferramenta = Ferramenta::Elipse { pontos: Vec::new() },
             "hachura" => self.ferramenta = Ferramenta::Hachura,
+            "contar" => self.ferramenta = Ferramenta::Contar,
             outro => return self.executar_anotacao(doc, outro),
         }
         true
@@ -469,11 +471,24 @@ impl Sessao {
                     self.ferramenta = Ferramenta::Elipse { pontos };
                 }
             }
-            Ferramenta::Hachura => match hachura_no_ponto(doc, ponto, self.hachura_solida) {
+            Ferramenta::Hachura => match hachura_com_padrao(doc, ponto, if self.hachura_solida { crate::padroes::SOLIDA } else { &self.hachura_padrao }, self.hachura_escala) {
                 Ok(g) => {
                     doc.adicionar_geometria(g);
                 }
                 Err(_) => self.dizer(Mensagem::nova("hachura.semContorno")),
+            },
+            Ferramenta::Contar => match escolher(doc, ponto, tolerancia).and_then(|id| crate::contagem::iguais_a(doc, id)) {
+                Some(c) => {
+                    let n = c.ids.len().to_string();
+                    let mut camadas: Vec<String> = c.por_camada.iter().take(4).map(|(nome, q)| format!("{nome}: {q}")).collect();
+                    if c.por_camada.len() > 4 {
+                        camadas.push("…".into());
+                    }
+                    self.selecao = c.ids.into_iter().collect();
+                    self.rev_selecao += 1;
+                    self.dizer(Mensagem::nova("contar.resultado").com("n", &n).com("camadas", &camadas.join("; ")));
+                }
+                None => self.dizer(Mensagem::nova("contar.nenhum")),
             },
             outra => return self.clique_de_anotacao(doc, outra, ponto, tolerancia),
         }
@@ -624,6 +639,14 @@ impl Sessao {
             Ferramenta::Hachura => match self.comandos.resolver_opcao(texto) {
                 Some("solida") => self.hachura_solida = true,
                 Some("padrao") => self.hachura_solida = false,
+                // o nome de um padrão da biblioteca (CONCRETO, TERRA…) escolhe o padrão
+                _ if crate::padroes::reconhecer(texto).is_some() => {
+                    let nome = crate::padroes::reconhecer(texto).unwrap_or(crate::padroes::PADRAO_DE_FABRICA);
+                    self.hachura_solida = nome == crate::padroes::SOLIDA;
+                    if !self.hachura_solida {
+                        self.hachura_padrao = nome.to_string();
+                    }
+                }
                 _ => self.digitar_ponto_ou_comando(doc, texto),
             },
             _ => self.digitar_ponto_ou_comando(doc, texto),

@@ -45,6 +45,7 @@ export const RIBBON: AbaDado[] = [
         { id: 'retangulo', comando: 'retangulo', simbolo: '▭', pequeno: true },
         { id: 'elipse', comando: 'elipse', simbolo: '⬭', pequeno: true },
         { id: 'hachura', comando: 'hachura', simbolo: '▨', pequeno: true },
+        { id: 'hachura_padrao', comando: null, simbolo: '▩', pequeno: true, acao: 'hachura_padrao' },
       ] },
       { id: 'modificar', botoes: [
         { id: 'mover', comando: 'mover', simbolo: '✥', pequeno: true },
@@ -86,6 +87,7 @@ export const RIBBON: AbaDado[] = [
       ] },
       { id: 'utilitarios', botoes: [
         { id: 'medir', comando: 'medir', simbolo: '📏' },
+        { id: 'contar', comando: 'contar', simbolo: '#' },
       ] },
       { id: 'area_transferencia', botoes: [
         { id: 'colar', comando: 'colar', simbolo: '📋' },
@@ -94,7 +96,13 @@ export const RIBBON: AbaDado[] = [
       ] },
     ],
   },
-  { id: 'inserir', paineis: [] },
+  { id: 'inserir', paineis: [
+    { id: 'folha', botoes: [
+      { id: 'folha_inserir', comando: null, simbolo: '▭', acao: 'folha_inserir' },
+      { id: 'folha_escala', comando: null, simbolo: '⤡', acao: 'folha_escala' },
+      { id: 'folha_carimbo', comando: null, simbolo: '✎', acao: 'folha_carimbo' },
+    ] },
+  ] },
   { id: 'anotar', paineis: [] },
   { id: 'parametrico', paineis: [] },
   { id: 'exibir', paineis: [] },
