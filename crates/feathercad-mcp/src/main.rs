@@ -3,6 +3,7 @@
 
 mod agente;
 mod compacto;
+mod componentes;
 mod consulta;
 mod esquemas;
 mod expressao;

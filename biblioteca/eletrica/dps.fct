@@ -1,0 +1,24 @@
+// nome: dps
+// descricao: Protetor contra surtos (DPS) de 1 módulo, com janela de estado e etiqueta.
+// categoria: quadro
+// tamanho: 17.5 x 90 mm
+unidade mm
+camada FUNDO_DISPOSITIVOS #1B2027
+H solida 0 0 17.5 0 17.5 90 0 90 #1B2027
+camada DPS #FFFFFF
+P 2 0 15.5 0 ~0.414 17.5 2 17.5 88 ~0.414 15.5 90 2 90 ~0.414 0 88 0 2 ~0.414 f
+L 1.2 22 16.3 22 #9AA0A6
+L 1.2 68 16.3 68 #9AA0A6
+C 8.75 79 3.6 #FFFFFF
+C 8.75 79 2.232 #9AA0A6
+L 6.77 79 10.73 79 #9AA0A6
+L 8.75 77.02 8.75 80.98 #9AA0A6
+C 8.75 11 3.6 #FFFFFF
+C 8.75 11 2.232 #9AA0A6
+L 6.77 11 10.73 11 #9AA0A6
+L 8.75 9.02 8.75 12.98 #9AA0A6
+R 3 55 11.5 8 #9AA0A6
+H solida 3.6 55.6 13.9 55.6 13.9 62.4 3.6 62.4 #FF2A2A
+R 3 28 11.5 24 #9AA0A6
+T 4.6 38 3 0 "DPS" #B8BEC4
+H solida 2 24 15.5 24 15.5 26.4 2 26.4 #22B14C

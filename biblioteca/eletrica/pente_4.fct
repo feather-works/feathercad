@@ -1,0 +1,15 @@
+// nome: pente_4
+// descricao: Barramento tipo pente para 4 polos.
+// categoria: quadro
+// tamanho: 70 x 18 mm
+unidade mm
+camada PENTE #FFFFFF
+R 0 12 70 6 #FFFFFF
+P 5.55 12 5.55 3 11.95 3 11.95 12 #FFFFFF
+L 7.35 5 10.15 5 #FFFFFF
+P 23.05 12 23.05 3 29.45 3 29.45 12 #FFFFFF
+L 24.85 5 27.65 5 #FFFFFF
+P 40.55 12 40.55 3 46.95 3 46.95 12 #FFFFFF
+L 42.35 5 45.15 5 #FFFFFF
+P 58.05 12 58.05 3 64.45 3 64.45 12 #FFFFFF
+L 59.85 5 62.65 5 #FFFFFF

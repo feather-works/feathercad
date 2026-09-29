@@ -137,6 +137,15 @@ cd src-tauri && cargo clippy
   `npm run mcp:build` é preciso reconectar o MCP no Claude Code (`/mcp`)**: o processo antigo continua com o binário velho.
   O servidor MCP tem o **desenho dele na memória, separado do app**: o app só vê o que for gravado no arquivo que ele tem
   aberto (recarrega em ~1 s se não há alteração pendente). Ligar o MCP ao motor do app ao vivo ainda não existe.
+- **MCP: biblioteca de componentes em arquivos** (29-30/09/2026, `crates/feathercad-mcp/src/componentes.rs`, `build.rs`, pasta `biblioteca/`):
+  cada equipamento é um `.fct` em mm reais (origem no canto inferior esquerdo) com cabeçalho `// descricao|categoria|tamanho|parametros: a=1 b=x`
+  e `{{a}}` no corpo. `cad_componentes {busca?}` lista, `cad_componente {nome, ponto, valores?, ampliacao?, rotacao?, camada?}` coloca (um
+  passo de desfazer; funciona em `cad_lote`). De fábrica: embutidos no binário pelo `build.rs` (largar um `.fct` em `biblioteca/**` e recompilar);
+  do usuário: `~/.config/feathercad/biblioteca/**.fct` (ou `$FEATHERCAD_BIBLIOTECA`), que vale sobre o de fábrica. Os de fábrica atuais
+  (disjuntor modular 1-4p, DR, DPS, trilho DIN, barras, pente, caixa de quadro, transformador lateral/frontal) saem de
+  `biblioteca/gerar_biblioteca.py` a partir de `exemplos/pack_eletrica.py`. Um quadro inteiro = uma chamada de `cad_lote`. **Depois de
+  `npm run mcp:build` é preciso reconectar o MCP (`/mcp`).** Falta: símbolos unifilares (fusível, seccionadora, TC, TP, pára-raios), cubículo MT,
+  QGBT, carimbo/folha como componente, atributos (tag/kVA) e lista de materiais automática (estilo AutoCAD Electrical).
 - **Botão direito = menu** (`menu-contexto.ts`; a lista é do motor, `menu_contexto.rs`): comando em
   andamento → Enter/Cancelar/Fechar + interruptores; objetos selecionados → Mover, Copiar, Girar…
   Apagar, Propriedades; nada → Repetir último comando, Colar, Desfazer/Refazer, Zoom, interruptores,
