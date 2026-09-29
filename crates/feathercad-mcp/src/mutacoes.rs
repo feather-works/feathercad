@@ -1,7 +1,7 @@
 //! O que muda o desenho: criar formas, editar (mover, copiar, girar…), camadas, hachura e desfazer.
 //! Toda chamada valida **tudo antes** de tocar no desenho e vira **um** passo de desfazer.
 
-use feathercad_core::aparar::hachura_no_ponto;
+use feathercad_core::aparar::hachura_com_padrao;
 use feathercad_core::camadas::Propriedade;
 use feathercad_core::documento::{AlinhaH, AlinhaV, Documento, Geometria, Id, Mudanca, NovaEntidade, Propriedades, TipoLinha};
 use feathercad_core::edicao::{retangulo, transformar};
@@ -18,6 +18,32 @@ fn vertices(pts: &[Ponto]) -> Vec<Vertice> {
 
 /// Um retângulo por dois cantos opostos, ou por canto + largura + altura (+ giro em graus).
 fn forma_retangulo(f: &Value) -> Res<Geometria> {
+    let base = forma_retangulo_reto(f)?;
+    match (numero_opcional(f, "raio"), &base) {
+        (Some(r), Geometria::Polilinha { vertices, .. }) if r > 0.0 => Ok(Geometria::Polilinha { vertices: arredondar(vertices, r), fechada: true }),
+        _ => Ok(base),
+    }
+}
+
+/// Cantos arredondados de raio `r` num polígono convexo anti-horário de 4 vértices (arcos por bulge de 90°).
+fn arredondar(v: &[Vertice], r: f64) -> Vec<Vertice> {
+    let n = v.len();
+    let menor = (0..n).map(|i| v[i].p.distancia(v[(i + 1) % n].p)).fold(f64::MAX, f64::min);
+    let r = r.min(menor / 2.0);
+    let mut fora = Vec::with_capacity(2 * n);
+    for i in 0..n {
+        let (ant, atual, prox) = (v[(i + n - 1) % n].p, v[i].p, v[(i + 1) % n].p);
+        let ao = |q: Ponto| {
+            let d = atual.distancia(q).max(1e-12);
+            Ponto::novo(atual.x + (q.x - atual.x) / d * r, atual.y + (q.y - atual.y) / d * r)
+        };
+        fora.push(Vertice { p: ao(ant), bulge: (std::f64::consts::FRAC_PI_2 / 4.0).tan() });
+        fora.push(Vertice { p: ao(prox), bulge: 0.0 });
+    }
+    fora
+}
+
+fn forma_retangulo_reto(f: &Value) -> Res<Geometria> {
     if f.get("canto1").is_some() {
         return Ok(retangulo(ponto_de(f, "canto1")?, ponto_de(f, "canto2")?));
     }
@@ -26,6 +52,23 @@ fn forma_retangulo(f: &Value) -> Res<Geometria> {
     let (s, k) = giro.sin_cos();
     let canto = |dx: f64, dy: f64| Ponto::novo(c.x + dx * k - dy * s, c.y + dx * s + dy * k);
     Ok(Geometria::Polilinha { vertices: vertices(&[canto(0.0, 0.0), canto(l, 0.0), canto(l, a), canto(0.0, a)]), fechada: true })
+}
+
+/// Hachura de um ou mais contornos (`contornos`: listas de pontos, o primeiro é o de fora, os de dentro viram ilhas) ou de um
+/// só (`pontos`), com um padrão da biblioteca (`padrao`, padrão `solida`) e `escala`.
+fn forma_hachura(f: &Value) -> Res<Geometria> {
+    let laços: Vec<Vec<Vertice>> = match (f.get("contornos"), f.get("pontos")) {
+        (Some(c), _) => c.as_array().ok_or("`contornos` precisa ser uma lista de listas de pontos")?.iter().map(|l| lista_de_pontos(l, "contornos").map(|p| vertices(&p))).collect::<Res<_>>()?,
+        (None, Some(p)) => vec![vertices(&lista_de_pontos(p, "pontos")?)],
+        _ => return Err("hachura: falta `pontos` (um contorno) ou `contornos`".into()),
+    };
+    if laços.is_empty() || laços.iter().any(|l| l.len() < 3) {
+        return Err("hachura: cada contorno precisa de ao menos 3 pontos".into());
+    }
+    let pedido = texto_opcional(f, "padrao").unwrap_or(feathercad_core::padroes::SOLIDA);
+    let nome = feathercad_core::padroes::reconhecer(pedido).ok_or_else(|| format!("padrão `{pedido}` não existe (solida ou {})", feathercad_core::padroes::NOMES.join(", ").to_lowercase()))?;
+    let (padrao, nome) = feathercad_core::padroes::para_contornos(nome, numero_opcional(f, "escala").unwrap_or(1.0), &laços);
+    Ok(Geometria::Hachura { contornos: laços, padrao, nome })
 }
 
 /// A linha por dois pontos, ou por ponto + distância + ângulo (polar).
@@ -77,8 +120,9 @@ fn forma(f: &Value) -> Res<Geometria> {
             let pts = lista_de_pontos(f.get("pontos").ok_or("falta `pontos`")?, "pontos")?;
             (pts.len() >= 2).then(|| Geometria::Polilinha { vertices: vertices(&pts), fechada: f.get("fechada").and_then(Value::as_bool).unwrap_or(false) }).ok_or_else(|| "a polilinha precisa de ao menos 2 pontos".to_string())
         }
+        "hachura" => forma_hachura(f),
         "texto" => Ok(Geometria::Texto { ponto: ponto_de(f, "ponto")?, altura: numero_de(f, "altura")?, rotacao: numero_opcional(f, "rotacao").unwrap_or(0.0), conteudo: texto_de(f, "conteudo")?.to_string(), h: AlinhaH::Esquerda, v: AlinhaV::Base }),
-        outro => Err(format!("forma desconhecida `{outro}` (use linha, retangulo, poligono, polilinha, circulo, arco ou texto)")),
+        outro => Err(format!("forma desconhecida `{outro}` (use linha, retangulo, poligono, polilinha, circulo, arco, hachura ou texto)")),
     }
 }
 
@@ -162,6 +206,13 @@ pub fn editar(doc: &mut Documento, args: &Value) -> Res<Value> {
         match (op, &t) {
             ("apagar", _) => ms.push(Mudanca::Remover(*id)),
             ("propriedades", _) => ms.push(propriedades(doc, e.id, args)?),
+            ("texto", _) => {
+                if let Geometria::Texto { ponto, altura, rotacao, conteudo, h, v } = &e.geometria {
+                    let novo = texto_opcional(args, "conteudo").map_or_else(|| conteudo.clone(), str::to_string);
+                    let alt = numero_opcional(args, "altura").filter(|a| *a > 0.0).unwrap_or(*altura);
+                    ms.push(Mudanca::Trocar(*id, Geometria::Texto { ponto: *ponto, altura: alt, rotacao: *rotacao, conteudo: novo, h: *h, v: *v }));
+                }
+            }
             (_, Some(t)) if op == "copiar" => {
                 let mut acumulada = *t;
                 for _ in 0..quantidade {
@@ -171,7 +222,7 @@ pub fn editar(doc: &mut Documento, args: &Value) -> Res<Value> {
             }
             (_, Some(t)) if copia_espelho || copia_girar => ms.push(Mudanca::Novo(NovaEntidade { camada: e.camada, cor: e.cor, geometria: transformar(&e.geometria, t), props: e.props.clone() })),
             (_, Some(t)) => ms.push(Mudanca::Trocar(*id, transformar(&e.geometria, t))),
-            _ => return Err(format!("operação desconhecida `{op}` (mover, copiar, girar, escala, espelhar, apagar, propriedades)")),
+            _ => return Err(format!("operação desconhecida `{op}` (mover, copiar, girar, escala, espelhar, apagar, propriedades, texto)")),
         }
     }
     let novos = doc.aplicar_mudancas(ms);
@@ -263,9 +314,15 @@ fn propriedade_de_camada(doc: &mut Documento, nome: &str, args: &Value) -> Res<(
 pub fn hachurar(doc: &mut Documento, args: &Value) -> Res<Value> {
     let p = ponto_de(args, "ponto")?;
     let solida = args.get("solida").and_then(Value::as_bool).unwrap_or(true);
-    let g = hachura_no_ponto(doc, p, solida).map_err(|_| "não há área fechada em volta desse ponto (falta fechar o contorno? use cad_verificar)".to_string())?;
+    let escala = numero_opcional(args, "escala").unwrap_or(1.0);
+    let pedido = match texto_opcional(args, "padrao") {
+        Some(n) => feathercad_core::padroes::reconhecer(n).ok_or_else(|| format!("padrão `{n}` não existe (solida ou {})", feathercad_core::padroes::NOMES.join(", ").to_lowercase()))?,
+        None if solida => feathercad_core::padroes::SOLIDA,
+        None => feathercad_core::padroes::PADRAO_DE_FABRICA,
+    };
+    let g = hachura_com_padrao(doc, p, pedido, escala).map_err(|_| "não há área fechada em volta desse ponto (falta fechar o contorno? use cad_verificar)".to_string())?;
     let id = doc.adicionar_geometria(g);
-    Ok(json!({ "criada": { "id": id, "tipo": "hachura", "solida": solida }, "ponto": par(p) }))
+    Ok(json!({ "criada": { "id": id, "tipo": "hachura", "solida": pedido == feathercad_core::padroes::SOLIDA, "padrao": pedido, "escala": escala }, "ponto": par(p) }))
 }
 
 /// Desfaz ou refaz o último passo.

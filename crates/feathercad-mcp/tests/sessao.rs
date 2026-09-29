@@ -318,3 +318,42 @@ fn lote_e_anunciado_com_a_linguagem_de_expressoes() {
     let d = lote["description"].as_str().unwrap();
     assert!(d.contains("para_cada") && d.contains("deslocar(caminho,d)") && d.contains("tudo ou nada") || d.contains("Tudo ou nada"));
 }
+
+#[test]
+fn folha_pdf_contar_e_hachura_com_padrao_funcionam_pelo_mcp() {
+    let mut s = Servidor::novo();
+    s.json("cad_novo", json!({ "unidade": "m" }));
+    s.json("cad_criar", json!({ "formas": [{ "tipo": "linha", "a": [0, 0], "b": [500, 250] }] }));
+    for i in 0..6 {
+        s.json("cad_criar", json!({ "camada": "DORMENTES", "formas": [{ "tipo": "retangulo", "canto": [f64::from(i) * 2.0, 10], "largura": 0.24, "altura": 2.0, "rotacao": 30 }] }));
+    }
+    // folha: sem escala pedida escolhe a que cabe; origem põe o canto em (0,0)
+    let f = s.json("cad_folha", json!({ "acao": "inserir", "papel": "A1", "origem": true, "campos": { "titulo": "TÚNEL" } }));
+    assert_eq!(f["folha"]["papel"], "A1");
+    assert_eq!(f["folha"]["min"], json!({ "x": 0.0, "y": 0.0 }));
+    let escala = f["folha"]["escala"].as_f64().unwrap();
+    assert!(escala >= 500.0, "500 m em A1 pedem 1:750 ou mais: {escala}");
+    let c = s.json("cad_folha", json!({ "acao": "campos", "indice": 0 }));
+    assert_eq!(c["campos"]["titulo"], "TÚNEL");
+    let e = s.json("cad_folha", json!({ "acao": "escala", "indice": 0, "escala": 1000 }));
+    assert_eq!(e["folha"]["escala_texto"], "1:1000");
+    // contar dormentes pela medida e pelo modelo, mesmo girados
+    let n = s.json("cad_contar", json!({ "tipo": "retangulo", "medida": { "largura": 0.24, "altura": 2 }, "camada": "DORMENTES" }));
+    assert_eq!(n["total"], 6);
+    let (ent, _) = s.ferramenta("cad_entidades", json!({ "camada": "DORMENTES", "limite": 1 }));
+    let id = serde_json::from_str::<Value>(ent[0]["text"].as_str().unwrap()).unwrap()["entidades"][0]["id"].as_u64().unwrap();
+    assert_eq!(s.json("cad_contar", json!({ "igual_a": id }))["total"], 6);
+    // hachura com padrão e como forma
+    let h = s.json("cad_criar", json!({ "formas": [{ "tipo": "hachura", "pontos": [[600, 0], [700, 0], [700, 100], [600, 100]], "padrao": "concreto" }] }));
+    assert_eq!(h["criadas"][0]["tipo"], "hachura");
+    let dir = std::env::temp_dir().join(format!("fcad_pdf_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let pdf = dir.join("t.pdf");
+    let r = s.json("cad_pdf", json!({ "caminho": pdf.to_str().unwrap(), "papel": "A1" }));
+    assert_eq!(r["paginas"], 1);
+    let bytes = std::fs::read(&pdf).unwrap();
+    assert!(bytes.starts_with(b"%PDF") && String::from_utf8_lossy(&bytes).contains("MediaBox [0 0 2383.937 1683.78]"), "A1 deitada");
+    let (_, erro) = s.ferramenta("cad_pdf", json!({ "caminho": pdf.to_str().unwrap() }));
+    assert!(erro, "não sobrescreve sem pedir");
+    std::fs::remove_dir_all(&dir).ok();
+}

@@ -76,6 +76,7 @@ fn editar_ou_criar(ag: &mut Agente, nome: &str, args: &Value) -> Res<Value> {
         "cad_editar" => editar(&mut ag.doc, args),
         "cad_camadas" => camadas(&mut ag.doc, args),
         "cad_hachurar" => hachurar(&mut ag.doc, args),
+        "cad_folha" => crate::folhas::folha(&mut ag.doc, args),
         "cad_simbolo" => simbolo(&mut ag.doc, args),
         "cad_eletroduto" => eletroduto(&mut ag.doc, args),
         "cad_desfazer" => Ok(desfazer(&mut ag.doc, args.get("refazer").and_then(Value::as_bool).unwrap_or(false))),
@@ -100,6 +101,8 @@ pub fn chamar(ag: &mut Agente, fonte: &Fonte, nome: &str, args: &Value) -> Res<C
         "cad_regioes" => regioes(&ag.doc, args).map(|v| texto(&v)),
         "cad_verificar" => Ok(texto(&verificar(&ag.doc, args))),
         "cad_lote" => lote(ag, fonte, args).map(|v| texto(&v)),
+        "cad_pdf" => crate::folhas::pdf(ag, args).map(|v| texto(&v)),
+        "cad_contar" => crate::folhas::contar(&ag.doc, args).map(|v| texto(&v)),
         outra => editar_ou_criar(ag, outra, args).map(|v| texto(&v)),
     }
 }

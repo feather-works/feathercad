@@ -13,7 +13,9 @@
 //! A 50 25 10 0 90            arco: centro, raio, ângulo inicial e final
 //! T 10 10 2.5 0 "Sala"       texto: ponto, altura, giro, conteúdo
 //! . 5 5                      ponto
-//! H solida 0 0 10 0 10 10 | 2 2 4 2 4 4   hachura (laços separados por |)
+//! H solida 0 0 10 0 10 10 | 2 2 4 2 4 4   hachura (laços separados por |); em vez de `solida`: `padrao` (45°) ou um da
+//!                                           biblioteca — concreto, areia, brita, terra, tijolo, ansi32, ansi37, horizontal,
+//!                                           vertical, grade, pontos — e `terra*2` dobra o espaço do padrão
 //! ```
 //! Uma linha pode começar por `@id` (o id que a IA cita) e terminar por `#RRGGBB` (cor própria).
 //! `camada NOME [#cor] [off] [congelada] [bloqueada]` define a camada e a usa daí em diante.
@@ -21,7 +23,7 @@
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
-use feathercad_core::documento::{AlinhaH, AlinhaV, Camada, Documento, Geometria, Id, LinhaDePadrao};
+use feathercad_core::documento::{AlinhaH, AlinhaV, Camada, Documento, Geometria, Id};
 use feathercad_core::edicao::transformar;
 use feathercad_core::geom::{Ponto, Transf, Vertice};
 
@@ -104,7 +106,7 @@ fn linha_da_forma(g: &Geometria) -> Option<String> {
         Geometria::Arco { centro, raio, inicio, fim } => format!("A {} {} {} {}", pt(*centro), numero(*raio), numero(*inicio), numero(*fim)),
         Geometria::Texto { ponto, altura, rotacao, conteudo, .. } => format!("T {} {} {} {}", pt(*ponto), numero(*altura), numero(*rotacao), texto_entre_aspas(conteudo)),
         Geometria::Ponto { p } => format!(". {}", pt(*p)),
-        Geometria::Hachura { contornos, padrao, .. } => format!("H {} {}", if padrao.is_empty() { "solida" } else { "padrao" }, contornos.iter().map(|c| como_laco(c)).collect::<Vec<_>>().join(" | ")),
+        Geometria::Hachura { contornos, padrao, nome } => format!("H {} {}", if padrao.is_empty() { "solida".to_string() } else if feathercad_core::padroes::reconhecer(nome).is_some() { nome.to_lowercase() } else { "padrao".to_string() }, contornos.iter().map(|c| como_laco(c)).collect::<Vec<_>>().join(" | ")),
         Geometria::Insercao { .. } => return None,
     })
 }
@@ -265,14 +267,20 @@ fn retangulo(n: &[f64]) -> Res<Geometria> {
 }
 
 fn hachura(p: &[String]) -> Res<Geometria> {
-    let solida = p.first().map(String::as_str) == Some("solida");
+    // `solida`, `padrao` (45°) ou o nome de um padrão da biblioteca (`concreto`, `terra`, `tijolo`…); vírgula-escala: `terra*2`
+    let primeiro = p.first().map(String::as_str).unwrap_or("padrao");
+    let (nome_pedido, escala) = match primeiro.split_once('*') {
+        Some((n, e)) => (n, e.replace(',', ".").parse::<f64>().map_err(|_| format!("hachura: escala `{e}` inválida"))?),
+        None => (primeiro, 1.0),
+    };
+    let nome = if nome_pedido.eq_ignore_ascii_case("solida") { feathercad_core::padroes::SOLIDA } else if nome_pedido.eq_ignore_ascii_case("padrao") { feathercad_core::padroes::PADRAO_DE_FABRICA } else { feathercad_core::padroes::reconhecer(nome_pedido).ok_or_else(|| format!("hachura: padrão `{nome_pedido}` não existe (solida, padrao ou {})", feathercad_core::padroes::NOMES.join(", ").to_lowercase()))? };
     let corpo = p.get(1..).unwrap_or(&[]).join(" ");
     let contornos: Vec<Vec<Vertice>> = corpo.split('|').map(|l| lista_de_vertices(&l.split_whitespace().map(str::to_string).collect::<Vec<_>>())).collect::<Res<_>>()?;
     if contornos.iter().any(|c| c.len() < 3) {
         return Err("hachura: cada laço precisa de ao menos 3 pontos".into());
     }
-    let padrao = if solida { Vec::new() } else { vec![LinhaDePadrao { angulo: 45.0, base: contornos[0][0].p, dx: -0.7, dy: 0.7 }] };
-    Ok(Geometria::Hachura { contornos, padrao, nome: if solida { "SOLID".into() } else { "ANSI31".into() } })
+    let (padrao, nome) = feathercad_core::padroes::para_contornos(nome, escala, &contornos);
+    Ok(Geometria::Hachura { contornos, padrao, nome })
 }
 
 /// Uma forma a partir da letra e dos argumentos (já sem `@id` nem `#cor`).
