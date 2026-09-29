@@ -30,7 +30,7 @@ export const CAIXA_EXPORTAR_CSS = `
 .exportar .pe button.principal { background: var(--destaque); color: var(--fundo-painel); border-color: var(--destaque); }
 `;
 
-const PAPEIS: OpcoesPdf['papel'][] = ['A4', 'A3', 'A2', 'A1'];
+const PAPEIS: OpcoesPdf['papel'][] = ['A4', 'A3', 'A2', 'A1', 'A0', 'FOLHA'];
 const ORIENTACOES: OpcoesPdf['orientacao'][] = ['automatica', 'horizontal', 'vertical'];
 
 /** Um grupo de botões de escolha única; `aoMudar` guarda o valor. */

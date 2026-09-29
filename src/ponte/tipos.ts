@@ -8,7 +8,7 @@ export interface Ponto {
 /** A janela por onde se olha o desenho. Toda conta sobre ela é do Rust. */
 /** O que o diálogo de exportação pede ao motor (o Rust valida e monta o PDF). */
 export interface OpcoesPdf {
-  papel: 'A4' | 'A3' | 'A2' | 'A1';
+  papel: 'A4' | 'A3' | 'A2' | 'A1' | 'A0' | 'FOLHA';
   orientacao: 'automatica' | 'horizontal' | 'vertical';
   /** `true` mantém as cores da tela; `false` é o modo papel (preto sobre branco). */
   cores: boolean;

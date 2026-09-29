@@ -493,6 +493,18 @@ pub fn montar(doc: &Documento, vista: &Vista, versao_conhecida: Option<u64>, fun
     montar_com_selecao(doc, vista, versao_conhecida, fundo, fundo_claro, &BTreeSet::new(), 0)
 }
 
+/// Como `montar`, para impressão: arcos e círculos com `tolerancia_px` de erro (a tela usa 0,5 px; o papel pede bem menos,
+/// senão um círculo pequeno sai como um octógono). Sempre é um quadro novo, sem fundo.
+pub fn montar_fino(doc: &Documento, vista: &Vista, fundo_claro: bool, tolerancia_px: f64) -> Vec<u8> {
+    let ctx = Contexto { doc, vista, area: vista.area_visivel(), tolerancia: tolerancia_px / vista.escala, fundo_claro };
+    let mut dentro = Saida::default();
+    let raiz = Nivel { t: Transf::IDENTIDADE, herdada: None, profundidade: 0, destaque: false };
+    for e in doc.entidades() {
+        desenhar(&ctx, &Peca { camada: e.camada, cor: e.cor, geo: &e.geometria, destaque: false, props: &e.props }, &raiz, &mut dentro);
+    }
+    escrever_quadro(0, &dentro, vista, None)
+}
+
 /// Como `montar`, com os objetos `selecao` na cor de seleção. `revisao` é o contador da seleção: entra
 /// na versão do quadro (`versão do desenho + revisão × 2³²`), porque mudar só a seleção também refaz o quadro.
 pub fn montar_com_selecao(doc: &Documento, vista: &Vista, versao_conhecida: Option<u64>, fundo: Option<f64>, fundo_claro: bool, selecao: &BTreeSet<Id>, revisao: u64) -> Vec<u8> {

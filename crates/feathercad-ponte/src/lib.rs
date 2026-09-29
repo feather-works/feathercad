@@ -762,7 +762,7 @@ impl Ponte {
     /// O PDF do documento, uma página por folha (camada `FOLHA`; sem folhas, o desenho inteiro).
     fn documento_exportar_pdf(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
         let p: PedidoPdf = ler("documento_exportar_pdf", corpo)?;
-        let papel = feathercad_io::pdf::Papel::de_nome(&p.papel).ok_or_else(|| format!("papel `{}` não existe (A4, A3, A2 ou A1)", p.papel))?;
+        let papel = feathercad_io::pdf::Papel::de_nome(&p.papel).ok_or_else(|| format!("papel `{}` não existe (A4, A3, A2, A1, A0 ou FOLHA)", p.papel))?;
         let orientacao = match &p.orientacao {
             Some(o) => feathercad_io::pdf::Orientacao::de_nome(o).ok_or_else(|| format!("orientação `{o}` não existe (automatica, horizontal ou vertical)"))?,
             None => feathercad_io::pdf::Orientacao::Automatica,
