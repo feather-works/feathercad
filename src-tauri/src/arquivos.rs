@@ -280,3 +280,32 @@ pub fn inicio_projeto_remover(app: AppHandle, pasta: String) -> Result<EstadoIni
 pub fn inicio_pasta_listar(pasta: String) -> Result<Vec<ItemDeArquivo>, String> {
     inicio::listar_pasta(Path::new(&pasta))
 }
+
+/// Miniaturas já feitas, por caminho e data de modificação: a página inicial pede de novo a cada visita.
+static MINIATURAS: Mutex<Vec<((String, u64), String)>> = Mutex::new(Vec::new());
+const MINIATURAS_GUARDADAS: usize = 200;
+
+/// A miniatura (SVG) de um desenho do disco, para a página inicial. Vazia se o desenho não tem o que mostrar.
+/// Roda fora da thread da interface; o arquivo é lido e desenhado só aqui, nada passa pelo desenho aberto.
+#[tauri::command]
+pub async fn inicio_miniatura(caminho: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let modificado = std::fs::metadata(&caminho).map_err(|e| e.to_string())?.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map_or(0, |d| d.as_millis() as u64);
+        let chave = (caminho.clone(), modificado);
+        if let Some((_, svg)) = MINIATURAS.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(k, _)| *k == chave) {
+            return Ok(svg.clone());
+        }
+        let bytes = std::fs::read(&caminho).map_err(|e| e.to_string())?;
+        let aberto = feathercad_io::abrir(&bytes)?;
+        let svg = feathercad_io::pdf::miniatura_svg(&aberto.doc, 320.0, 200.0).unwrap_or_default();
+        let mut guardadas = MINIATURAS.lock().unwrap_or_else(|e| e.into_inner());
+        guardadas.retain(|(k, _)| k.0 != chave.0);
+        if guardadas.len() >= MINIATURAS_GUARDADAS {
+            guardadas.remove(0);
+        }
+        guardadas.push((chave, svg.clone()));
+        Ok(svg)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}

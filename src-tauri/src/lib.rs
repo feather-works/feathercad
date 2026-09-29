@@ -124,6 +124,7 @@ pub fn run() {
             arquivos::inicio_projeto_adicionar,
             arquivos::inicio_projeto_remover,
             arquivos::inicio_pasta_listar,
+            arquivos::inicio_miniatura,
             metricas::metricas_do_motor,
             mcp::mcp_estado,
             mcp::mcp_testar,

@@ -82,6 +82,8 @@ export const inicioEstado = (): Promise<EstadoInicio> => chamar<EstadoInicio>('i
 export const inicioRecenteRemover = (caminho: string): Promise<EstadoInicio> => chamar<EstadoInicio>('inicio_recente_remover', { caminho });
 export const inicioProjetoAdicionar = (): Promise<EstadoInicio> => chamar<EstadoInicio>('inicio_projeto_adicionar');
 export const inicioProjetoRemover = (pasta: string): Promise<EstadoInicio> => chamar<EstadoInicio>('inicio_projeto_remover', { pasta });
+/** A miniatura (SVG) de um desenho do disco; texto vazio se não há o que mostrar. */
+export const inicioMiniatura = (caminho: string): Promise<string> => chamar<string>('inicio_miniatura', { caminho });
 export const inicioPastaListar = (pasta: string): Promise<ItemDeArquivo[]> => chamar<ItemDeArquivo[]>('inicio_pasta_listar', { pasta });
 
 /** Um processo da árvore do aplicativo, como o Rust o mede. */

@@ -11,7 +11,7 @@
  * e a língua (o Rust sem dependência não conhece o fuso).
  */
 
-import { inicioEstado, inicioPastaListar, inicioProjetoAdicionar, inicioProjetoRemover, inicioRecenteRemover, noApp } from '../ponte/nativo.ts';
+import { inicioEstado, inicioMiniatura, inicioPastaListar, inicioProjetoAdicionar, inicioProjetoRemover, inicioRecenteRemover, noApp } from '../ponte/nativo.ts';
 import type { EstadoInicio, ItemDeArquivo } from '../ponte/nativo.ts';
 import { codigoAtual, type Textos } from '../idiomas/index.ts';
 import { guardarVisaoDoInicio, visaoDoInicio } from './preferencias.ts';
@@ -52,6 +52,7 @@ export const PAGINA_INICIAL_CSS = `
 .inicio .cartao { display: flex; flex-direction: column; gap: 4px; padding: 10px; background: var(--fundo-faixa); border: 1px solid var(--borda); border-radius: 3px; cursor: pointer; }
 .inicio .cartao:hover, .inicio .cartao:focus { border-color: var(--destaque); outline: none; }
 .inicio .cartao .miniatura { display: flex; align-items: center; justify-content: center; height: 100px; background: var(--fundo-area); color: var(--destaque); font-size: 38px; }
+.inicio .cartao .miniatura img { width: 100%; height: 100%; object-fit: contain; }
 .inicio .cartao .nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inicio .cartao .data { color: var(--texto-suave); font-size: 11px; }
 .inicio .vazio { padding: 30px 4px; color: var(--texto-suave); }
@@ -200,17 +201,42 @@ export function criarPaginaInicial(cx: Contexto): PaginaInicial {
     return tabela;
   }
 
+  // Cada desenho da grade pede a sua miniatura ao Rust, um de cada vez (a lista aparece na hora, as imagens vão chegando).
+  // Uma grade nova invalida a fila da anterior.
+  let geracaoDasMiniaturas = 0;
+  async function carregarMiniaturas(fila: { caminho: string; caixa: HTMLElement }[]): Promise<void> {
+    const minha = ++geracaoDasMiniaturas;
+    if (!noApp()) return;
+    for (const { caminho, caixa } of fila) {
+      if (minha !== geracaoDasMiniaturas) return;
+      try {
+        const svg = await inicioMiniatura(caminho);
+        if (minha !== geracaoDasMiniaturas || !svg) continue;
+        const img = document.createElement('img');
+        img.alt = '';
+        img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+        caixa.replaceChildren(img);
+      } catch (e) {
+        console.warn(`[início] sem miniatura de ${caminho}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
+
   function cartoes(lista: { item: ItemDeArquivo; data: number | null }[]): HTMLElement {
     const g = el('div', 'cartoes');
+    const fila: { caminho: string; caixa: HTMLElement }[] = [];
     for (const { item, data: quandoMs } of lista) {
       const c = el('div', 'cartao');
       c.tabIndex = 0;
       c.title = item.caminho;
-      c.append(el('div', 'miniatura', '╱'), el('div', 'nome', item.nome), el('div', 'data', quando(quandoMs)));
+      const miniatura = el('div', 'miniatura', '╱');
+      fila.push({ caminho: item.caminho, caixa: miniatura });
+      c.append(miniatura, el('div', 'nome', item.nome), el('div', 'data', quando(quandoMs)));
       c.addEventListener('dblclick', () => cx.aoAbrir(item.caminho));
       c.addEventListener('keydown', (ev) => ev.key === 'Enter' && cx.aoAbrir(item.caminho));
       g.append(c);
     }
+    void carregarMiniaturas(fila);
     return g;
   }
 
