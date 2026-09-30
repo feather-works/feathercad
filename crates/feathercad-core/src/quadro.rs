@@ -172,6 +172,31 @@ fn escrever_texto(saida: &mut Vec<u8>, geo: &Geometria, cor: u32, vista: &Vista,
     true
 }
 
+/// Um hash barato (multiplicar e girar) para a grade de pixels do LOD: a chave é só três inteiros e o `SipHash` do
+/// `std` custava mais que o resto da conta em 300 mil traços.
+#[derive(Default)]
+struct HashRapido(u64);
+
+impl std::hash::Hasher for HashRapido {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for b in bytes {
+            self.0 = (self.0.rotate_left(5) ^ u64::from(*b)).wrapping_mul(0x517c_c1b7_2722_0a95);
+        }
+    }
+    fn write_i32(&mut self, i: i32) {
+        self.0 = (self.0.rotate_left(5) ^ u64::from(i as u32)).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+    fn write_u32(&mut self, i: u32) {
+        self.0 = (self.0.rotate_left(5) ^ u64::from(i)).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+}
+
+/// Os pixels que já têm um traço miúdo de certa cor (LOD).
+type PixelsOcupados = std::collections::HashSet<(i32, i32, u32), std::hash::BuildHasherDefault<HashRapido>>;
+
 /// O que se acumula ao montar o quadro.
 #[derive(Default)]
 struct Saida {
@@ -181,6 +206,10 @@ struct Saida {
     nt: u32,
     preenchimentos: Vec<u8>,
     np: u32,
+    /// LOD da tela: um traço que cabe num pixel só é escrito uma vez por pixel e cor (senão um mapa denso, com o
+    /// desenho todo na tela, manda centenas de milhares de riscos que se sobrepõem no mesmo pixel).
+    lod: bool,
+    ocupados: PixelsOcupados,
 }
 
 /// O que não muda ao descer pelas entidades e pelos blocos.
@@ -279,6 +308,10 @@ type TracoPx = ((f64, f64), (f64, f64));
 const MAXIMO_DE_TRACOS_POR_FORMA: f64 = 4000.0;
 
 fn escrever_px(saida: &mut Saida, ((x1, y1), (x2, y2)): TracoPx, cor: u32, espessura: f32) {
+    // LOD: traço que cabe num pixel já desenhado (mesma cor) não muda nada na tela.
+    if saida.lod && (x2 - x1).abs() < 1.0 && (y2 - y1).abs() < 1.0 && !saida.ocupados.insert((x1.round() as i32, y1.round() as i32, cor)) {
+        return;
+    }
     for v in [x1, y1, x2, y2] {
         escrever_f32(&mut saida.corpo, v);
     }
@@ -296,6 +329,9 @@ struct Nivel {
     destaque: bool,
 }
 
+/// LOD: bloco menor que isto (em pixels na tela) é desenhado como um ponto.
+const BLOCO_MINIMO_PX: f64 = 2.0;
+
 /// Desenha um bloco inserido: recorta pela caixa dele e desce em cada entidade, sob a transformação composta.
 fn desenhar_insercao(ctx: &Contexto<'_>, geo: &Geometria, nivel: &Nivel, cor: u32, destaque: bool, saida: &mut Saida) {
     let Geometria::Insercao { bloco, ponto, escala_x, escala_y, rotacao } = geo else { return };
@@ -304,6 +340,13 @@ fn desenhar_insercao(ctx: &Contexto<'_>, geo: &Geometria, nivel: &Nivel, cor: u3
     if let Some(caixa) = ctx.doc.caixa_guardada_do_bloco(*bloco) {
         let (min, max) = caixa_transformada(caixa, &filha);
         if !toca(ctx.area, min, max) {
+            return;
+        }
+        // LOD: um bloco que na tela mede menos que `BLOCO_MINIMO_PX` vira um ponto (as árvores de um mapa inteiro).
+        if ctx.simplificar && (max.x - min.x).max(max.y - min.y) * ctx.vista.escala < BLOCO_MINIMO_PX {
+            let cor_do_ponto = if destaque { COR_DA_SELECAO } else { cor_na_tela(cor, ctx.fundo_claro) };
+            let (px, py) = ctx.vista.para_tela(Ponto::novo((min.x + max.x) / 2.0, (min.y + max.y) / 2.0));
+            escrever_px(saida, ((px, py), (px + 0.5, py)), cor_do_ponto, ESPESSURA);
             return;
         }
     }
@@ -505,6 +548,43 @@ fn sem_traco_invisivel(tracos: &mut Vec<TracoPx>) {
     }
 }
 
+/// LOD: o passo mínimo entre pontos de uma linha quebrada na tela (em pixels ao quadrado): pontos mais juntos que
+/// isto (0,8 px) são absorvidos no traço seguinte. Uma curva de mil cordas com o desenho todo na tela vira dezenas.
+const PASSO_MINIMO_PX2: f64 = 0.64;
+
+/// Decima uma sequência de segmentos: a cadeia que se emenda (o fim de um é o começo do próximo) só emite um ponto
+/// novo quando ele está a mais de `PASSO_MINIMO_PX2` do último emitido. Se a forma toda é miúda, sobra um traço
+/// (ela não some). Sequências que não se emendam (recortadas pela janela) recomeçam a cadeia.
+fn decimar(tracos: &mut Vec<TracoPx>) {
+    if tracos.len() < 2 {
+        return;
+    }
+    let junto = |p: (f64, f64), q: (f64, f64)| (p.0 - q.0).abs() < 1e-6 && (p.1 - q.1).abs() < 1e-6;
+    let longe = |p: (f64, f64), q: (f64, f64)| (p.0 - q.0).powi(2) + (p.1 - q.1).powi(2) >= PASSO_MINIMO_PX2;
+    let mut fora: Vec<TracoPx> = Vec::with_capacity(tracos.len() / 2 + 1);
+    let mut inicio = tracos[0].0;
+    let mut ultimo = inicio;
+    for (de, ate) in tracos.iter().copied() {
+        if !junto(de, ultimo) {
+            if !junto(ultimo, inicio) {
+                fora.push((inicio, ultimo));
+            }
+            inicio = de;
+        }
+        ultimo = ate;
+        if longe(inicio, ultimo) {
+            fora.push((inicio, ultimo));
+            inicio = ultimo;
+        }
+    }
+    if !junto(ultimo, inicio) {
+        fora.push((inicio, ultimo));
+    }
+    if !fora.is_empty() {
+        *tracos = fora;
+    }
+}
+
 /// Desenha uma entidade (do desenho ou de dentro de um bloco).
 fn desenhar(ctx: &Contexto<'_>, peca: &Peca<'_>, nivel: &Nivel, saida: &mut Saida) {
     let Some(c) = ctx.doc.camadas().get(peca.camada) else { return };
@@ -535,6 +615,7 @@ fn desenhar(ctx: &Contexto<'_>, peca: &Peca<'_>, nivel: &Nivel, saida: &mut Said
             let mut em_pixels: Vec<_> = pedacos.iter().map(|(a, b)| (ctx.vista.para_tela(t.aplicar(*a)), ctx.vista.para_tela(t.aplicar(*b)))).collect();
             if ctx.simplificar {
                 sem_traco_invisivel(&mut em_pixels);
+                decimar(&mut em_pixels);
             }
             escrever_tracos(saida, &em_pixels, cor_na_tela, espessura_em_px(peca.props.espessura.or(c.espessura)), peca.props.tipo_linha.unwrap_or(c.tipo_linha));
         }
@@ -575,7 +656,7 @@ pub fn montar_arrastando(doc: &Documento, vista: &Vista, versao_conhecida: Optio
         return MAGIA_IGUAL.to_vec();
     }
     let ctx = Contexto { doc, vista, area: vista.area_visivel(), tolerancia: TOLERANCIA_DO_ARCO_PX / vista.escala, fundo_claro, simplificar: true };
-    let mut dentro = Saida::default();
+    let mut dentro = Saida { lod: true, ..Saida::default() };
     let raiz = Nivel { t: Transf::IDENTIDADE, herdada: None, profundidade: 0, destaque: false };
     for e in doc.entidades() {
         let selecionada = selecao.contains(&e.id);
@@ -615,4 +696,67 @@ fn escrever_quadro(versao: u64, dentro: &Saida, vista: &Vista, fundo: Option<f64
     escrever_marcas(&mut saida, &xs);
     escrever_marcas(&mut saida, &ys);
     saida
+}
+
+#[cfg(test)]
+mod lod {
+    use super::*;
+    use crate::documento::{Bloco, Documento, NovaEntidade};
+    use crate::geom::Vertice;
+
+    fn segmentos_do_quadro(bytes: &[u8]) -> u32 {
+        u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]])
+    }
+
+    fn vista(escala: f64) -> Vista {
+        Vista { centro: Ponto::novo(0.0, 0.0), escala, largura: 1000.0, altura: 800.0 }
+    }
+
+    #[test]
+    fn curva_de_mil_cordas_vira_dezenas_com_o_desenho_todo_na_tela_e_fica_inteira_de_perto() {
+        let mut d = Documento::default();
+        let vertices: Vec<Vertice> = (0..=1000).map(|i| Vertice { p: Ponto::novo(f64::from(i) * 0.01, (f64::from(i) * 0.05).sin() * 0.3), bulge: 0.0 }).collect();
+        d.adicionar_polilinha(vertices, false).unwrap();
+        // longe: 10 unidades em 5 px (0,5 px/unidade) → as 1000 cordas colapsam
+        let longe = montar(&d, &vista(0.5), None, None, false);
+        assert!(segmentos_do_quadro(&longe) < 20, "{}", segmentos_do_quadro(&longe));
+        // perto: 10 unidades em 1000 px → cada corda tem 10 px, nenhuma some
+        let perto = montar(&d, &Vista { centro: Ponto::novo(5.0, 0.0), escala: 100.0, largura: 1000.0, altura: 800.0 }, None, None, false);
+        assert!(segmentos_do_quadro(&perto) >= 1000, "{}", segmentos_do_quadro(&perto));
+    }
+
+    #[test]
+    fn dez_mil_linhas_miudas_no_mesmo_pixel_saem_uma_vez_so() {
+        let mut d = Documento::default();
+        for i in 0..10_000 {
+            let y = f64::from(i % 3) * 0.001;
+            d.adicionar_linha(Ponto::novo(0.0, y), Ponto::novo(0.3, y));
+        }
+        // escala 1 px/unidade: cada linha tem 0,3 px e todas caem no pixel do centro
+        let q = montar(&d, &vista(1.0), None, None, false);
+        assert!(segmentos_do_quadro(&q) <= 3, "{}", segmentos_do_quadro(&q));
+        // a impressão (fino) não simplifica: continua com tudo
+        let fino = montar_fino(&d, &vista(1.0), false, 0.05);
+        assert_eq!(segmentos_do_quadro(&fino), 10_000);
+    }
+
+    #[test]
+    fn bloco_minusculo_na_tela_vira_um_ponto_e_de_perto_desce_no_bloco() {
+        let arvore = Bloco {
+            nome: "ARVORE".into(),
+            base: Ponto::novo(0.0, 0.0),
+            entidades: vec![
+                NovaEntidade { camada: 0, cor: None, geometria: crate::documento::Geometria::Circulo { centro: Ponto::novo(0.0, 0.0), raio: 1.0 }, props: Default::default() },
+                NovaEntidade { camada: 0, cor: None, geometria: crate::documento::Geometria::Linha { a: Ponto::novo(-1.0, 0.0), b: Ponto::novo(1.0, 0.0) }, props: Default::default() },
+            ],
+        };
+        let insercoes = (0..500).map(|i| NovaEntidade { camada: 0, cor: None, geometria: crate::documento::Geometria::Insercao { bloco: 0, ponto: Ponto::novo(f64::from(i) * 3.0, 0.0), escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default() }).collect();
+        let d = Documento::de_partes_com_blocos(Vec::new(), 0, vec![arvore], insercoes);
+        // escala 0,1: cada árvore (2 unidades) mede 0,2 px → um ponto por árvore
+        let longe = montar(&d, &Vista { centro: Ponto::novo(750.0, 0.0), escala: 0.1, largura: 1000.0, altura: 800.0 }, None, None, false);
+        assert!(segmentos_do_quadro(&longe) <= 500, "{}", segmentos_do_quadro(&longe));
+        // escala 50: a árvore mede 100 px → círculo (muitas cordas) e a linha
+        let perto = montar(&d, &Vista { centro: Ponto::novo(0.0, 0.0), escala: 50.0, largura: 1000.0, altura: 800.0 }, None, None, false);
+        assert!(segmentos_do_quadro(&perto) > 10, "{}", segmentos_do_quadro(&perto));
+    }
 }

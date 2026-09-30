@@ -5,100 +5,16 @@
  */
 
 import { canalMedido } from './metricas.ts';
+import { etapa } from './perfil.ts';
+import { lerQuadro } from './quadro-binario.ts';
+import { noApp, ponteBinaria } from './nativo.ts';
 import { chamarJson, type Canal } from './canal.ts';
-import type { CamposFolha, OpcoesDeHachura, ConsultaDeCamadas, FolhasDoMotor, OpcoesPdf, PedidoFolhaNova, RespostaFolha, TipoDeSnap, Estado, Fundo, RespostaDeMenu, Unidade, MarcasDoFundo, PedidoDeCamada, RespostaDeCamada, ResumoDePropriedades, TabelaDeCamadas, Ponto, Preenchimento, Quadro, Regional, RespostaCursor, TextoDoQuadro, Vista } from './tipos.ts';
+import type { CamposFolha, OpcoesDeHachura, ConsultaDeCamadas, FolhasDoMotor, OpcoesPdf, PedidoFolhaNova, RespostaFolha, TipoDeSnap, Estado, Fundo, RespostaDeMenu, Unidade, PedidoDeCamada, RespostaDeCamada, ResumoDePropriedades, TabelaDeCamadas, Ponto, Quadro, Regional, RespostaCursor, Vista } from './tipos.ts';
 
 export type { Canal } from './canal.ts';
 export type * from './tipos.ts';
 
-const BYTES_POR_SEGMENTO = 24;
-const BYTES_POR_MARCA = 5;
-const CABECALHO = 16;
-
-function lerMarcas(v: DataView, inicio: number, n: number): MarcasDoFundo {
-  const pos = new Float32Array(n);
-  const principal = new Uint8Array(n);
-  for (let i = 0; i < n; i++) {
-    pos[i] = v.getFloat32(inicio + i * BYTES_POR_MARCA, true);
-    principal[i] = v.getUint8(inicio + i * BYTES_POR_MARCA + 4);
-  }
-  return { pos, principal };
-}
-
-const decodificador = new TextDecoder();
-const ALINHA_H = ['left', 'center', 'right'] as const;
-const ALINHA_V = ['alphabetic', 'bottom', 'middle', 'top'] as const;
-
-/** Lê a seção de textos: contagem e, por texto, posição, altura, giro, alinhamentos, cor e conteúdo. */
-function lerTextos(v: DataView, bytes: Uint8Array, inicio: number): { textos: TextoDoQuadro[]; fim: number } {
-  const n = v.getUint32(inicio, true);
-  const textos: TextoDoQuadro[] = [];
-  let o = inicio + 4;
-  for (let i = 0; i < n; i++) {
-    const x = v.getFloat32(o, true);
-    const y = v.getFloat32(o + 4, true);
-    const altura = v.getFloat32(o + 8, true);
-    const giro = v.getFloat32(o + 12, true);
-    const h = ALINHA_H[v.getUint8(o + 16)] ?? 'left';
-    const base = ALINHA_V[v.getUint8(o + 17)] ?? 'alphabetic';
-    const cor = v.getUint32(o + 18, true);
-    const tamanho = v.getUint16(o + 22, true);
-    const conteudo = decodificador.decode(bytes.subarray(v.byteOffset + o + 24, v.byteOffset + o + 24 + tamanho));
-    textos.push({ x, y, altura, giro, h, base, cor, conteudo });
-    o += 24 + tamanho;
-  }
-  return { textos, fim: o };
-}
-
-/** Lê a seção de preenchimentos: por área, cor e laços de pontos em pixels. */
-function lerPreenchimentos(v: DataView, inicio: number): { preenchimentos: Preenchimento[]; fim: number } {
-  const n = v.getUint32(inicio, true);
-  const preenchimentos: Preenchimento[] = [];
-  let o = inicio + 4;
-  for (let i = 0; i < n; i++) {
-    const cor = v.getUint32(o, true);
-    const nl = v.getUint32(o + 4, true);
-    o += 8;
-    const lacos: Float32Array[] = [];
-    for (let l = 0; l < nl; l++) {
-      const nv = v.getUint32(o, true);
-      o += 4;
-      const pts = new Float32Array(nv * 2);
-      for (let k = 0; k < nv * 2; k++) pts[k] = v.getFloat32(o + k * 4, true);
-      o += nv * 8;
-      lacos.push(pts);
-    }
-    preenchimentos.push({ cor, lacos });
-  }
-  return { preenchimentos, fim: o };
-}
-
-/** Lê os bytes do quadro (formato em `crates/feathercad-core/src/quadro.rs`). */
-export function lerQuadro(bytes: Uint8Array): Quadro {
-  const magia = String.fromCharCode(...bytes.subarray(0, 4));
-  if (magia === 'FCQ0') return { tipo: 'igual' };
-  if (magia !== 'FCQ1') throw new Error(`quadro desconhecido: ${magia}`);
-  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const versao = Number(v.getBigUint64(4, true));
-  const n = v.getUint32(12, true);
-  const xs = new Float32Array(n * 4);
-  const cores = new Uint32Array(n);
-  const espessuras = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const o = CABECALHO + i * BYTES_POR_SEGMENTO;
-    for (let k = 0; k < 4; k++) xs[i * 4 + k] = v.getFloat32(o + k * 4, true);
-    cores[i] = v.getUint32(o + 16, true);
-    espessuras[i] = v.getFloat32(o + 20, true);
-  }
-  // Depois dos segmentos vêm os textos e, por fim, o fundo (duas contagens e as marcas de X e de Y).
-  const { textos, fim: fimTextos } = lerTextos(v, bytes, CABECALHO + n * BYTES_POR_SEGMENTO);
-  const { preenchimentos, fim } = lerPreenchimentos(v, fimTextos);
-  const nx = v.getUint32(fim, true);
-  const ny = v.getUint32(fim + 4, true);
-  const fundoX = lerMarcas(v, fim + 8, nx);
-  const fundoY = lerMarcas(v, fim + 8 + nx * BYTES_POR_MARCA, ny);
-  return { tipo: 'novo', versao, xs, cores, espessuras, textos, preenchimentos, fundoX, fundoY };
-}
+export { lerQuadro } from './quadro-binario.ts';
 
 /**
  * Todo comando que a ponte atende e que o `Motor` usa. Na largada a interface pergunta ao motor a
@@ -418,6 +334,26 @@ export class Motor {
 
   /** O que está na tela. Passe `versaoConhecida` só se a vista e o tema não mudaram; `fundoClaro` diz se o tema é claro. */
   quadro(vista: Vista, versaoConhecida: number | null, fundoClaro = false): Quadro {
-    return lerQuadro(this.canal.chamar('quadro', { vista, versao_conhecida: versaoConhecida, fundo_claro: fundoClaro }));
+    const bytes = this.canal.chamar('quadro', { vista, versao_conhecida: versaoConhecida, fundo_claro: fundoClaro });
+    return etapa('quadro/decodificar', () => lerQuadro(bytes));
+  }
+
+  /**
+   * Os bytes do quadro, ainda por decodificar, **sem travar a interface** (IPC binário no aplicativo). Quem os recebe
+   * decodifica onde quiser: a área de desenho manda direto para um Worker (zero cópia, com transferência).
+   */
+  async quadroBrutoAsync(vista: Vista, versaoConhecida: number | null, fundoClaro = false): Promise<Uint8Array> {
+    const pedido = { vista, versao_conhecida: versaoConhecida, fundo_claro: fundoClaro };
+    return noApp() ? ponteBinaria('quadro', pedido) : this.canal.chamar('quadro', pedido);
+  }
+
+  /**
+   * O mesmo quadro, **sem travar a interface**: no aplicativo vai pelo `invoke` binário assíncrono (o Rust calcula em
+   * outra thread, e os bytes voltam crus); no navegador e nos testes é o mesmo `quadro` de sempre, já resolvido.
+   */
+  async quadroAsync(vista: Vista, versaoConhecida: number | null, fundoClaro = false): Promise<Quadro> {
+    if (!noApp()) return this.quadro(vista, versaoConhecida, fundoClaro);
+    const bytes = await ponteBinaria('quadro', { vista, versao_conhecida: versaoConhecida, fundo_claro: fundoClaro });
+    return etapa('quadro/decodificar', () => lerQuadro(bytes));
   }
 }

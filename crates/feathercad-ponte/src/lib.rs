@@ -92,7 +92,8 @@ pub const COMANDOS_DA_PONTE: [&str; 51] = [
 #[derive(Default)]
 pub struct Ponte {
     /// O último ponto do cursor (já resolvido): a direção de uma distância digitada.
-    ultimo_cursor: std::cell::Cell<Option<Ponto>>,
+    /// (`Mutex`, não `Cell`: os comandos de leitura rodam ao mesmo tempo em várias threads.)
+    ultimo_cursor: std::sync::Mutex<Option<Ponto>>,
     doc: Documento,
     sessao: Sessao,
     /// O arquivo em disco de onde veio (ou onde foi salvo) o documento.
@@ -456,6 +457,21 @@ fn segmento(v: &Vista, a: Ponto, b: Ponto) -> Segmento {
 
 impl Ponte {
     /// Atende um comando. O `Err` é a mensagem para o usuário, em português.
+    /// Os comandos que **só leem** o estado (o quadro, o cursor, a vista): podem rodar ao mesmo tempo, sem esperar
+    /// uns pelos outros. A casca os chama com uma trava de leitura, para o mouse continuar andando enquanto o
+    /// quadro é calculado. `None` = não é comando de leitura (use `chamar`).
+    pub fn chamar_leitura(&self, comando: &str, corpo: &[u8]) -> Option<Result<Vec<u8>, String>> {
+        Some(match comando {
+            "quadro" => self.quadro(corpo),
+            "quadro_arrasto" => self.quadro_arrasto(corpo),
+            "cursor_mover" => self.cursor_mover(corpo),
+            "vista_inicial" | "vista_deslocar" | "vista_zoom" | "vista_zoom_centro" | "vista_ajustar" => self.vista(comando, corpo),
+            "vista_texto" => self.vista_texto(corpo),
+            "estado" => self.estado(),
+            _ => return None,
+        })
+    }
+
     pub fn chamar(&mut self, comando: &str, corpo: &[u8]) -> Result<Vec<u8>, String> {
         match comando {
             "estado" => self.estado(),
@@ -582,9 +598,17 @@ impl Ponte {
         json(&serde_json::json!({ "tratado": r.tratado, "janela": r.janela, "estado": estado }))
     }
 
+    fn ultimo_cursor(&self) -> Option<Ponto> {
+        *self.ultimo_cursor.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn guardar_ultimo_cursor(&self, p: Ponto) {
+        *self.ultimo_cursor.lock().unwrap_or_else(|e| e.into_inner()) = Some(p);
+    }
+
     fn digitar(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
         let t: Texto = ler("digitar", corpo)?;
-        self.sessao.cursor = self.ultimo_cursor.get();
+        self.sessao.cursor = self.ultimo_cursor();
         self.sessao.unidade = self.doc.unidade();
         self.sessao.digitar(&mut self.doc, &t.texto);
         self.estado()
@@ -711,7 +735,7 @@ impl Ponte {
     fn cursor_mover(&self, corpo: &[u8]) -> Result<Vec<u8>, String> {
         let m: PedidoMouse = ler("cursor_mover", corpo)?;
         let r = self.resolver_mouse(&m.vista, m.x, m.y);
-        self.ultimo_cursor.set(Some(r.ponto));
+        self.guardar_ultimo_cursor(r.ponto);
         let reg = &self.sessao.regional;
         let base = self.sessao.base();
         let (x, y) = m.vista.para_tela(r.ponto);

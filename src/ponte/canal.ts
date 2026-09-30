@@ -12,6 +12,8 @@
  *   (`crates/feathercad-ponte`) compilado para WebAssembly.
  */
 
+import { etapa } from './perfil.ts';
+
 export interface Canal {
   /**
    * Atende um comando; lança `Error` com a mensagem do Rust se ele recusar. `args`
@@ -68,10 +70,17 @@ export function canalTauri(): Canal {
       // `arraybuffer` aqui, então os bytes vêm como texto de um "charset" que
       // mapeia um byte num caractere, sem conversão.
       x.overrideMimeType('text/plain; charset=x-user-defined');
-      x.send(corpoDe(args) as XMLHttpRequestBodyInit);
-      const texto = x.responseText;
-      const bytes = new Uint8Array(texto.length);
-      for (let i = 0; i < texto.length; i++) bytes[i] = texto.charCodeAt(i) & 0xff;
+      const corpo = etapa('ponte/serializar', () => corpoDe(args) as XMLHttpRequestBodyInit);
+      // a ida e volta até o Rust (com o motor dentro), sem a conversão da resposta
+      const texto = etapa('ponte/xhr', () => {
+        x.send(corpo);
+        return x.responseText;
+      });
+      const bytes = etapa('ponte/bytes', () => {
+        const b = new Uint8Array(texto.length);
+        for (let i = 0; i < texto.length; i++) b[i] = texto.charCodeAt(i) & 0xff;
+        return b;
+      });
       if (x.status !== 200) throw new Error(utf8.decode(bytes) || `ponte://${comando} falhou (${x.status})`);
       return bytes;
     },

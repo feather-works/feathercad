@@ -6,7 +6,7 @@
 //! do motor (ou `None` se o usuário cancelou a caixa).
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use feathercad_io::inicio::{self, ItemDeArquivo, Preferencias};
@@ -60,8 +60,8 @@ fn agora_ms() -> u64 {
 
 /// Um comando da ponte, com o lock.
 fn ponte(app: &AppHandle, comando: &str, corpo: &[u8]) -> Result<Vec<u8>, String> {
-    let estado = app.state::<Mutex<Ponte>>();
-    let mut p = estado.lock().unwrap_or_else(|e| e.into_inner());
+    let estado = app.state::<RwLock<Ponte>>();
+    let mut p = estado.write().unwrap_or_else(|e| e.into_inner());
     p.chamar(comando, corpo)
 }
 

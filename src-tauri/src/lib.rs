@@ -11,7 +11,7 @@ mod memoria_arvore;
 mod mcp;
 mod metricas;
 
-use std::sync::Mutex;
+use std::sync::RwLock;
 use std::time::Instant;
 
 use feathercad_ponte::Ponte;
@@ -30,30 +30,53 @@ fn resposta(status: u16, tipo: &str, corpo: Vec<u8>) -> Response<Vec<u8>> {
         .unwrap_or_else(|_| Response::new(Vec::new()))
 }
 
-/// Atende um pedido do `ponte://`: um comando do motor, com a métrica `[motor]`.
+/// Um comando do motor, com a métrica `[motor]`. Os de **leitura** (`Ponte::chamar_leitura`: quadro, cursor, vista)
+/// rodam com a trava de leitura, ao mesmo tempo; o resto pega a trava de escrita.
+fn executar(app: &tauri::AppHandle, comando: &str, corpo: &[u8]) -> Result<Vec<u8>, String> {
+    let estado = app.state::<RwLock<Ponte>>();
+    let chegou = Instant::now();
+    {
+        let leitura = estado.read().unwrap_or_else(|envenenado| envenenado.into_inner());
+        let espera = chegou.elapsed();
+        let inicio = Instant::now();
+        if let Some(resultado) = leitura.chamar_leitura(comando, corpo) {
+            drop(leitura);
+            metricas::registrar(comando, espera, inicio.elapsed(), corpo.len(), resultado.as_ref().map(Vec::len).map_err(String::as_str));
+            return resultado;
+        }
+    }
+    let chegou = Instant::now();
+    let mut ponte = estado.write().unwrap_or_else(|envenenado| envenenado.into_inner());
+    let espera = chegou.elapsed();
+    let inicio = Instant::now();
+    let resultado = ponte.chamar(comando, corpo);
+    drop(ponte);
+    metricas::registrar(comando, espera, inicio.elapsed(), corpo.len(), resultado.as_ref().map(Vec::len).map_err(String::as_str));
+    resultado
+}
+
+/// Atende um pedido do `ponte://` (XHR síncrono da página): um comando do motor.
 fn atender(app: &tauri::AppHandle, req: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     if req.method() == "OPTIONS" {
         return resposta(200, "text/plain", Vec::new());
     }
-    let estado = app.state::<Mutex<Ponte>>();
-    let chegou = Instant::now();
-    let mut ponte = estado.lock().unwrap_or_else(|envenenado| envenenado.into_inner());
-    let espera = chegou.elapsed();
     let comando = req.uri().path().trim_start_matches('/');
-    let inicio = Instant::now();
-    let resultado = ponte.chamar(comando, req.body());
-    drop(ponte);
-    metricas::registrar(
-        comando,
-        espera,
-        inicio.elapsed(),
-        req.body().len(),
-        resultado.as_ref().map(Vec::len).map_err(String::as_str),
-    );
-    match resultado {
+    match executar(app, comando, req.body()) {
         Ok(bytes) => resposta(200, "application/octet-stream", bytes),
         Err(erro) => resposta(400, "text/plain", erro.into_bytes()),
     }
+}
+
+/// Um comando do motor de **resposta grande** (o quadro do desenho, alguns MB), pelo `invoke` do Tauri: assíncrono,
+/// em outra thread (a janela não trava enquanto o Rust calcula) e com o corpo **cru**. Devolve `ipc::Response`, não
+/// `Vec<u8>`: o `Vec<u8>` iria como JSON (um número decimal por byte), e o `Response` chega ao JavaScript como
+/// `ArrayBuffer` — o mesmo padrão do `ler_arquivo` do FeatherSheet. O XHR síncrono do `ponte://` entregava o quadro
+/// como texto, e converter 10 MB assim custava ~100 ms (medido no zoom com um mapa pesado).
+#[tauri::command]
+async fn ponte_binaria(app: tauri::AppHandle, comando: String, corpo: String) -> Result<tauri::ipc::Response, String> {
+    tauri::async_runtime::spawn_blocking(move || executar(&app, &comando, corpo.as_bytes()).map(tauri::ipc::Response::new))
+        .await
+        .map_err(|e| format!("o comando {e}"))?
 }
 
 /// Memória residente da árvore inteira do aplicativo (o principal e os
@@ -96,13 +119,34 @@ fn abrir_pagina(app: &tauri::AppHandle, rotulo: &str, html: &str, titulo: &str, 
     Ok(())
 }
 
+/// Pede ao WebKitGTK para compor e desenhar o canvas na **placa de vídeo, sempre**. O padrão (`ON_DEMAND`) só usa a
+/// GPU quando a página pede animação 3D ou WebGL; um Canvas 2D comum ficava no processador (usuário 30/09/2026:
+/// a placa nem se mexia durante o zoom). O resultado sai no terminal: `[FeatherCAD] aceleração …`.
+#[cfg(target_os = "linux")]
+fn ligar_aceleracao_por_gpu(app: &tauri::App) {
+    use webkit2gtk::{HardwareAccelerationPolicy, SettingsExt, WebViewExt};
+    let Some(janela) = app.get_webview_window("main") else {
+        eprintln!("[FeatherCAD] aceleração por GPU: janela principal não encontrada");
+        return;
+    };
+    let pedido = janela.with_webview(|webview| {
+        let Some(ajustes) = webview.inner().settings() else { return };
+        let antes = ajustes.hardware_acceleration_policy();
+        ajustes.set_hardware_acceleration_policy(HardwareAccelerationPolicy::Always);
+        eprintln!("[FeatherCAD] aceleração por GPU: {:?} → {:?}", antes, ajustes.hardware_acceleration_policy());
+    });
+    if let Err(erro) = pedido {
+        eprintln!("[FeatherCAD] aceleração por GPU: não consegui acessar a webview: {erro}");
+    }
+}
+
 /// Sobe a janela do FeatherCAD. O conteúdo é o mesmo `dist/index.html` que roda no navegador.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     eprintln!("[FeatherCAD] Aplicativo iniciado (PID: {}). Logs ativados no terminal.", std::process::id());
     let executado = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .manage(Mutex::new(Ponte::default()))
+        .manage(RwLock::new(Ponte::default()))
         .manage(arquivos::VistoNoDisco::default())
         // Assíncrono: o WebKitGTK atende esquema próprio na thread da janela, e
         // esperar o lock ali congelaria a janela. A página continua esperando
@@ -111,8 +155,16 @@ pub fn run() {
             let app = ctx.app_handle().clone();
             tauri::async_runtime::spawn_blocking(move || responder.respond(atender(&app, &req)));
         })
+        .setup(|app| {
+            #[cfg(target_os = "linux")]
+            ligar_aceleracao_por_gpu(app);
+            #[cfg(not(target_os = "linux"))]
+            let _ = app;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             uso_memoria_arvore,
+            ponte_binaria,
             log_mensagem,
             abrir_janela_monitor,
             arquivos::desenho_abrir,

@@ -262,12 +262,44 @@ fn achados_da_prim(prim: &Prim, modos: &ModosSnap, base: Option<Ponto>, saida: &
     }
 }
 
+/// Rejeição rápida e conservadora: a caixa da forma, alargada pela tolerância, não contém o cursor. Evita decompor em
+/// primitivas (e calcular distâncias) cada uma das centenas de milhares de entidades a cada movimento do mouse.
+/// Texto e inserção nunca são rejeitados aqui (o snap "nó" delas segue a regra de sempre).
+fn longe_demais(g: &Geometria, cursor: Ponto, tolerancia: f64) -> bool {
+    let fora = |min: Ponto, max: Ponto| cursor.x < min.x - tolerancia || cursor.x > max.x + tolerancia || cursor.y < min.y - tolerancia || cursor.y > max.y + tolerancia;
+    match g {
+        Geometria::Linha { a, b } => fora(Ponto::novo(a.x.min(b.x), a.y.min(b.y)), Ponto::novo(a.x.max(b.x), a.y.max(b.y))),
+        Geometria::Circulo { centro, raio } | Geometria::Arco { centro, raio, .. } => fora(Ponto::novo(centro.x - raio, centro.y - raio), Ponto::novo(centro.x + raio, centro.y + raio)),
+        // com arco (bulge) a barriga passa da caixa dos vértices: não rejeita
+        Geometria::Polilinha { vertices, .. } if !vertices.is_empty() && vertices.iter().all(|v| v.bulge == 0.0) => {
+            let (mut min, mut max) = (vertices[0].p, vertices[0].p);
+            for v in vertices {
+                min = Ponto::novo(min.x.min(v.p.x), min.y.min(v.p.y));
+                max = Ponto::novo(max.x.max(v.p.x), max.y.max(v.p.y));
+            }
+            fora(min, max)
+        }
+        _ => false,
+    }
+}
+
+/// Das primitivas dentro do alcance, só as `MAX_PARA_INTERSECAO` mais perto do cursor entram na conta das
+/// interseções. Todas contra todas é O(k²): num mapa denso e com zoom afastado o alcance de 10 px cobre milhares
+/// de segmentos, e o `cursor_mover` chegou a 2,8–5 s (medido em 30/09/2026 com um DXF de Brasília). A interseção
+/// que o usuário quer é sempre entre as peças que passam mais perto do cursor.
+const MAX_PARA_INTERSECAO: usize = 48;
+
 /// O melhor ponto de snap perto de `cursor` (dentro de `tolerancia`), ou `None`.
 pub fn achar(doc: &Documento, base: Option<Ponto>, cursor: Ponto, tolerancia: f64, modos: &ModosSnap) -> Option<Achado> {
     let mut candidatos: Vec<Achado> = Vec::new();
     let mut proximas: Vec<Prim> = Vec::new();
+    // Um vetor só, reaproveitado: um por entidade eram 100 mil alocações a cada movimento do mouse.
+    let mut prims: Vec<Prim> = Vec::new();
     for e in doc.entidades().iter().filter(|e| doc.visivel(e)) {
-        let mut prims = Vec::new();
+        if longe_demais(&e.geometria, cursor, tolerancia) {
+            continue;
+        }
+        prims.clear();
         prims_da_entidade(&e.geometria, &mut prims);
         // Todo ponto de snap está SOBRE uma primitiva: só quem passa dentro do alcance do cursor importa.
         // (O centro é a exceção: fica fora da curva, e gruda também com o cursor em cima dele.)
@@ -280,20 +312,26 @@ pub fn achar(doc: &Documento, base: Option<Ponto>, cursor: Ponto, tolerancia: f6
                 }
             }
         }
-        let nesta: Vec<Prim> = prims.into_iter().filter(|p| distancia_da_prim(p, cursor) <= tolerancia).collect();
-        for p in &nesta {
-            achados_da_prim(p, modos, base, &mut candidatos);
+        for p in &prims {
+            if distancia_da_prim(p, cursor) <= tolerancia {
+                achados_da_prim(p, modos, base, &mut candidatos);
+                proximas.push(*p);
+            }
         }
         if let Geometria::Texto { ponto, .. } | Geometria::Insercao { ponto, .. } | Geometria::Ponto { p: ponto } = &e.geometria {
             if modos.ligado(TipoSnap::No) {
                 candidatos.push(Achado { ponto: *ponto, tipo: TipoSnap::No });
             }
         }
-        proximas.extend(nesta);
     }
     if modos.ligado(TipoSnap::Intersecao) {
-        for (i, x) in proximas.iter().enumerate() {
-            for y in &proximas[i + 1..] {
+        let mut perto: Vec<(f64, Prim)> = proximas.iter().map(|p| (distancia_da_prim(p, cursor), *p)).collect();
+        if perto.len() > MAX_PARA_INTERSECAO {
+            perto.select_nth_unstable_by(MAX_PARA_INTERSECAO, |a, b| a.0.total_cmp(&b.0));
+            perto.truncate(MAX_PARA_INTERSECAO);
+        }
+        for (i, (_, x)) in perto.iter().enumerate() {
+            for (_, y) in &perto[i + 1..] {
                 candidatos.extend(intersecoes(x, y).into_iter().map(|ponto| Achado { ponto, tipo: TipoSnap::Intersecao }));
             }
         }
@@ -373,6 +411,23 @@ mod testes {
         let (x, y) = (25.0 / 13.0, 60.0 / 13.0);
         let a = achar(&d, Some(Ponto::novo(13.0, 0.0)), Ponto::novo(x + 0.1, y - 0.1), 1.0, &so(TipoSnap::Tangente)).unwrap();
         assert!(a.ponto.distancia(Ponto::novo(x, y)) < 1e-9);
+    }
+
+    #[test]
+    fn mapa_denso_nao_explode_a_conta_das_intersecoes() {
+        // 4 000 segmentos passando pelo alcance do cursor + duas linhas que se cruzam exatamente sob ele:
+        // com todas contra todas seriam ~8 milhões de testes por movimento; com o teto é instantâneo, e a
+        // interseção certa (entre as peças mais perto do cursor) continua sendo achada.
+        let mut g = vec![linha((-1.0, 0.0), (1.0, 0.0)), linha((0.0, -1.0), (0.0, 1.0))];
+        for i in 0..4000 {
+            let y = 0.4 + (i as f64) * 0.0001;
+            g.push(linha((-50.0, y + 10.0), (50.0, y - 9.0)));
+        }
+        let d = doc_com(g);
+        let inicio = std::time::Instant::now();
+        let a = achar(&d, None, Ponto::novo(0.05, 0.05), 20.0, &so(TipoSnap::Intersecao)).unwrap();
+        assert!(a.ponto.distancia(Ponto::novo(0.0, 0.0)) < 1e-9, "{:?}", a.ponto);
+        assert!(inicio.elapsed().as_secs_f64() < 2.0, "demorou {:?}", inicio.elapsed());
     }
 
     #[test]

@@ -28,9 +28,28 @@ serde_json = "1"
 # nos outros sistemas, a caixa nativa (como no FeatherSheet).
 [target.'cfg(target_os = "linux")'.dependencies]
 tauri-plugin-dialog = { version = "2", default-features = false, features = ["xdg-portal"] }
+# O mesmo WebKitGTK que o Tauri já usa: só para pedir aceleração por GPU (`HardwareAccelerationPolicy`).
+webkit2gtk = { version = "2.0.2", features = ["v2_16"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 tauri-plugin-dialog = { version = "2" }
+
+# O `app:dev` compila em debug, e o motor em debug é ~7x mais lento (medido em 30/09/2026 com
+# `cargo run --example medir_movimento`, em crates/feathercad-ponte: 50 mil linhas = quadro de 25 ms
+# em debug contra 3,4 ms em release; um quadro de tela tem 16,6 ms). Só o motor e o que ele usa
+# ficam otimizados; o resto (a casca da janela) segue em debug e compila rápido.
+[profile.dev.package.feathercad-core]
+opt-level = 3
+[profile.dev.package.feathercad-ponte]
+opt-level = 3
+[profile.dev.package.feathercad-io]
+opt-level = 3
+[profile.dev.package.serde_json]
+opt-level = 3
+[profile.dev.package.serde]
+opt-level = 3
+[profile.dev.package.zip]
+opt-level = 3
 
 [profile.release]
 opt-level = "s"

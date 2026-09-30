@@ -8,6 +8,7 @@
  */
 
 import type { Canal } from './canal.ts';
+import { etapa } from './perfil.ts';
 
 export const LIMITE_MS = 16;
 
@@ -22,7 +23,8 @@ export function canalMedido(canal: Canal): Canal {
     chamar(comando, args) {
       const inicio = agora();
       try {
-        return canal.chamar(comando, args);
+        // cada comando aparece no perfil de quadro como `cmd/<nome>` (detalhe da etapa que o chamou)
+        return etapa(`cmd/${comando}`, () => canal.chamar(comando, args));
       } finally {
         const ms = agora() - inicio;
         acumulado.comandos++;

@@ -31,6 +31,18 @@ async function chamar<T>(cmd: string, args?: Record<string, unknown>): Promise<T
   return (await t.invoke(cmd, args)) as T;
 }
 
+/**
+ * Um comando do motor de resposta grande (o quadro), pelo `invoke` **assíncrono** do Tauri: o Rust roda em outra thread
+ * e devolve o corpo **cru** (`ipc::Response` → `ArrayBuffer`, sem JSON nem texto) — o padrão do `ler_arquivo` do
+ * FeatherSheet. O XHR síncrono do `ponte://` entrega bytes como texto, e converter 10 MB assim custava ~100 ms.
+ * Se o protocolo binário falhar, o Tauri cai sozinho para o caminho antigo (um array de números), que ainda funciona.
+ */
+export async function ponteBinaria(comando: string, corpo: unknown): Promise<Uint8Array> {
+  const r = await chamar<ArrayBuffer | number[] | Uint8Array>('ponte_binaria', { comando, corpo: JSON.stringify(corpo) });
+  if (r instanceof ArrayBuffer) return new Uint8Array(r);
+  return r instanceof Uint8Array ? r : new Uint8Array(r);
+}
+
 // ---------------------------------------------------------------------------
 // Arquivos e página inicial (`src-tauri/src/arquivos.rs`). O que abre e grava é o
 // Rust; aqui só o pedido. Cada um devolve o **estado novo** do motor, ou `null`
