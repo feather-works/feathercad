@@ -443,6 +443,22 @@ fn bloco_aninhado_ida_e_volta_no_dxf_e_no_fcdz() {
 }
 
 #[test]
+fn cota_do_app_e_um_bloco_anonimo_que_volta_igual_no_dxf_e_no_fcdz() {
+    let mut d = Documento::default();
+    let formas = feathercad_core::anotacao::cota_linear(p(0.0, 0.0), p(10.0, 0.0), p(5.0, 4.0), 1.0, &Default::default()).unwrap();
+    d.adicionar_cota(formas, p(0.0, 0.0)).unwrap();
+    for formato in [Formato::Dxf, Formato::Fcdz] {
+        let g = gravar(&d, formato).unwrap();
+        let a = abrir(&g.bytes).unwrap();
+        assert_eq!(a.doc.entidades().len(), 1, "{formato:?}: continua um objeto só");
+        assert_eq!(a.doc.blocos()[0].nome, "*D1", "{formato:?}");
+        assert_eq!(a.doc.blocos().len(), d.blocos().len(), "{formato:?}");
+        assert_eq!(a.doc.blocos()[0].entidades.len(), d.blocos()[0].entidades.len(), "{formato:?}");
+        assert!(a.avisos.is_empty(), "{formato:?}: {:?}", a.avisos);
+    }
+}
+
+#[test]
 fn insert_de_bloco_inexistente_e_dimension_sem_bloco_viram_aviso() {
     let dxf = "0\nSECTION\n2\nENTITIES\n0\nINSERT\n8\n0\n2\nfantasma\n10\n0\n20\n0\n0\nDIMENSION\n8\n0\n2\n*D1\n0\nENDSEC\n0\nEOF\n";
     let a = abrir(dxf.as_bytes()).unwrap();

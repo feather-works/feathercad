@@ -83,7 +83,12 @@
         "rotulo": "Girar",
         "dica": "Gira os objetos em torno de um ponto (GI)"
       },
-      "aparar": {
+      "estender": {
+    "clique": "ESTENDER Clique perto da ponta a estender (Enter termina):",
+    "semLimite": "Não há nenhuma forma no caminho desta ponta.",
+    "naoSuporta": "Só se estende linha, arco e polilinha aberta de trechos retos."
+  },
+  "aparar": {
         "rotulo": "Aparar",
         "dica": "Apara o trecho clicado entre os cortes (PA)"
       },
@@ -94,6 +99,14 @@
       "espelhar": {
         "rotulo": "Espelhar",
         "dica": "Espelha os objetos em relação a uma linha (ES)"
+      },
+      "deslocar": {
+        "rotulo": "Deslocar",
+        "dica": "Cópia paralela à distância dada (O)"
+      },
+      "estender": {
+        "rotulo": "Estender",
+        "dica": "Estende a ponta clicada até a próxima forma (EX)"
       },
       "concordancia": {
         "rotulo": "Concordância",
@@ -122,6 +135,18 @@
       "cota": {
         "rotulo": "Cota",
         "dica": "Cota linear: dois pontos e a posição da linha (COT)"
+      },
+      "cota_alinhada": {
+        "rotulo": "Cota alinhada",
+        "dica": "Mede a distância real entre dois pontos, com a linha paralela (CAL)"
+      },
+      "cota_raio": {
+        "rotulo": "Raio",
+        "dica": "Cota o raio de um círculo ou arco (CRA)"
+      },
+      "cota_diametro": {
+        "rotulo": "Diâmetro",
+        "dica": "Cota o diâmetro de um círculo ou arco (CDI)"
       },
       "chamada": {
         "rotulo": "Chamada",
@@ -261,6 +286,17 @@
   "refazer": {
     "feito": "Refeito.",
     "nada": "Nada a refazer."
+  },
+  "fps": {
+    "rotulo": "FPS",
+    "pior": "pior",
+    "motor": "motor",
+    "cursor": "cursor",
+    "segmentos": "seg",
+    "textos": "txt",
+    "trabalho": "trabalho",
+    "webview": "webview",
+    "pintura": "pintura"
   },
   "monitor": {
     "titulo": "Monitor do {nome}",
@@ -460,6 +496,13 @@
     "semCorte": "Nada cruza este objeto: não há onde cortar.",
     "naoSuporta": "Este tipo de objeto (ou polilinha com arco) ainda não pode ser aparado."
   },
+  "deslocar": {
+    "objeto": "DESLOCAR Distância {distancia} (digite um número para mudar; 0 = passar por um ponto). Clique no objeto (Enter termina):",
+    "lado": "Clique do lado para onde deslocar (ou digite a distância):",
+    "naoSuporta": "Só se desloca linha, círculo, arco e polilinha de trechos retos.",
+    "naoCabe": "A distância não cabe neste objeto.",
+    "negativa": "A distância não pode ser negativa."
+  },
   "concordancia": {
     "primeira": "CONCORDÂNCIA Clique na primeira linha (raio atual {raio}; digite um número para mudar):",
     "segunda": "Clique na segunda linha:",
@@ -596,6 +639,11 @@
     "alturaInvalida": "A altura precisa ser um número maior que zero."
   },
   "cota": {
+    "posicaoAlinhada": "Posição da linha de cota (paralela aos dois pontos):",
+    "objetoRaio": "COTA DE RAIO Clique no círculo ou arco:",
+    "objetoDiametro": "COTA DE DIÂMETRO Clique no círculo ou arco:",
+    "posicaoRaio": "Posição do texto (a reta segue nessa direção):",
+    "soCirculo": "Só se cota o raio ou o diâmetro de círculo e arco.",
     "primeiro": "COTA Primeiro ponto a medir:",
     "segundo": "Segundo ponto a medir:",
     "posicao": "Posição da linha de cota (acima/abaixo = horizontal; ao lado = vertical):",
@@ -694,6 +742,18 @@
       "rotulo": "Corpo da letra",
       "dica": "Tamanho padrão, em pixels."
     },
+    "segundoPlano": {
+      "rotulo": "Pintar o desenho em segundo plano",
+      "dica": "Decodifica e pinta o desenho num Worker, fora da thread principal: o mouse não trava enquanto um desenho pesado é pintado. Vale ao reabrir o aplicativo. Desligue se o desenho não aparecer."
+    },
+    "textoNoMovimento": {
+      "rotulo": "Texto completo no zoom e no pan",
+      "dica": "Redesenha o texto a cada quadro do zoom e do pan (nítido, mas trava em desenhos com muito texto). Desligado (padrão), o texto acompanha o movimento por escala e volta nítido quando você para."
+    },
+    "zoomSuave": {
+      "rotulo": "Zoom suave",
+      "dica": "A roda do mouse e os botões de zoom animam a aproximação em vez de pular de uma vez. Desligue para o zoom seco, como no AutoCAD."
+    },
     "fundo": {
       "rotulo": "Fundo do desenho",
       "dica": "O que aparece atrás dos objetos.",
@@ -744,7 +804,11 @@
       "texto": "FeatherCAD — CAD 2D da suíte FeatherOffice. Tudo roda na sua máquina: nenhum dado do desenho sai daqui.",
       "monitor": "Monitor (F12)",
       "monitorDica": "Memória, console e métricas do aplicativo, numa janela à parte.",
-      "abrirMonitor": "Abrir Monitor"
+      "abrirMonitor": "Abrir Monitor",
+      "fps": {
+        "rotulo": "Medidor de FPS",
+        "dica": "Mostra no topo da área de desenho os quadros por segundo e o tempo de cada etapa (motor, cursor, pintura). Ctrl+Shift+F também liga e desliga. Os números: seg = segmentos de reta desenhados no quadro; txt = textos."
+      }
     },
     "cota": {
       "rotulo": "Tamanho da cota",
@@ -835,6 +899,7 @@
       "girar": "Girar",
       "escala": "Escala",
       "espelhar": "Espelhar",
+      "deslocar": "Deslocar",
       "esticar": "Esticar",
       "matriz": "Matriz",
       "recortar": "Recortar",
@@ -858,12 +923,16 @@
       "arco": "Arco",
       "inserir": "Inserir bloco",
       "aparar": "Aparar",
+      "estender": "Estender",
       "concordancia": "Concordância",
       "retangulo": "Retângulo",
       "elipse": "Elipse",
       "hachura": "Hachura",
       "texto": "Texto",
       "cota": "Cota",
+      "cota_alinhada": "Cota alinhada",
+      "cota_raio": "Cota de raio",
+      "cota_diametro": "Cota de diâmetro",
       "chamada": "Chamada",
       "tabela": "Tabela",
       "medir": "Medir",

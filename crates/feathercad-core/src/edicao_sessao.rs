@@ -5,8 +5,10 @@
 use std::collections::BTreeSet;
 
 use crate::aparar::{aparar, concordar, hachura_com_padrao, Recusa};
+use crate::deslocar::deslocar;
+use crate::estender::estender;
 use crate::documento::{Documento, Geometria, Id, Mudanca, NovaEntidade};
-use crate::edicao::{elipse, escolher, escolher_na_janela, esticar, matriz, retangulo, transformar};
+use crate::edicao::{distancia, elipse, escolher, escolher_na_janela, esticar, matriz, retangulo, transformar};
 use crate::geom::{Ponto, Transf};
 use crate::sessao::{Ferramenta, Mensagem, Sessao};
 
@@ -194,10 +196,15 @@ impl Sessao {
                 Etapa::Nome(_) => "bloco.nome",
             },
             Ferramenta::Aparar => "aparar.clique",
+            Ferramenta::Estender => "estender.clique",
             Ferramenta::Concordancia { primeira: None } => {
                 return Mensagem::nova("concordancia.primeira").com("raio", &self.regional.numero(self.raio_concordancia));
             }
             Ferramenta::Concordancia { primeira: Some(_) } => "concordancia.segunda",
+            Ferramenta::Deslocar { alvo: None } => {
+                return Mensagem::nova("deslocar.objeto").com("distancia", &self.regional.numero(self.distancia_deslocar));
+            }
+            Ferramenta::Deslocar { alvo: Some(_) } => "deslocar.lado",
             Ferramenta::Retangulo { canto: None } => "retangulo.primeiroCanto",
             Ferramenta::Retangulo { canto: Some(_) } => "retangulo.outroCanto",
             Ferramenta::Elipse { pontos } => match pontos.len() {
@@ -246,6 +253,11 @@ impl Sessao {
                 }
                 v
             }
+            Ferramenta::Deslocar { alvo: Some(id) } => doc
+                .entidade(*id)
+                .and_then(|e| self.deslocada(doc, &e.geometria, cursor))
+                .into_iter()
+                .collect(),
             Ferramenta::Retangulo { canto: Some(c) } => vec![retangulo(*c, cursor)],
             Ferramenta::Elipse { pontos } => match pontos.as_slice() {
                 [c] => vec![Geometria::Linha { a: *c, b: cursor }],
@@ -269,7 +281,12 @@ impl Sessao {
         self.janela = None;
         match comando {
             "aparar" => self.ferramenta = Ferramenta::Aparar,
+            "estender" => self.ferramenta = Ferramenta::Estender,
             "concordancia" => self.ferramenta = Ferramenta::Concordancia { primeira: None },
+            "deslocar" => {
+                self.limpar_selecao();
+                self.ferramenta = Ferramenta::Deslocar { alvo: None };
+            }
             "retangulo" => self.ferramenta = Ferramenta::Retangulo { canto: None },
             "elipse" => self.ferramenta = Ferramenta::Elipse { pontos: Vec::new() },
             "hachura" => self.ferramenta = Ferramenta::Hachura,
@@ -443,7 +460,9 @@ impl Sessao {
             Ferramenta::Nenhuma => self.selecionar_por_clique(doc, ponto, tolerancia, aditivo, false),
             Ferramenta::Editar { cmd, etapa } => self.clique_em_etapa(doc, cmd, etapa, ponto, tolerancia, aditivo),
             Ferramenta::Aparar => self.clique_aparar(doc, ponto, tolerancia),
+            Ferramenta::Estender => self.clique_estender(doc, ponto, tolerancia),
             Ferramenta::Concordancia { primeira } => self.clique_concordancia(doc, primeira, ponto, tolerancia),
+            Ferramenta::Deslocar { alvo } => self.clique_deslocar(doc, alvo, ponto, tolerancia),
             Ferramenta::Retangulo { canto: None } => self.ferramenta = Ferramenta::Retangulo { canto: Some(ponto) },
             Ferramenta::Retangulo { canto: Some(a) } => {
                 if a.x == ponto.x || a.y == ponto.y {
@@ -536,6 +555,19 @@ impl Sessao {
         }
     }
 
+    fn clique_estender(&mut self, doc: &mut Documento, ponto: Ponto, tolerancia: f64) {
+        let Some(id) = escolher(doc, ponto, tolerancia) else { return };
+        match estender(doc, id, ponto) {
+            Ok(ms) => {
+                doc.aplicar_mudancas(ms);
+            }
+            Err(r) => self.dizer(Mensagem::nova(match r {
+                Recusa::SemCorte => "estender.semLimite",
+                _ => "estender.naoSuporta",
+            })),
+        }
+    }
+
     fn clique_concordancia(&mut self, doc: &mut Documento, primeira: Option<(Id, Ponto)>, ponto: Ponto, tolerancia: f64) {
         let Some(id) = escolher(doc, ponto, tolerancia) else { return };
         let Some(primeira) = primeira else {
@@ -558,12 +590,51 @@ impl Sessao {
         }
     }
 
+    /// A cópia deslocada de `geo` para o lado do `cursor`. Distância 0 = passar pelo cursor.
+    fn deslocada(&self, doc: &Documento, geo: &Geometria, cursor: Ponto) -> Option<Geometria> {
+        self.deslocada_ou_recusa(doc, geo, cursor).ok()
+    }
+
+    fn deslocada_ou_recusa(&self, doc: &Documento, geo: &Geometria, cursor: Ponto) -> Result<Geometria, Recusa> {
+        let d = if self.distancia_deslocar > 0.0 { self.distancia_deslocar } else { distancia(doc, geo, cursor) };
+        deslocar(geo, d, cursor)
+    }
+
+    /// Primeiro clique: escolhe o objeto (fica realçado). Segundo: cria a cópia do lado clicado e volta a pedir objeto.
+    fn clique_deslocar(&mut self, doc: &mut Documento, alvo: Option<Id>, ponto: Ponto, tolerancia: f64) {
+        let Some(id) = alvo else {
+            if let Some(id) = escolher(doc, ponto, tolerancia) {
+                self.limpar_selecao();
+                self.selecao.insert(id);
+                self.rev_selecao += 1;
+                self.ferramenta = Ferramenta::Deslocar { alvo: Some(id) };
+            }
+            return;
+        };
+        let Some(original) = doc.entidade(id).cloned() else {
+            self.limpar_selecao();
+            self.ferramenta = Ferramenta::Deslocar { alvo: None };
+            return;
+        };
+        match self.deslocada_ou_recusa(doc, &original.geometria, ponto) {
+            Ok(geometria) => {
+                doc.aplicar_mudancas(vec![Mudanca::Novo(NovaEntidade { camada: original.camada, cor: original.cor, geometria, props: crate::documento::Propriedades { grupo: None, ..original.props.clone() } })]);
+                self.limpar_selecao();
+                self.ferramenta = Ferramenta::Deslocar { alvo: None };
+            }
+            Err(r) => self.dizer(Mensagem::nova(match r {
+                Recusa::RaioGrande => "deslocar.naoCabe",
+                _ => "deslocar.naoSuporta",
+            })),
+        }
+    }
+
     /// Texto digitado quando a ferramenta é de edição. `false` se a ferramenta é outra.
     pub(crate) fn digitar_de_edicao(&mut self, doc: &mut Documento, texto: &str) -> bool {
         let ferramenta = self.ferramenta.clone();
         match ferramenta {
             Ferramenta::Editar { cmd, etapa } => self.digitar_em_etapa(doc, cmd, etapa, texto),
-            Ferramenta::Aparar | Ferramenta::Retangulo { .. } | Ferramenta::Elipse { .. } | Ferramenta::Concordancia { .. } | Ferramenta::Hachura => self.digitar_em_ferramenta(doc, &ferramenta, texto),
+            Ferramenta::Aparar | Ferramenta::Estender | Ferramenta::Retangulo { .. } | Ferramenta::Elipse { .. } | Ferramenta::Concordancia { .. } | Ferramenta::Deslocar { .. } | Ferramenta::Hachura => self.digitar_em_ferramenta(doc, &ferramenta, texto),
             outra => return self.digitar_de_anotacao(doc, &outra, texto),
         }
         true
@@ -624,6 +695,14 @@ impl Sessao {
                     self.raio_concordancia = raio;
                 } else {
                     self.dizer(Mensagem::nova("concordancia.raioNegativo"));
+                }
+            }
+            Ferramenta::Deslocar { .. } if self.regional.ler_numero(texto).is_some() => {
+                let d = self.regional.ler_numero(texto).unwrap_or(-1.0);
+                if d >= 0.0 {
+                    self.distancia_deslocar = d;
+                } else {
+                    self.dizer(Mensagem::nova("deslocar.negativa"));
                 }
             }
             Ferramenta::Elipse { pontos } if pontos.len() == 2 && self.regional.ler_numero(texto).is_some() => {

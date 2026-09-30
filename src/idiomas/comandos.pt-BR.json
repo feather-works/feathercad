@@ -61,9 +61,18 @@
       "MATRIZ",
       "MZ"
     ],
+    "estender": [
+      "ESTENDER",
+      "EX"
+    ],
     "aparar": [
       "APARAR",
       "PA"
+    ],
+    "deslocar": [
+      "DESLOCAR",
+      "DESL",
+      "O"
     ],
     "concordancia": [
       "CONCORDANCIA",
@@ -88,6 +97,18 @@
     "cota": [
       "COTA",
       "COT"
+    ],
+    "cota_alinhada": [
+      "COTAALINHADA",
+      "CAL"
+    ],
+    "cota_raio": [
+      "COTARAIO",
+      "CRA"
+    ],
+    "cota_diametro": [
+      "COTADIAMETRO",
+      "CDI"
     ],
     "chamada": [
       "CHAMADA",

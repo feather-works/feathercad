@@ -84,7 +84,7 @@ impl Sessao {
         }
 
         if self.selecionados() > 0 {
-            for c in ["mover", "copiar", "girar", "escala", "espelhar", "esticar", "matriz"] {
+            for c in ["mover", "copiar", "girar", "escala", "espelhar", "deslocar", "esticar", "matriz"] {
                 v.push(ItemDeMenu::novo(c));
             }
             separar(&mut v);

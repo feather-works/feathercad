@@ -2,7 +2,7 @@
 //! transferência interna), tornar atual, igualar propriedades — mais as ações sobre seleção que fecham a aba
 //! Início: copiar/recortar para a prancheta, igualar camada, criar bloco e agrupar. Tudo do Rust.
 
-use crate::anotacao::{altura_padrao, area_e_perimetro, chamada, cota_linear, tabela};
+use crate::anotacao::{altura_padrao, area_e_perimetro, chamada, cota_alinhada, cota_de_raio, cota_linear, tabela};
 use crate::aparar::caixa_dos;
 use crate::documento::{AlinhaH, AlinhaV, Documento, Geometria, Id, Mudanca, NovaEntidade, Propriedades};
 use crate::edicao::{escolher, escolher_com, transformar};
@@ -52,7 +52,7 @@ impl Sessao {
     pub(crate) fn base_da_anotacao(&self, f: &Ferramenta) -> Option<Ponto> {
         match f {
             Ferramenta::Texto { etapa: EtapaTexto::Altura(p) | EtapaTexto::Conteudo(p, _) } => Some(*p),
-            Ferramenta::Cota { pontos } | Ferramenta::Chamada { pontos } | Ferramenta::Medir { pontos, .. } => pontos.last().copied(),
+            Ferramenta::Cota { pontos } | Ferramenta::CotaAlinhada { pontos } | Ferramenta::Chamada { pontos } | Ferramenta::Medir { pontos, .. } => pontos.last().copied(),
             Ferramenta::Tabela { origem } => *origem,
             _ => None,
         }
@@ -68,6 +68,14 @@ impl Sessao {
                 1 => "cota.segundo",
                 _ => "cota.posicao",
             },
+            Ferramenta::CotaAlinhada { pontos } => match pontos.len() {
+                0 => "cota.primeiro",
+                1 => "cota.segundo",
+                _ => "cota.posicaoAlinhada",
+            },
+            Ferramenta::CotaRaio { diametro: false, alvo: None } => "cota.objetoRaio",
+            Ferramenta::CotaRaio { diametro: true, alvo: None } => "cota.objetoDiametro",
+            Ferramenta::CotaRaio { alvo: Some(_), .. } => "cota.posicaoRaio",
             Ferramenta::Chamada { pontos } => match pontos.len() {
                 0 => "chamada.ponta",
                 1 => "chamada.pouso",
@@ -96,6 +104,12 @@ impl Sessao {
                 [a, b] => cota_linear(*a, *b, cursor, self.altura_da_cota(doc), &self.regional).unwrap_or_default(),
                 _ => Vec::new(),
             },
+            Ferramenta::CotaAlinhada { pontos } => match pontos.as_slice() {
+                [a] => vec![Geometria::Linha { a: *a, b: cursor }],
+                [a, b] => cota_alinhada(*a, *b, cursor, self.altura_da_cota(doc), &self.regional).unwrap_or_default(),
+                _ => Vec::new(),
+            },
+            Ferramenta::CotaRaio { diametro, alvo: Some((centro, raio)) } => cota_de_raio(*centro, *raio, cursor, *diametro, self.altura_da_cota(doc), &self.regional).unwrap_or_default(),
             Ferramenta::Chamada { pontos } => match pontos.as_slice() {
                 [a] => chamada(*a, cursor, h, "").unwrap_or_default(),
                 [a, b] => chamada(*a, *b, h, "").unwrap_or_default(),
@@ -126,6 +140,9 @@ impl Sessao {
         match comando {
             "texto" => self.ferramenta = Ferramenta::Texto { etapa: EtapaTexto::Ponto },
             "cota" => self.ferramenta = Ferramenta::Cota { pontos: Vec::new() },
+            "cota_alinhada" => self.ferramenta = Ferramenta::CotaAlinhada { pontos: Vec::new() },
+            "cota_raio" => self.ferramenta = Ferramenta::CotaRaio { diametro: false, alvo: None },
+            "cota_diametro" => self.ferramenta = Ferramenta::CotaRaio { diametro: true, alvo: None },
             "chamada" => self.ferramenta = Ferramenta::Chamada { pontos: Vec::new() },
             "tabela" => self.ferramenta = Ferramenta::Tabela { origem: None },
             "medir" => self.ferramenta = Ferramenta::Medir { pontos: Vec::new(), area: false },
@@ -166,7 +183,7 @@ impl Sessao {
                     let h = self.altura_da_cota(doc);
                     match cota_linear(*a, *b, *posicao, h, &self.regional) {
                         Some(formas) => {
-                            self.criar_formas(doc, formas);
+                            doc.adicionar_cota(formas, *a);
                             self.ferramenta = Ferramenta::Nenhuma;
                         }
                         None => {
@@ -179,6 +196,39 @@ impl Sessao {
                     self.ferramenta = Ferramenta::Cota { pontos };
                 }
             }
+            Ferramenta::CotaAlinhada { mut pontos } => {
+                pontos.push(ponto);
+                if let [a, b, posicao] = pontos.as_slice() {
+                    match cota_alinhada(*a, *b, *posicao, self.altura_da_cota(doc), &self.regional) {
+                        Some(formas) => {
+                            doc.adicionar_cota(formas, *a);
+                            self.ferramenta = Ferramenta::Nenhuma;
+                        }
+                        None => {
+                            self.dizer(Mensagem::nova("cota.nula"));
+                            pontos.truncate(1);
+                            self.ferramenta = Ferramenta::CotaAlinhada { pontos };
+                        }
+                    }
+                } else {
+                    self.ferramenta = Ferramenta::CotaAlinhada { pontos };
+                }
+            }
+            Ferramenta::CotaRaio { diametro, alvo: None } => {
+                let forma = crate::edicao::escolher(doc, ponto, tolerancia).and_then(|id| doc.entidade(id)).map(|e| e.geometria.clone());
+                match forma {
+                    Some(Geometria::Circulo { centro, raio }) | Some(Geometria::Arco { centro, raio, .. }) => self.ferramenta = Ferramenta::CotaRaio { diametro, alvo: Some((centro, raio)) },
+                    Some(_) => self.dizer(Mensagem::nova("cota.soCirculo")),
+                    None => {}
+                }
+            }
+            Ferramenta::CotaRaio { diametro, alvo: Some((centro, raio)) } => match cota_de_raio(centro, raio, ponto, diametro, self.altura_da_cota(doc), &self.regional) {
+                Some(formas) => {
+                    doc.adicionar_cota(formas, centro);
+                    self.ferramenta = Ferramenta::Nenhuma;
+                }
+                None => self.dizer(Mensagem::nova("cota.nula")),
+            },
             Ferramenta::Chamada { mut pontos } => {
                 if pontos.len() < 2 {
                     pontos.push(ponto);
@@ -349,7 +399,7 @@ impl Sessao {
             Ferramenta::Medir { .. } if self.comandos.resolver_opcao(texto).is_some() => {
                 self.ferramenta = Ferramenta::Medir { pontos: Vec::new(), area: self.comandos.resolver_opcao(texto) == Some("area") };
             }
-            Ferramenta::Cota { .. } | Ferramenta::Chamada { .. } | Ferramenta::Tabela { .. } | Ferramenta::Medir { .. } | Ferramenta::Colar | Ferramenta::TornarAtual | Ferramenta::IgualarPropriedades { .. } => {
+            Ferramenta::Cota { .. } | Ferramenta::CotaAlinhada { .. } | Ferramenta::CotaRaio { .. } | Ferramenta::Chamada { .. } | Ferramenta::Tabela { .. } | Ferramenta::Medir { .. } | Ferramenta::Colar | Ferramenta::TornarAtual | Ferramenta::IgualarPropriedades { .. } => {
                 if texto.is_empty() {
                     self.ferramenta = Ferramenta::Nenhuma;
                 } else {

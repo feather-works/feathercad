@@ -81,8 +81,12 @@ pub enum Ferramenta {
     Editar { cmd: CmdEdicao, etapa: Etapa },
     /// Aparar: cada clique apara o trecho clicado (as arestas de corte são as outras formas).
     Aparar,
+    /// Estender: cada clique leva a ponta mais perto até a primeira forma no caminho.
+    Estender,
     /// Concordância de duas linhas: a primeira, já clicada.
     Concordancia { primeira: Option<(Id, Ponto)> },
+    /// Deslocar: o objeto já escolhido (depois vem o lado).
+    Deslocar { alvo: Option<Id> },
     /// Retângulo: o primeiro canto.
     Retangulo { canto: Option<Ponto> },
     /// Elipse: centro, ponta do eixo e (no clique final) o outro semi-eixo.
@@ -93,6 +97,10 @@ pub enum Ferramenta {
     Texto { etapa: EtapaTexto },
     /// Cota linear: os dois pontos medidos e a posição da linha de cota.
     Cota { pontos: Vec<Ponto> },
+    /// Cota alinhada: os dois pontos medidos e a posição da linha de cota.
+    CotaAlinhada { pontos: Vec<Ponto> },
+    /// Cota de raio (ou de diâmetro): o círculo/arco já escolhido (centro e raio); depois vem a posição.
+    CotaRaio { diametro: bool, alvo: Option<(Ponto, f64)> },
     /// Chamada: a ponta da seta, o pouso e o texto (digitado).
     Chamada { pontos: Vec<Ponto> },
     /// Tabela: o canto superior esquerdo; depois se digita linhas, colunas e o tamanho da célula.
@@ -121,12 +129,17 @@ impl Ferramenta {
             Ferramenta::Insercao { .. } => "inserir",
             Ferramenta::Editar { cmd, .. } => cmd.nome(),
             Ferramenta::Aparar => "aparar",
+            Ferramenta::Estender => "estender",
             Ferramenta::Concordancia { .. } => "concordancia",
+            Ferramenta::Deslocar { .. } => "deslocar",
             Ferramenta::Retangulo { .. } => "retangulo",
             Ferramenta::Elipse { .. } => "elipse",
             Ferramenta::Hachura => "hachura",
             Ferramenta::Texto { .. } => "texto",
             Ferramenta::Cota { .. } => "cota",
+            Ferramenta::CotaAlinhada { .. } => "cota_alinhada",
+            Ferramenta::CotaRaio { diametro: false, .. } => "cota_raio",
+            Ferramenta::CotaRaio { diametro: true, .. } => "cota_diametro",
             Ferramenta::Chamada { .. } => "chamada",
             Ferramenta::Tabela { .. } => "tabela",
             Ferramenta::Medir { .. } => "medir",
@@ -159,6 +172,8 @@ pub struct Sessao {
     pub(crate) ultima_janela: Option<(Ponto, Ponto)>,
     /// O raio da concordância (0 = só encontrar as linhas).
     pub(crate) raio_concordancia: f64,
+    /// Distância do Deslocar (0 = passar por um ponto clicado).
+    pub(crate) distancia_deslocar: f64,
     /// Hachura sólida (senão, linhas a 45°).
     pub(crate) hachura_solida: bool,
     /// O padrão da biblioteca (`padroes::NOMES`) e a escala dele para a próxima hachura (a sólida vale `hachura_solida`).
@@ -210,6 +225,7 @@ impl Default for Sessao {
             janela: None,
             ultima_janela: None,
             raio_concordancia: 0.0,
+            distancia_deslocar: 0.0,
             hachura_solida: false,
             hachura_padrao: crate::padroes::PADRAO_DE_FABRICA.to_string(),
             hachura_escala: 1.0,

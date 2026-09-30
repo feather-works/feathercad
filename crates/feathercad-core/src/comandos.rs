@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 /// Os comandos que o motor conhece (o nome interno, em minúsculas).
-pub const CONHECIDOS: [&str; 34] = [
+pub const CONHECIDOS: [&str; 39] = [
     "linha",
     "polilinha",
     "circulo",
@@ -27,12 +27,17 @@ pub const CONHECIDOS: [&str; 34] = [
     "esticar",
     "matriz",
     "aparar",
+    "estender",
     "concordancia",
+    "deslocar",
     "retangulo",
     "elipse",
     "hachura",
     "texto",
     "cota",
+    "cota_alinhada",
+    "cota_raio",
+    "cota_diametro",
     "chamada",
     "tabela",
     "medir",

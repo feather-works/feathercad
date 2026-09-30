@@ -83,7 +83,12 @@
         "rotulo": "Rotate",
         "dica": "Rotates objects about a point (RO)"
       },
-      "aparar": {
+      "estender": {
+    "clique": "EXTEND Click near the end to extend (Enter ends):",
+    "semLimite": "There is no shape in the way of this end.",
+    "naoSuporta": "Only lines, arcs and open straight-segment polylines can be extended."
+  },
+  "aparar": {
         "rotulo": "Trim",
         "dica": "Trims the clicked part between cuts (TR)"
       },
@@ -94,6 +99,14 @@
       "espelhar": {
         "rotulo": "Mirror",
         "dica": "Mirrors objects across a line (MI)"
+      },
+      "deslocar": {
+        "rotulo": "Offset",
+        "dica": "Parallel copy at the given distance (O)"
+      },
+      "estender": {
+        "rotulo": "Extend",
+        "dica": "Extends the clicked end to the next shape (EX)"
       },
       "concordancia": {
         "rotulo": "Fillet",
@@ -122,6 +135,18 @@
       "cota": {
         "rotulo": "Dimension",
         "dica": "Linear dimension: two points and the line position (DLI)"
+      },
+      "cota_alinhada": {
+        "rotulo": "Aligned",
+        "dica": "Measures the true distance between two points, with a parallel line (DAL)"
+      },
+      "cota_raio": {
+        "rotulo": "Radius",
+        "dica": "Dimensions the radius of a circle or arc (DRA)"
+      },
+      "cota_diametro": {
+        "rotulo": "Diameter",
+        "dica": "Dimensions the diameter of a circle or arc (DDI)"
       },
       "chamada": {
         "rotulo": "Leader",
@@ -261,6 +286,17 @@
   "refazer": {
     "feito": "Redone.",
     "nada": "Nothing to redo."
+  },
+  "fps": {
+    "rotulo": "FPS",
+    "pior": "worst",
+    "motor": "engine",
+    "cursor": "cursor",
+    "segmentos": "seg",
+    "textos": "txt",
+    "trabalho": "work",
+    "webview": "webview",
+    "pintura": "paint"
   },
   "monitor": {
     "titulo": "{nome} Monitor",
@@ -460,6 +496,13 @@
     "semCorte": "Nothing crosses this object: there is no cutting edge.",
     "naoSuporta": "This kind of object (or a polyline with arcs) cannot be trimmed yet."
   },
+  "deslocar": {
+    "objeto": "OFFSET Distance {distancia} (type a number to change it; 0 = through a point). Click the object (Enter ends):",
+    "lado": "Click the side to offset to (or type the distance):",
+    "naoSuporta": "Only lines, circles, arcs and straight-segment polylines can be offset.",
+    "naoCabe": "The distance does not fit this object.",
+    "negativa": "The distance cannot be negative."
+  },
   "concordancia": {
     "primeira": "FILLET Click the first line (current radius {raio}; type a number to change it):",
     "segunda": "Click the second line:",
@@ -596,6 +639,11 @@
     "alturaInvalida": "The height must be a number greater than zero."
   },
   "cota": {
+    "posicaoAlinhada": "Dimension line position (parallel to the two points):",
+    "objetoRaio": "RADIUS DIMENSION Click the circle or arc:",
+    "objetoDiametro": "DIAMETER DIMENSION Click the circle or arc:",
+    "posicaoRaio": "Text position (the line follows that direction):",
+    "soCirculo": "Only circles and arcs can be dimensioned by radius or diameter.",
     "primeiro": "DIMENSION First point to measure:",
     "segundo": "Second point to measure:",
     "posicao": "Dimension line position (above/below = horizontal; beside = vertical):",
@@ -694,6 +742,18 @@
       "rotulo": "Font size",
       "dica": "Default size, in pixels."
     },
+    "segundoPlano": {
+      "rotulo": "Paint the drawing in the background",
+      "dica": "Decodes and paints the drawing in a Worker, off the main thread, so the mouse does not stall while a heavy drawing is painted. Takes effect when the app is reopened. Turn it off if the drawing does not appear."
+    },
+    "textoNoMovimento": {
+      "rotulo": "Full text while zooming and panning",
+      "dica": "Redraws text on every zoom and pan frame (sharp, but stutters in drawings with lots of text). Off (default), the text follows the motion by scaling and is redrawn sharp when you stop."
+    },
+    "zoomSuave": {
+      "rotulo": "Smooth zoom",
+      "dica": "The mouse wheel and the zoom buttons animate the change instead of jumping. Turn it off for the instant zoom, as in AutoCAD."
+    },
     "fundo": {
       "rotulo": "Drawing background",
       "dica": "What shows behind the objects.",
@@ -744,7 +804,11 @@
       "texto": "FeatherCAD — 2D CAD of the FeatherOffice suite. Everything runs on your machine: no drawing data leaves it.",
       "monitor": "Monitor (F12)",
       "monitorDica": "Memory, console and metrics of the app, in a separate window.",
-      "abrirMonitor": "Open Monitor"
+      "abrirMonitor": "Open Monitor",
+      "fps": {
+        "rotulo": "FPS meter",
+        "dica": "Shows frames per second and the time of each stage (engine, cursor, paint) at the top of the drawing area. Ctrl+Shift+F also toggles it. seg = straight segments drawn in the frame; txt = texts."
+      }
     },
     "cota": {
       "rotulo": "Dimension size",
@@ -835,6 +899,7 @@
       "girar": "Rotate",
       "escala": "Scale",
       "espelhar": "Mirror",
+      "deslocar": "Offset",
       "esticar": "Stretch",
       "matriz": "Array",
       "recortar": "Cut",
@@ -858,12 +923,16 @@
       "arco": "Arc",
       "inserir": "Insert block",
       "aparar": "Trim",
+      "estender": "Extend",
       "concordancia": "Fillet",
       "retangulo": "Rectangle",
       "elipse": "Ellipse",
       "hachura": "Hatch",
       "texto": "Text",
       "cota": "Dimension",
+      "cota_alinhada": "Aligned dimension",
+      "cota_raio": "Radius dimension",
+      "cota_diametro": "Diameter dimension",
       "chamada": "Leader",
       "tabela": "Table",
       "medir": "Measure",

@@ -1,9 +1,9 @@
-//! Formas de anotação prontas: cota linear, chamada (leader) e tabela. Só geometria: a sessão
+//! Formas de anotação prontas: cotas (linear, alinhada, raio e diâmetro), chamada (leader) e tabela. Só geometria: a sessão
 //! escolhe os pontos e grava o resultado como entidades comuns (linhas, setas cheias e texto).
 
 use crate::documento::{AlinhaH, AlinhaV, Documento, Geometria};
 use crate::formato::Regional;
-use crate::geom::{Ponto, Vertice};
+use crate::geom::{normalizar_graus, Ponto, Vertice};
 
 /// A altura de texto quando o usuário não escolheu: 1/150 da diagonal do desenho (2,5 se ele está vazio).
 pub fn altura_padrao(doc: &Documento) -> f64 {
@@ -40,7 +40,29 @@ fn texto(ponto: Ponto, altura: f64, rotacao: f64, conteudo: String, h: AlinhaH, 
 pub fn cota_linear(p1: Ponto, p2: Ponto, posicao: Ponto, altura: f64, reg: &Regional) -> Option<Vec<Geometria>> {
     let meio = Ponto::novo((p1.x + p2.x) / 2.0, (p1.y + p2.y) / 2.0);
     let horizontal = (posicao.y - meio.y).abs() >= (posicao.x - meio.x).abs();
-    let (u, n) = if horizontal { ((1.0, 0.0), (0.0, 1.0)) } else { ((0.0, 1.0), (-1.0, 0.0)) };
+    let u = if horizontal { (1.0, 0.0) } else { (0.0, 1.0) };
+    cota_ao_longo(p1, p2, posicao, u, altura, reg)
+}
+
+/// Cota alinhada: mede a distância real entre `p1` e `p2`, com a linha de cota paralela ao par, passando por
+/// `posicao`. `None` se os pontos coincidem.
+pub fn cota_alinhada(p1: Ponto, p2: Ponto, posicao: Ponto, altura: f64, reg: &Regional) -> Option<Vec<Geometria>> {
+    let c = p1.distancia(p2);
+    if c < 1e-12 {
+        return None;
+    }
+    let mut u = ((p2.x - p1.x) / c, (p2.y - p1.y) / c);
+    // o texto nunca fica de cabeça para baixo: a direção aponta para a direita (ou para cima, se vertical)
+    if u.0 < -1e-9 || (u.0.abs() <= 1e-9 && u.1 < 0.0) {
+        u = (-u.0, -u.1);
+    }
+    cota_ao_longo(p1, p2, posicao, u, altura, reg)
+}
+
+/// O desenho de uma cota cuja linha corre na direção `u` (unitária): a medida é a projeção de `p1→p2` em `u`.
+/// A normal é a perpendicular à esquerda de `u`, e é para onde o texto sobe.
+fn cota_ao_longo(p1: Ponto, p2: Ponto, posicao: Ponto, u: (f64, f64), altura: f64, reg: &Regional) -> Option<Vec<Geometria>> {
+    let n = (-u.1, u.0);
     let medida = ((p2.x - p1.x) * u.0 + (p2.y - p1.y) * u.1).abs();
     if medida < 1e-12 {
         return None;
@@ -65,9 +87,34 @@ pub fn cota_linear(p1: Ponto, p2: Ponto, posicao: Ponto, altura: f64, reg: &Regi
     let tamanho = altura.min(d1.distancia(d2) / 3.0);
     v.extend(seta(d1, d2, tamanho));
     v.extend(seta(d2, d1, tamanho));
-    let (rotacao, cima) = if horizontal { (0.0, (0.0, 1.0)) } else { (90.0, (-1.0, 0.0)) };
-    let centro = Ponto::novo((d1.x + d2.x) / 2.0 + cima.0 * altura * 0.6, (d1.y + d2.y) / 2.0 + cima.1 * altura * 0.6);
+    let rotacao = normalizar_graus(u.1.atan2(u.0).to_degrees());
+    let centro = Ponto::novo((d1.x + d2.x) / 2.0 + n.0 * altura * 0.6, (d1.y + d2.y) / 2.0 + n.1 * altura * 0.6);
     v.push(texto(centro, altura, rotacao, reg.numero(medida), AlinhaH::Centro, AlinhaV::Base));
+    Some(v)
+}
+
+/// Cota de raio (`diametro` falso, texto `R5`) ou de diâmetro (texto `Ø10`) de um círculo ou arco. A reta vai do
+/// centro (raio) ou do lado oposto (diâmetro) até a circunferência, na direção de `posicao`, e segue até ela se
+/// estiver fora; o texto fica na ponta. `None` se `posicao` coincide com o centro ou o raio não é positivo.
+pub fn cota_de_raio(centro: Ponto, raio: f64, posicao: Ponto, diametro: bool, altura: f64, reg: &Regional) -> Option<Vec<Geometria>> {
+    let d = centro.distancia(posicao);
+    if d < 1e-12 || raio <= 0.0 {
+        return None;
+    }
+    let dir = ((posicao.x - centro.x) / d, (posicao.y - centro.y) / d);
+    let na_borda = soma(centro, dir.0 * raio, dir.1 * raio);
+    // a reta termina na borda ou, se o texto foi posto fora do círculo, no ponto escolhido
+    let fim = if d > raio { posicao } else { na_borda };
+    let inicio = if diametro { soma(centro, -dir.0 * raio, -dir.1 * raio) } else { centro };
+    let tamanho = altura.min(inicio.distancia(fim) / 3.0);
+    let mut v = vec![Geometria::Linha { a: inicio, b: fim }];
+    v.extend(seta(na_borda, inicio, tamanho));
+    if diametro {
+        v.extend(seta(inicio, na_borda, tamanho));
+    }
+    let (dx, h) = if dir.0 >= 0.0 { (altura * 0.4, AlinhaH::Esquerda) } else { (-altura * 0.4, AlinhaH::Direita) };
+    let rotulo = if diametro { format!("Ø{}", reg.numero(raio * 2.0)) } else { format!("R{}", reg.numero(raio)) };
+    v.push(texto(soma(fim, dx, 0.0), altura, 0.0, rotulo, h, AlinhaV::Meio));
     Some(v)
 }
 
@@ -148,6 +195,43 @@ mod testes {
         assert!(v.contains(&Geometria::Linha { a: p(-5.0, 0.0), b: p(-5.0, 6.0) }), "{v:?}");
         assert!(matches!(v.last(), Some(Geometria::Texto { conteudo, rotacao, .. }) if conteudo == "6.0" && *rotacao == 90.0));
         assert!(cota_linear(p(0.0, 2.0), p(9.0, 2.0), p(4.0, 5.0), 1.0, &reg).is_some());
+    }
+
+    #[test]
+    fn cota_alinhada_mede_a_distancia_real_e_o_texto_acompanha_a_inclinacao() {
+        let reg = Regional { decimal: '.', separador_de_coordenadas: ',', casas: 1 };
+        // 3-4-5: a medida é 5, a linha de cota é paralela ao par e passa por (0, 5) → deslocada 3 para o lado
+        let v = cota_alinhada(p(0.0, 0.0), p(4.0, 3.0), p(0.0, 5.0), 1.0, &reg).unwrap();
+        let Some(Geometria::Texto { conteudo, rotacao, .. }) = v.last() else { panic!() };
+        assert_eq!(conteudo, "5.0");
+        assert!((rotacao - 36.869897645844).abs() < 1e-6, "{rotacao}");
+        // a linha de cota é a que liga os dois pés e tem o mesmo comprimento do par
+        let cota = v.iter().filter_map(|g| if let Geometria::Linha { a, b } = g { Some(a.distancia(*b)) } else { None }).fold(0.0_f64, f64::max);
+        assert!((cota - 5.0).abs() < 1e-9);
+        // do outro lado do par, ou com os pontos invertidos, a medida e a legibilidade são as mesmas
+        let inv = cota_alinhada(p(4.0, 3.0), p(0.0, 0.0), p(0.0, 5.0), 1.0, &reg).unwrap();
+        assert!(matches!(inv.last(), Some(Geometria::Texto { rotacao, .. }) if *rotacao < 90.0 || *rotacao > 270.0));
+        assert!(cota_alinhada(p(1.0, 1.0), p(1.0, 1.0), p(0.0, 5.0), 1.0, &reg).is_none());
+    }
+
+    #[test]
+    fn cota_de_raio_e_de_diametro() {
+        let reg = Regional { decimal: '.', separador_de_coordenadas: ',', casas: 1 };
+        // raio: do centro até a borda (posição dentro do círculo); texto R5.0 do lado da direção
+        let v = cota_de_raio(p(0.0, 0.0), 5.0, p(1.0, 0.0), false, 1.0, &reg).unwrap();
+        assert!(v.contains(&Geometria::Linha { a: p(0.0, 0.0), b: p(5.0, 0.0) }), "{v:?}");
+        assert!(matches!(v.last(), Some(Geometria::Texto { conteudo, h: AlinhaH::Esquerda, .. }) if conteudo == "R5.0"));
+        assert_eq!(v.iter().filter(|g| matches!(g, Geometria::Hachura { .. })).count(), 1);
+        // posição fora do círculo: a reta chega nela e o texto vai para lá
+        let v = cota_de_raio(p(0.0, 0.0), 5.0, p(-9.0, 0.0), false, 1.0, &reg).unwrap();
+        assert!(v.contains(&Geometria::Linha { a: p(0.0, 0.0), b: p(-9.0, 0.0) }));
+        assert!(matches!(v.last(), Some(Geometria::Texto { h: AlinhaH::Direita, .. })));
+        // diâmetro: de um lado ao outro, duas setas, texto Ø10.0
+        let v = cota_de_raio(p(0.0, 0.0), 5.0, p(0.0, 2.0), true, 1.0, &reg).unwrap();
+        assert!(v.contains(&Geometria::Linha { a: p(0.0, -5.0), b: p(0.0, 5.0) }), "{v:?}");
+        assert!(matches!(v.last(), Some(Geometria::Texto { conteudo, .. }) if conteudo == "Ø10.0"));
+        assert_eq!(v.iter().filter(|g| matches!(g, Geometria::Hachura { .. })).count(), 2);
+        assert!(cota_de_raio(p(0.0, 0.0), 5.0, p(0.0, 0.0), false, 1.0, &reg).is_none());
     }
 
     #[test]

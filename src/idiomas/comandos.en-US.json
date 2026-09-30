@@ -61,9 +61,17 @@
       "ARRAY",
       "AR"
     ],
+    "estender": [
+      "EXTEND",
+      "EX"
+    ],
     "aparar": [
       "TRIM",
       "TR"
+    ],
+    "deslocar": [
+      "OFFSET",
+      "O"
     ],
     "concordancia": [
       "FILLET",
@@ -88,6 +96,18 @@
     "cota": [
       "DIMLINEAR",
       "DLI"
+    ],
+    "cota_alinhada": [
+      "DIMALIGNED",
+      "DAL"
+    ],
+    "cota_raio": [
+      "DIMRADIUS",
+      "DRA"
+    ],
+    "cota_diametro": [
+      "DIMDIAMETER",
+      "DDI"
     ],
     "chamada": [
       "LEADER",

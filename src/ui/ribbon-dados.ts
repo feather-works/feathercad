@@ -55,6 +55,8 @@ export const RIBBON: AbaDado[] = [
         { id: 'espelhar', comando: 'espelhar', simbolo: '⇋', pequeno: true },
         { id: 'escala', comando: 'escala', simbolo: '⤡', pequeno: true },
         { id: 'aparar', comando: 'aparar', simbolo: '✂', pequeno: true },
+        { id: 'deslocar', comando: 'deslocar', simbolo: '⫽', pequeno: true },
+        { id: 'estender', comando: 'estender', simbolo: '⇥', pequeno: true },
         { id: 'concordancia', comando: 'concordancia', simbolo: '⌒', pequeno: true },
         { id: 'matriz', comando: 'matriz', simbolo: '⁙', pequeno: true },
         { id: 'apagar', comando: 'apagar', simbolo: '✕', pequeno: true },
@@ -62,6 +64,9 @@ export const RIBBON: AbaDado[] = [
       { id: 'anotacao', botoes: [
         { id: 'texto', comando: 'texto', simbolo: 'A' },
         { id: 'cota', comando: 'cota', simbolo: '⟷' },
+        { id: 'cota_alinhada', comando: 'cota_alinhada', simbolo: '⤢', pequeno: true },
+        { id: 'cota_raio', comando: 'cota_raio', simbolo: 'R', pequeno: true },
+        { id: 'cota_diametro', comando: 'cota_diametro', simbolo: 'Ø', pequeno: true },
         { id: 'chamada', comando: 'chamada', simbolo: '↗', pequeno: true },
         { id: 'tabela', comando: 'tabela', simbolo: '▦', pequeno: true },
       ] },

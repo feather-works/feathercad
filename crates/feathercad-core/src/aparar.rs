@@ -23,19 +23,19 @@ pub enum Recusa {
 
 /// Uma linha ou um arco de círculo (`varredura` = 360 é o círculo inteiro), para achar cruzamentos.
 #[derive(Clone, Copy, Debug)]
-enum Curva {
+pub(crate) enum Curva {
     Seg(Ponto, Ponto),
     Arco { c: Ponto, r: f64, ini: f64, varr: f64 },
 }
 
 const EPS: f64 = 1e-9;
 
-fn no_arco(c: Ponto, ini: f64, varr: f64, p: Ponto) -> bool {
+pub(crate) fn no_arco(c: Ponto, ini: f64, varr: f64, p: Ponto) -> bool {
     varr >= 360.0 - EPS || varredura_graus(ini, c.angulo_ate(p)) <= varr + 1e-7 || varredura_graus(ini, c.angulo_ate(p)) >= 360.0 - 1e-7
 }
 
 /// As curvas de uma forma. Polilinha com arco vira cordas.
-fn curvas_de(geo: &Geometria) -> Vec<Curva> {
+pub(crate) fn curvas_de(geo: &Geometria) -> Vec<Curva> {
     match geo {
         Geometria::Linha { a, b } => vec![Curva::Seg(*a, *b)],
         Geometria::Circulo { centro, raio } => vec![Curva::Arco { c: *centro, r: *raio, ini: 0.0, varr: 360.0 }],
@@ -73,7 +73,7 @@ fn seg_circulo(a: Ponto, b: Ponto, c: Ponto, r: f64) -> Vec<Ponto> {
 }
 
 /// Onde as duas curvas se cruzam.
-fn cruzamentos(x: &Curva, y: &Curva) -> Vec<Ponto> {
+pub(crate) fn cruzamentos(x: &Curva, y: &Curva) -> Vec<Ponto> {
     match (x, y) {
         (Curva::Seg(a, b), Curva::Seg(c, d)) => {
             let (rx, ry, sx, sy) = (b.x - a.x, b.y - a.y, d.x - c.x, d.y - c.y);

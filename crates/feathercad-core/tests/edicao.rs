@@ -258,7 +258,7 @@ fn texto_ponto_altura_e_conteudo_e_a_altura_fica_para_o_proximo() {
 }
 
 #[test]
-fn cota_em_tres_cliques_cria_as_formas_num_passo_so() {
+fn cota_em_tres_cliques_vira_um_objeto_so_e_um_ctrl_z_desfaz() {
     let mut d = Documento::default();
     let mut s = Sessao::default();
     s.regional.decimal = ',';
@@ -268,10 +268,28 @@ fn cota_em_tres_cliques_cria_as_formas_num_passo_so() {
     assert!(s.previa_com(&d, p(5.0, 4.0)).len() >= 5, "a prévia mostra a cota como ficaria");
     clicar(&mut s, &mut d, 5.0, 4.0);
     assert_eq!(s.ferramenta, Ferramenta::Nenhuma);
-    let textos: Vec<_> = geometrias(&d).into_iter().filter_map(|g| if let Geometria::Texto { conteudo, .. } = g { Some(conteudo) } else { None }).collect();
+    // no desenho é uma inserção só; as linhas, setas e o texto moram no bloco anônimo *D1
+    assert_eq!(d.entidades().len(), 1);
+    let Geometria::Insercao { bloco, ponto, .. } = d.entidades()[0].geometria.clone() else { panic!("a cota devia ser uma inserção") };
+    assert_eq!(ponto, p(0.0, 0.0));
+    assert_eq!(d.blocos()[bloco].nome, "*D1");
+    let textos: Vec<_> = d.blocos()[bloco].entidades.iter().filter_map(|n| if let Geometria::Texto { conteudo, .. } = &n.geometria { Some(conteudo.clone()) } else { None }).collect();
     assert_eq!(textos, ["10,000"]);
-    assert!(d.entidades().len() >= 6);
+    assert!(d.blocos()[bloco].entidades.len() >= 6);
+    assert!(d.nomes_de_blocos_inseriveis().is_empty(), "o bloco anônimo não aparece na lista do Inserir");
+    // clicar em qualquer parte da cota (a linha de cota, em y = 4) seleciona o objeto inteiro
+    clicar(&mut s, &mut d, 2.0, 4.0);
+    assert_eq!(s.selecionados(), 1);
+    // uma segunda cota ganha outro nome
+    s.cancelar(&mut d);
+    s.executar(&mut d, "cota");
+    clicar(&mut s, &mut d, 0.0, 20.0);
+    clicar(&mut s, &mut d, 6.0, 20.0);
+    clicar(&mut s, &mut d, 3.0, 24.0);
+    assert_eq!(d.blocos()[1].nome, "*D2");
+    assert!(d.desfazer() && d.entidades().len() == 1);
     assert!(d.desfazer() && d.entidades().is_empty(), "um Ctrl+Z desfaz a cota inteira");
+    assert!(d.blocos().is_empty(), "e o bloco some junto");
 }
 
 #[test]
@@ -419,4 +437,78 @@ fn grab_leva_junto_toda_a_selecao_e_no_vazio_nao_pega_nada() {
     assert_eq!(geometrias(&d)[1], Geometria::Linha { a: p(2.0, 5.0), b: p(12.0, 5.0) });
     s.cancelar(&mut d);
     assert!(!s.arrasto_iniciar(&d, p(50.0, 50.0), TOL));
+}
+
+#[test]
+fn deslocar_com_distancia_digitada_repete_e_um_ctrl_z_desfaz_cada_copia() {
+    let mut d = Documento::default();
+    d.adicionar_linha(p(0.0, 0.0), p(10.0, 0.0));
+    let mut s = Sessao::default();
+    s.executar(&mut d, "deslocar");
+    s.digitar(&mut d, "2");
+    clicar(&mut s, &mut d, 5.0, 0.0);
+    assert_eq!(s.selecionados(), 1, "o objeto escolhido fica realçado");
+    clicar(&mut s, &mut d, 5.0, 8.0);
+    assert_eq!(d.entidades().len(), 2);
+    assert_eq!(geometrias(&d)[1], Geometria::Linha { a: p(0.0, 2.0), b: p(10.0, 2.0) });
+    assert_eq!(s.selecionados(), 0);
+    // continua no comando: a cópia pode ser deslocada de novo, agora para baixo do original
+    clicar(&mut s, &mut d, 5.0, 0.0);
+    clicar(&mut s, &mut d, 5.0, -3.0);
+    assert_eq!(geometrias(&d)[2], Geometria::Linha { a: p(0.0, -2.0), b: p(10.0, -2.0) });
+    d.desfazer();
+    assert_eq!(d.entidades().len(), 2);
+    // distância 0 = passar pelo ponto clicado
+    s.digitar(&mut d, "0");
+    clicar(&mut s, &mut d, 5.0, 0.0);
+    clicar(&mut s, &mut d, 5.0, 4.5);
+    assert_eq!(geometrias(&d)[2], Geometria::Linha { a: p(0.0, 4.5), b: p(10.0, 4.5) });
+}
+
+#[test]
+fn estender_pelos_cliques_avisa_quando_nao_ha_limite_e_um_ctrl_z_desfaz() {
+    let mut d = Documento::default();
+    d.adicionar_linha(p(0.0, 0.0), p(4.0, 0.0));
+    d.adicionar_linha(p(10.0, -5.0), p(10.0, 5.0));
+    let mut s = Sessao::default();
+    s.executar(&mut d, "estender");
+    clicar(&mut s, &mut d, 3.9, 0.0);
+    assert_eq!(geometrias(&d)[0], Geometria::Linha { a: p(0.0, 0.0), b: p(10.0, 0.0) });
+    assert!(matches!(s.ferramenta, Ferramenta::Estender), "continua no comando");
+    // a ponta da esquerda não tem nada no caminho: a linha fica como está
+    clicar(&mut s, &mut d, 0.1, 0.0);
+    assert_eq!(geometrias(&d)[0], Geometria::Linha { a: p(0.0, 0.0), b: p(10.0, 0.0) });
+    d.desfazer();
+    assert_eq!(geometrias(&d)[0], Geometria::Linha { a: p(0.0, 0.0), b: p(4.0, 0.0) });
+}
+
+#[test]
+fn cota_alinhada_raio_e_diametro_tambem_viram_um_objeto_so() {
+    let mut d = Documento::default();
+    let mut s = Sessao::default();
+    s.regional.decimal = ',';
+    s.executar(&mut d, "cota_alinhada");
+    clicar(&mut s, &mut d, 0.0, 0.0);
+    clicar(&mut s, &mut d, 4.0, 3.0);
+    clicar(&mut s, &mut d, 0.0, 5.0);
+    assert_eq!((d.entidades().len(), d.blocos().len()), (1, 1));
+    let textos = |d: &Documento, i: usize| -> Vec<String> { d.blocos()[i].entidades.iter().filter_map(|n| if let Geometria::Texto { conteudo, .. } = &n.geometria { Some(conteudo.clone()) } else { None }).collect() };
+    assert_eq!(textos(&d, 0), ["5,000"]);
+    // raio: escolhe o círculo, depois a posição do texto
+    d.adicionar_circulo(p(50.0, 50.0), 5.0);
+    s.executar(&mut d, "cota_raio");
+    clicar(&mut s, &mut d, 0.0, 100.0); // vazio: continua pedindo o círculo
+    assert!(matches!(s.ferramenta, Ferramenta::CotaRaio { alvo: None, .. }));
+    clicar(&mut s, &mut d, 55.0, 50.0);
+    assert!(matches!(s.ferramenta, Ferramenta::CotaRaio { alvo: Some(_), .. }));
+    assert!(!s.previa_com(&d, p(60.0, 55.0)).is_empty(), "a prévia mostra a cota como ficaria");
+    clicar(&mut s, &mut d, 60.0, 50.0);
+    assert_eq!(s.ferramenta, Ferramenta::Nenhuma);
+    assert_eq!(textos(&d, 1), ["R5,000"]);
+    // diâmetro; e clicar numa linha avisa que só serve para círculo e arco
+    s.executar(&mut d, "cota_diametro");
+    clicar(&mut s, &mut d, 50.0, 45.0); // uma linha não serve: escolhe o objeto mais perto (aqui o círculo)
+    clicar(&mut s, &mut d, 50.0, 56.0);
+    assert_eq!(textos(&d, 2), ["Ø10,000"]);
+    assert_eq!(d.entidades().len(), 4, "3 cotas e o círculo");
 }

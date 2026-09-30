@@ -24,10 +24,10 @@ export const MENU_CONTEXTO_CSS = `
 
 /** Enfeite por item (o que o item faz é do motor). */
 const ICONES: Record<string, string> = {
-  enter: '↵', cancelar: '✕', fechar: '◯', mover: '✥', copiar: '⧉', girar: '↻', escala: '⤢', espelhar: '⇋', esticar: '↔',
+  enter: '↵', cancelar: '✕', fechar: '◯', mover: '✥', copiar: '⧉', girar: '↻', escala: '⤢', espelhar: '⇋', deslocar: '⫽', esticar: '↔',
   matriz: '▦', recortar: '✂', copiar_area: '⎘', colar: '📋', criar_bloco: '▣', agrupar: '⬚', apagar: '🗑',
   desfazer: '↶', refazer: '↷', propriedades: '☰', zoom_ajustar: '⛶', configuracoes: '⚙',
-  linha: '╱', polilinha: '⌇', circulo: '○', arco: '◠', retangulo: '▭', elipse: '⬭', hachura: '▨', texto: 'A', cota: '⟷',
+  linha: '╱', polilinha: '⌇', circulo: '○', arco: '◠', retangulo: '▭', elipse: '⬭', hachura: '▨', texto: 'A', cota: '⟷', cota_alinhada: '⤢', cota_raio: 'R', cota_diametro: 'Ø',
 };
 
 export interface MenuContexto {

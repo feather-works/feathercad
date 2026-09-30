@@ -242,6 +242,33 @@ impl Documento {
         Ok(indice)
     }
 
+    /// Uma cota (ou outra anotação que deve valer por um objeto só): as `formas`, em coordenadas do desenho, vão para
+    /// um bloco anônimo `*D<n>` e entra **uma** inserção dele, na camada atual, com a base em `base`. Selecionar,
+    /// mover, copiar e apagar valem para o conjunto; o DXF grava como bloco `*D`, o que o AutoCAD lê como cota.
+    /// Um Ctrl+Z desfaz tudo. `None` se não há formas.
+    pub fn adicionar_cota(&mut self, formas: Vec<crate::documento::Geometria>, base: crate::geom::Ponto) -> Option<crate::documento::Id> {
+        if formas.is_empty() {
+            return None;
+        }
+        self.desfazer.push(Passo::Tudo(Box::new(Captura { camadas: self.camadas.clone(), atual: self.camada_atual, entidades: self.entidades.clone(), blocos: self.blocos.clone() })));
+        self.refazer.clear();
+        let mut n = 1;
+        while self.bloco_por_nome(&format!("*D{n}")).is_some() {
+            n += 1;
+        }
+        // camada 0 dentro do bloco: as formas tomam a camada e a cor da inserção
+        let entidades = formas.into_iter().map(|g| crate::documento::NovaEntidade { camada: 0, cor: None, geometria: g, props: Default::default() }).collect();
+        self.blocos.push(crate::documento::Bloco { nome: format!("*D{n}"), base, entidades });
+        let indice = self.blocos.len() - 1;
+        self.caixas_dos_blocos.push(self.caixa_do_bloco(indice, 0));
+        let id = self.proximo_id;
+        self.proximo_id += 1;
+        let camada = self.camada_atual;
+        self.entidades.push(crate::documento::Entidade { id, camada, cor: None, geometria: crate::documento::Geometria::Insercao { bloco: indice, ponto: base, escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default() });
+        self.mudou();
+        Some(id)
+    }
+
     /// A camada `indice` tem objetos (no desenho ou dentro de um bloco)?
     pub fn camada_em_uso(&self, indice: usize) -> bool {
         self.entidades.iter().any(|e| e.camada == indice) || self.blocos.iter().any(|b| b.entidades.iter().any(|n| n.camada == indice))
