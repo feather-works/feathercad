@@ -28,7 +28,7 @@
   "bundle": {
     "active": true,
     "targets": ["deb", "appimage", "rpm", "nsis", "msi"],
-    "category": "Graphics",
+    "category": "GraphicsAndDesign",
     "shortDescription": "CAD 2D com DXF e formato próprio eficiente",
     "longDescription": "FeatherCAD — CAD 2D da suíte FeatherOffice. Motor em Rust, lê e grava DXF, formato próprio .fcdz. Sem conta e sem telemetria.",
     "icon": [
