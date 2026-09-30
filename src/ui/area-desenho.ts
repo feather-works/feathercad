@@ -8,18 +8,23 @@
  * gesto vai e a vista nova volta. O TypeScript guarda a vista, não mexe nela.
  */
 
-import { medir } from '../ponte/metricas.ts';
+import { etapa, quadroDePerfil, registrar } from '../ponte/perfil.ts';
 import { criarBarraNavegacao } from './barra-navegacao.ts';
+import { criarMedidorFps } from './medidor-fps.ts';
+import { pintarEmSegundoPlano, textoNoMovimento, zoomSuave } from './preferencias.ts';
+import { criarPintor } from './pintor-quadro.ts';
+import { pintarObjetos, type ObjetosDoQuadro } from './pintura.ts';
 import { criarVistaCubo } from './vista-cubo.ts';
 import { aoMudarTema, corDoTema, temaVisivel } from './tema.ts';
-import type { Estado, Fundo, ItemDeMenu, MarcasDoFundo, Motor, Preenchimento, Quadro, RespostaCursor, Segmento, TextoDoQuadro, TipoDeSnap, Vista } from '../ponte/index.ts';
+import type { Estado, Fundo, ItemDeMenu, Motor, RespostaCursor, Segmento, TipoDeSnap, Vista } from '../ponte/index.ts';
 import type { Textos } from '../idiomas/index.ts';
 import { Z } from './z.ts';
 
 export const AREA_DESENHO_CSS = `
 .area { position: relative; overflow: hidden; background: var(--fundo-area); cursor: none; }
 .area canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.area .desenho { z-index: ${Z.desenho}; }
+.area .desenho { z-index: ${Z.desenho}; transform-origin: 0 0; will-change: transform; }
+.area .textos { z-index: ${Z.textos}; transform-origin: 0 0; will-change: transform; }
 .area .sobreposicao { z-index: ${Z.sobreposicao}; }
 .area .caixa { position: absolute; z-index: ${Z.entradaDinamica}; padding: 1px 5px; background: var(--caixa-dinamica); border: 1px solid var(--destaque); color: var(--texto); font: 11px var(--fonte); pointer-events: none; white-space: nowrap; }
 `;
@@ -30,6 +35,12 @@ const FATOR_DO_ZOOM = 1.25;
 const DUPLO_CLIQUE_MS = 350;
 /** Quanto o mouse precisa andar, em pixels, para o "grab" valer como arrasto e não como clique. */
 const LIMIAR_DO_ARRASTO_PX = 4;
+/** Quanto tempo depois do último movimento (zoom/pan) o texto real volta no lugar do traço. */
+const ESPERA_DO_TEXTO_MS = 150;
+/** Zoom suave: a cada quadro a vista anda esta fração do que falta (constante de tempo, em ms). Ao redor de 3× isto o gesto termina. */
+const TEMPO_DO_ZOOM_SUAVE_MS = 70;
+/** O que falta de zoom (em log) abaixo disto termina de uma vez. */
+const RESTO_DO_ZOOM_SUAVE = 0.003;
 /** As cores do desenho vêm das variáveis do tema (`base.ts`), relidas quando o tema muda. */
 /** A marca de cada tipo de snap, como no AutoCAD: quadrado, triângulo, círculo, losango, X… */
 function marcaDeSnap(ctx: CanvasRenderingContext2D, tipo: TipoDeSnap | null, x: number, y: number): void {
@@ -105,15 +116,6 @@ function lerCores(): void {
   cores.janelaToca = corDoTema('--janela-toca');
 }
 
-/** O que se pinta de um quadro: preenchimentos, segmentos e textos (sem o fundo). */
-interface ObjetosDoQuadro {
-  xs: Float32Array;
-  cores: Uint32Array;
-  espessuras: Float32Array;
-  textos: TextoDoQuadro[];
-  preenchimentos: Preenchimento[];
-}
-
 export interface AreaDesenho {
   el: HTMLElement;
   /** O estado do motor mudou: pede o quadro de novo se preciso. */
@@ -145,10 +147,6 @@ function tela2d(c: HTMLCanvasElement): CanvasRenderingContext2D {
   return ctx;
 }
 
-function corCss(cor: number): string {
-  return `#${cor.toString(16).padStart(6, '0')}`;
-}
-
 /** Cria a área de desenho. */
 export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   const { motor, t } = cx;
@@ -156,21 +154,20 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   el.className = 'area';
   const telaDoFundo = document.createElement('canvas');
   telaDoFundo.className = 'desenho';
+  const telaDosTextos = document.createElement('canvas');
+  telaDosTextos.className = 'textos';
   const topo = document.createElement('canvas');
   topo.className = 'sobreposicao';
   const caixaXY = document.createElement('div');
   const caixaDA = document.createElement('div');
   caixaXY.className = caixaDA.className = 'caixa';
   caixaXY.hidden = caixaDA.hidden = true;
-  el.append(telaDoFundo, topo, caixaXY, caixaDA);
-  const zoomMais = (): void => {
-    vista = motor.vistaZoomCentro(vista, FATOR_DO_ZOOM);
-    vistaMudou();
-  };
-  const zoomMenos = (): void => {
-    vista = motor.vistaZoomCentro(vista, 1 / FATOR_DO_ZOOM);
-    vistaMudou();
-  };
+  const fps = criarMedidorFps(t);
+  // Quem pinta o quadro: um Worker (a thread principal fica livre) ou, se a webview não suporta, a própria thread principal.
+  const pintor = criarPintor(telaDoFundo, telaDosTextos, pintarEmSegundoPlano());
+  el.append(telaDoFundo, telaDosTextos, topo, caixaXY, caixaDA, fps.el);
+  const zoomMais = (): void => pedirZoom(vista.largura / 2, vista.altura / 2, FATOR_DO_ZOOM);
+  const zoomMenos = (): void => pedirZoom(vista.largura / 2, vista.altura / 2, 1 / FATOR_DO_ZOOM);
   const ajustar = (): void => {
     vista = motor.vistaAjustar(vista);
     vistaMudou();
@@ -178,7 +175,8 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   el.append(criarVistaCubo(t), criarBarraNavegacao(t, zoomMais, zoomMenos, ajustar));
 
   let vista: Vista = motor.vistaInicial(800, 600);
-  let quadro: { versao: number; xs: Float32Array; cores: Uint32Array; espessuras: Float32Array; textos: TextoDoQuadro[]; preenchimentos: Preenchimento[]; fundoX: MarcasDoFundo; fundoY: MarcasDoFundo } | null = null;
+  /** A versão do último quadro pintado (o motor responde "nada mudou" se ela ainda vale e a vista é a mesma). */
+  let versaoDoQuadro: number | null = null;
   let fundo: Fundo = 'nada';
   let vistaDoQuadro = '';
   let cursor: RespostaCursor | null = null;
@@ -191,113 +189,120 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
     const dpr = window.devicePixelRatio || 1;
     const { width, height } = el.getBoundingClientRect();
     if (width === 0 || height === 0) return;
-    for (const c of [telaDoFundo, topo]) {
-      c.width = Math.round(width * dpr);
-      c.height = Math.round(height * dpr);
-      tela2d(c).setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
+    topo.width = Math.round(width * dpr);
+    topo.height = Math.round(height * dpr);
+    tela2d(topo).setTransform(dpr, 0, 0, dpr, 0, 0);
+    pintor.tamanho(width, height, dpr);
     vista = { ...vista, largura: width, altura: height };
+    vistaDoFundo = vistaDosTextos = null;
+    telaDoFundo.style.transform = telaDosTextos.style.transform = '';
     pedirQuadro();
     pintarTopo();
     cx.aoZoom(motor.vistaTexto(vista));
   }
 
-  function pintarFundo(): void {
-    const ctx = tela2d(telaDoFundo);
-    ctx.clearRect(0, 0, vista.largura, vista.altura);
-    if (!quadro) return;
-    pintarGrade(ctx, quadro.fundoX, quadro.fundoY);
-    pintarObjetos(ctx, quadro);
+  /** A vista com que cada camada foi pintada: até o quadro novo chegar, ela só é escalada/deslocada por CSS. */
+  let vistaDoFundo: Vista | null = null;
+  let vistaDosTextos: Vista | null = null;
+  /** A vista está em movimento (zoom ou pan): o texto acompanha por CSS, sem ser redesenhado a cada quadro. */
+  let emMovimentoAgora = false;
+  let acabamento: ReturnType<typeof setTimeout> | null = null;
+
+  const mesmaVista = (a: Vista, b: Vista): boolean => a.escala === b.escala && a.centro.x === b.centro.x && a.centro.y === b.centro.y && a.largura === b.largura && a.altura === b.altura;
+
+  /**
+   * Leva uma camada já pintada com a vista `v0` até a vista de agora só com `transform` (a placa de vídeo escala a
+   * imagem; nada é rasterizado de novo). A matriz é a composição das duas projeções mundo→tela (`Vista::para_tela`, no motor).
+   */
+  function acompanhar(tela: HTMLCanvasElement, v0: Vista | null): void {
+    if (!v0) return;
+    if (mesmaVista(v0, vista)) {
+      tela.style.transform = '';
+      return;
+    }
+    const k = vista.escala / v0.escala;
+    const tx = (vista.largura / 2) * (1 - k) + (v0.centro.x - vista.centro.x) * vista.escala;
+    const ty = (vista.altura / 2) * (1 - k) - (v0.centro.y - vista.centro.y) * vista.escala;
+    tela.style.transform = `matrix(${k}, 0, 0, ${k}, ${tx}, ${ty})`;
   }
 
-  /** Preenchimentos, segmentos (um caminho por cor e espessura) e textos de um quadro. */
-  function pintarObjetos(ctx: CanvasRenderingContext2D, q: ObjetosDoQuadro): void {
-    for (const p of q.preenchimentos) {
-      ctx.fillStyle = corCss(p.cor);
-      ctx.beginPath();
-      for (const laco of p.lacos) {
-        ctx.moveTo(laco[0]!, laco[1]!);
-        for (let k = 2; k < laco.length; k += 2) ctx.lineTo(laco[k]!, laco[k + 1]!);
-        ctx.closePath();
-      }
-      ctx.fill('evenodd');
-    }
-    ctx.lineWidth = 1;
-    const { xs, cores, espessuras } = q;
-    // Um caminho por cor e espessura (não um `stroke` por segmento): com dezenas de milhares de segmentos a diferença é enorme.
-    const porCor = new Map<string, number[]>();
-    for (let i = 0; i < cores.length; i++) {
-      const chave = `${cores[i]!}:${espessuras[i]!}`;
-      const lista = porCor.get(chave);
-      if (lista) lista.push(i);
-      else porCor.set(chave, [i]);
-    }
-    for (const indices of porCor.values()) {
-      const primeiro = indices[0]!;
-      ctx.strokeStyle = corCss(cores[primeiro]!);
-      ctx.lineWidth = espessuras[primeiro]!;
-      ctx.beginPath();
-      for (const i of indices) {
-        ctx.moveTo(xs[i * 4]!, xs[i * 4 + 1]!);
-        ctx.lineTo(xs[i * 4 + 2]!, xs[i * 4 + 3]!);
-      }
-      ctx.stroke();
-    }
-    pintarTextos(ctx, q.textos);
+  /** A vista mudou: as duas camadas seguem o gesto na hora, sem esperar o quadro novo do motor. */
+  function acompanharCamadas(): void {
+    acompanhar(telaDoFundo, vistaDoFundo);
+    acompanhar(telaDosTextos, vistaDosTextos);
   }
 
-  /** Os textos, cada um na posição, tamanho e giro que o motor mandou. */
-  function pintarTextos(ctx: CanvasRenderingContext2D, textos: TextoDoQuadro[]): void {
-    for (const t of textos) {
-      ctx.save();
-      ctx.translate(t.x, t.y);
-      ctx.rotate(t.giro);
-      ctx.fillStyle = corCss(t.cor);
-      ctx.font = `${t.altura}px system-ui, sans-serif`;
-      ctx.textAlign = t.h;
-      ctx.textBaseline = t.base;
-      ctx.fillText(t.conteudo, 0, 0);
-      ctx.restore();
-    }
-  }
-
-  /** O fundo (linhas ou pontos) nas posições que o motor mandou. */
-  function pintarGrade(ctx: CanvasRenderingContext2D, gx: MarcasDoFundo, gy: MarcasDoFundo): void {
-    if (fundo === 'grade') {
-      ctx.lineWidth = 1;
-      for (const principal of [false, true]) {
-        ctx.strokeStyle = principal ? cores.principal : cores.linha;
-        ctx.beginPath();
-        gx.pos.forEach((x, i) => {
-          if ((gx.principal[i] === 1) === principal) {
-            ctx.moveTo(Math.round(x) + 0.5, 0);
-            ctx.lineTo(Math.round(x) + 0.5, vista.altura);
-          }
+  /** Marca que a vista está em movimento e agenda o texto nítido para quando ele parar. */
+  function emMovimento(): void {
+    // com o texto completo ligado nas Configurações, o texto é redesenhado a cada quadro (mais lento no zoom)
+    if (textoNoMovimento()) return;
+    emMovimentoAgora = true;
+    if (acabamento !== null) clearTimeout(acabamento);
+    acabamento = setTimeout(() => {
+      acabamento = null;
+      emMovimentoAgora = false;
+      const v = vistaDoFundo;
+      if (v) {
+        void pintor.pintarTextos(v).then(() => {
+          vistaDosTextos = v;
+          acompanhar(telaDosTextos, v);
         });
-        gy.pos.forEach((y, i) => {
-          if ((gy.principal[i] === 1) === principal) {
-            ctx.moveTo(0, Math.round(y) + 0.5);
-            ctx.lineTo(vista.largura, Math.round(y) + 0.5);
-          }
-        });
-        ctx.stroke();
       }
-    } else if (fundo === 'pontos') {
-      ctx.fillStyle = cores.ponto;
-      for (const x of gx.pos) for (const y of gy.pos) ctx.fillRect(Math.round(x), Math.round(y), 1.5, 1.5);
-    }
+    }, ESPERA_DO_TEXTO_MS);
   }
 
-  /** Pede o quadro; se a vista não mudou e a versão vale, o motor responde "nada mudou". */
+  /** Há um pedido de quadro no ar; só um por vez, e o último estado vale (ver `pedirQuadro`). */
+  let emVoo = false;
+  let querDeNovo = false;
+
+  /**
+   * Pede o quadro ao motor **sem travar a interface**: o Rust calcula em outra thread e os bytes voltam crus (IPC
+   * binário). Só um pedido por vez; se a vista (ou o desenho) mudou enquanto ele voava, o quadro que chega ainda é
+   * pintado (as camadas acompanham por CSS) e logo sai outro pedido, com o estado de agora. Se a vista não mudou e a
+   * versão vale, o motor responde "nada mudou".
+   */
   function pedirQuadro(): void {
-    const chaveDaVista = JSON.stringify(vista);
-    const conhecida = quadro && chaveDaVista === vistaDoQuadro ? quadro.versao : null;
-    const q: Quadro = medir('quadro', 'desenho', () => motor.quadro(vista, conhecida, temaVisivel() === 'light'), (r) => (r.tipo === 'novo' ? `${r.cores.length} segmentos` : 'igual'));
-    if (q.tipo === 'novo') {
-      quadro = { versao: q.versao, xs: q.xs, cores: q.cores, espessuras: q.espessuras, textos: q.textos, preenchimentos: q.preenchimentos, fundoX: q.fundoX, fundoY: q.fundoY };
-      vistaDoQuadro = chaveDaVista;
-      pintarFundo();
+    if (emVoo) {
+      querDeNovo = true;
+      return;
     }
+    emVoo = true;
+    querDeNovo = false;
+    const vistaPedida = vista;
+    const chave = JSON.stringify(vistaPedida);
+    const conhecida = versaoDoQuadro !== null && chave === vistaDoQuadro ? versaoDoQuadro : null;
+    const inicio = performance.now();
+    let comTextos = true;
+    motor
+      .quadroBrutoAsync(vistaPedida, conhecida, temaVisivel() === 'light')
+      .then((bytes) => {
+        // Em movimento a camada de textos não é refeita (o CSS a acompanha); ao parar, `emMovimento` a redesenha.
+        comTextos = !(emMovimentoAgora && vistaDosTextos);
+        return pintor.pintar({ bytes, vista: vistaPedida, modo: fundo, cores: { linha: cores.linha, principal: cores.principal, ponto: cores.ponto }, comTextos });
+      })
+      .then((r) => {
+        emVoo = false;
+        quadroDePerfil('quadro-chegou', () => {
+          registrar('quadro/latencia(pedido→resposta)', performance.now() - inicio);
+          if (r.tipo === 'novo') {
+            versaoDoQuadro = r.versao;
+            vistaDoQuadro = chave;
+            vistaDoFundo = vistaPedida;
+            if (comTextos) vistaDosTextos = vistaPedida;
+            acompanharCamadas();
+            // O que o pintor gastou (no Worker, fora da thread principal): aparece como detalhe no perfil.
+            registrar('pintor/decodificar', r.ms.decodificar);
+            registrar('pintor/fundo', r.ms.fundo);
+            registrar('pintor/textos', r.ms.textos);
+            fps.info(`${r.segmentos} ${t.fps.segmentos} · ${r.textos} ${t.fps.textos}${pintor.emWorker ? '' : ' · sem Worker'}`);
+          }
+        });
+        if (querDeNovo || JSON.stringify(vista) !== chave) pedirQuadro();
+      })
+      .catch((erro: unknown) => {
+        emVoo = false;
+        console.error('quadro:', erro);
+      });
   }
 
   function linha(ctx: CanvasRenderingContext2D, s: Segmento, cor: string, tracejada: boolean): void {
@@ -376,6 +381,7 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
 
   /** A vista mudou de zoom: pede o quadro, o texto do zoom e refaz o cursor. */
   function vistaMudou(): void {
+    acompanharCamadas();
     pedirQuadro();
     cx.aoZoom(motor.vistaTexto(vista));
     if (mouse) moverCursor(mouse.x, mouse.y);
@@ -383,14 +389,15 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
 
   function moverCursor(x: number, y: number): void {
     mouse = { x, y };
-    cursor = motor.cursorMover(vista, x, y);
+    cursor = fps.medir('cursor', () => etapa('cursor', () => motor.cursorMover(vista, x, y)));
     arrastados = null;
     if (pegou) {
-      const q = motor.quadroArrasto(vista, x, y, temaVisivel() === 'light');
+      const q = etapa('quadro_arrasto', () => motor.quadroArrasto(vista, x, y, temaVisivel() === 'light'));
       if (q.tipo === 'novo') arrastados = q;
     }
-    pintarTopo();
-    cx.aoCursor(cursor);
+    fps.medir('pintura', () => etapa('pintar_topo', pintarTopo));
+    const atual = cursor;
+    etapa('ao_cursor', () => cx.aoCursor(atual));
   }
 
   function posicao(e: MouseEvent): { x: number; y: number } {
@@ -401,6 +408,92 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   let arrastando: { x: number; y: number } | null = null;
   let pendente: { x: number; y: number } | null = null;
   let agendado = false;
+  // Pan e zoom também são agrupados por quadro de tela: o mouse (e a roda) disparam várias vezes por
+  // quadro, e cada um custava um quadro inteiro do motor.
+  let panPendente = { dx: 0, dy: 0 };
+  let zoomPendente: { x: number; y: number; fator: number } | null = null;
+
+  /** Aplica de uma vez o pan e o zoom acumulados desde o último quadro de tela. */
+  function aplicarMovimentoPendente(): void {
+    let mudou = false;
+    if (panPendente.dx !== 0 || panPendente.dy !== 0) {
+      const { dx, dy } = panPendente;
+      vista = etapa('vista_deslocar', () => motor.vistaDeslocar(vista, dx, dy));
+      panPendente = { dx: 0, dy: 0 };
+      mudou = true;
+    }
+    if (zoomPendente) {
+      const z = zoomPendente;
+      vista = etapa('vista_zoom', () => motor.vistaZoom(vista, z.x, z.y, z.fator));
+      mouse = { x: z.x, y: z.y };
+      zoomPendente = null;
+      cx.aoZoom(etapa('vista_texto', () => motor.vistaTexto(vista)));
+      mudou = true;
+    }
+    if (mudou) {
+      emMovimento();
+      acompanharCamadas();
+      pedirQuadro();
+    }
+  }
+
+  /** Zoom suave em andamento: o que falta (fator) e o ponto fixo (o mouse, ou o centro nos botões). */
+  let zoomAnimado: { x: number; y: number; falta: number; ultimo: number } | null = null;
+
+  /** Pede um zoom de `fator` em volta de `(x, y)`: animado se a preferência está ligada, senão de uma vez. */
+  function pedirZoom(x: number, y: number, fator: number): void {
+    if (!zoomSuave()) {
+      zoomPendente = { x, y, fator: (zoomPendente?.fator ?? 1) * fator };
+      agendarQuadro();
+      return;
+    }
+    const rodando = zoomAnimado !== null;
+    zoomAnimado = { x, y, falta: (zoomAnimado?.falta ?? 1) * fator, ultimo: zoomAnimado?.ultimo ?? performance.now() };
+    if (!rodando) requestAnimationFrame(passoDoZoom);
+  }
+
+  /** Um quadro do zoom suave: aplica uma fração do que falta (o cálculo da vista continua sendo do motor). */
+  function passoDoZoom(agora: number): void {
+    const z = zoomAnimado;
+    if (!z) return;
+    const fracao = 1 - Math.exp(-Math.max(1, agora - z.ultimo) / TEMPO_DO_ZOOM_SUAVE_MS);
+    const acabou = Math.abs(Math.log(z.falta)) < RESTO_DO_ZOOM_SUAVE;
+    const passo = acabou ? z.falta : Math.pow(z.falta, fracao);
+    zoomPendente = { x: z.x, y: z.y, fator: passo };
+    fps.quadro();
+    quadroDePerfil('zoom', () =>
+      fps.medir('total', () => {
+        aplicarMovimentoPendente();
+        moverCursor(z.x, z.y);
+      }),
+    );
+    if (acabou) {
+      zoomAnimado = null;
+    } else {
+      z.falta /= passo;
+      z.ultimo = agora;
+      requestAnimationFrame(passoDoZoom);
+    }
+  }
+
+  function agendarQuadro(): void {
+    if (agendado) return;
+    agendado = true;
+    requestAnimationFrame(() => {
+      agendado = false;
+      fps.quadro();
+      // o tipo do quadro no perfil: o que este quadro de tela vai fazer além de mexer o cursor
+      const tipo = panPendente.dx !== 0 || panPendente.dy !== 0 ? 'pan' : zoomPendente ? 'zoom-seco' : 'mouse';
+      quadroDePerfil(tipo, () =>
+        fps.medir('total', () => {
+          aplicarMovimentoPendente();
+          if (pendente) moverCursor(pendente.x, pendente.y);
+          else if (mouse) moverCursor(mouse.x, mouse.y);
+          pendente = null;
+        }),
+      );
+    });
+  }
   let ultimoCliqueDaRoda = 0;
   /** Sem comando ativo, apertar o mouse sobre um objeto o "pega" (grab): arrastar move, soltar sem andar é um clique. */
   let pegou: { x: number; y: number } | null = null;
@@ -412,20 +505,12 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   el.addEventListener('mousemove', (e) => {
     const p = posicao(e);
     if (arrastando) {
-      vista = motor.vistaDeslocar(vista, p.x - arrastando.x, p.y - arrastando.y);
+      panPendente = { dx: panPendente.dx + p.x - arrastando.x, dy: panPendente.dy + p.y - arrastando.y };
       arrastando = p;
-      pedirQuadro();
     }
     // O mouse dispara várias vezes por quadro; o motor só é consultado uma vez por quadro de tela.
     pendente = p;
-    if (!agendado) {
-      agendado = true;
-      requestAnimationFrame(() => {
-        agendado = false;
-        if (pendente) moverCursor(pendente.x, pendente.y);
-        pendente = null;
-      });
-    }
+    agendarQuadro();
   });
   el.addEventListener('mousedown', (e) => {
     const p = posicao(e);
@@ -465,6 +550,7 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   el.addEventListener('contextmenu', (e) => e.preventDefault());
   window.addEventListener('mouseup', (e) => {
     arrastando = null;
+    aplicarMovimentoPendente();
     if (janelaPorArrasto && e.button === 0) {
       const inicio = janelaPorArrasto;
       janelaPorArrasto = null;
@@ -498,9 +584,10 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
     (e) => {
       e.preventDefault();
       const p = posicao(e);
-      vista = motor.vistaZoom(vista, p.x, p.y, e.deltaY < 0 ? FATOR_DO_ZOOM : 1 / FATOR_DO_ZOOM);
+      // Várias voltas da roda no mesmo quadro de tela viram um zoom só (os fatores se multiplicam).
+      const fator = e.deltaY < 0 ? FATOR_DO_ZOOM : 1 / FATOR_DO_ZOOM;
       mouse = p;
-      vistaMudou();
+      pedirZoom(p.x, p.y, fator);
     },
     { passive: false },
   );
@@ -509,7 +596,7 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   lerCores();
   aoMudarTema(() => {
     lerCores();
-    quadro = null;
+    versaoDoQuadro = null;
     pedirQuadro();
     pintarTopo();
   });
@@ -522,7 +609,7 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
       // Trocou o estilo do fundo: o quadro guardado não vale mais.
       if (e.fundo !== fundo) {
         fundo = e.fundo;
-        quadro = null;
+        versaoDoQuadro = null;
       }
       pedirQuadro();
       if (mouse) moverCursor(mouse.x, mouse.y);

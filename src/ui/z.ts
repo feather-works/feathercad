@@ -5,10 +5,12 @@
 export const Z = {
   /** O quadro do desenho. */
   desenho: 1,
+  /** Os textos do quadro, numa camada própria (escalada por CSS durante o zoom, redesenhada nítida ao parar). */
+  textos: 2,
   /** Cursor, guias e prévia, por cima do quadro. */
-  sobreposicao: 2,
+  sobreposicao: 3,
   /** As caixinhas da entrada dinâmica, junto ao cursor. */
-  entradaDinamica: 3,
+  entradaDinamica: 4,
   /** Paletas acopláveis/flutuantes. */
   paleta: 10,
   /** A Ribbon (abre lista por cima da área). */

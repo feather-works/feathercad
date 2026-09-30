@@ -10,7 +10,7 @@ import type { Estado, Motor } from '../ponte/index.ts';
 import { apelidosDoUsuario, codigoAtual, comandosPadraoDe, guardarApelidosDoUsuario, guardarIdioma, IDIOMAS, regionalDe, comandosDe, formatar, type Textos } from '../idiomas/index.ts';
 import { abrirJanelaMonitor, mcpEstado, mcpTestar, noApp, type EstadoDoMcp } from '../ponte/nativo.ts';
 import { devConsole } from './console-depuracao.ts';
-import { ACENTOS, ANGULOS_DO_ORTO, CORPOS, FONTES, acentoPreferido, aplicarAparencia, corpoPreferido, fontePreferida, formatoPadrao, guardarAparencia, guardarCota, guardarOrtoAngulo, guardarFormatoPadrao, guardarFundo } from './preferencias.ts';
+import { ACENTOS, ANGULOS_DO_ORTO, CORPOS, FONTES, acentoPreferido, aplicarAparencia, corpoPreferido, fontePreferida, formatoPadrao, guardarAparencia, guardarCota, guardarOrtoAngulo, guardarFormatoPadrao, guardarFps, guardarFundo, fpsLigado, guardarZoomSuave, zoomSuave, guardarTextoNoMovimento, textoNoMovimento, guardarPintarEmSegundoPlano, pintarEmSegundoPlano } from './preferencias.ts';
 import { definirModo, modoSalvo, type ModoDoTema } from './tema.ts';
 import type { Fundo, Unidade } from '../ponte/tipos.ts';
 import { Z } from './z.ts';
@@ -295,6 +295,9 @@ export function criarConfiguracoes(t: Textos, a: AcoesDeConfiguracao): Configura
     for (const nome of ['snap', 'orto', 'osnap'] as const) {
       corpo.append(linha(c.desenho[nome].rotulo, c.desenho[nome].dica, interruptor(e[nome], (v) => motor(a.motor.interruptor(nome, v)))));
     }
+    corpo.append(linha(c.zoomSuave.rotulo, c.zoomSuave.dica, interruptor(zoomSuave(), (v) => guardarZoomSuave(v))));
+    corpo.append(linha(c.segundoPlano.rotulo, c.segundoPlano.dica, interruptor(pintarEmSegundoPlano(), (v) => guardarPintarEmSegundoPlano(v))));
+    corpo.append(linha(c.textoNoMovimento.rotulo, c.textoNoMovimento.dica, interruptor(textoNoMovimento(), (v) => guardarTextoNoMovimento(v))));
     corpo.append(linha(c.fundo.rotulo, c.fundo.dica, seg([['nada', c.fundo.nada], ['pontos', c.fundo.pontos], ['grade', c.fundo.grade]], e.fundo, (v) => { guardarFundo(v as Fundo); motor(a.motor.fundoDefinir(v as Fundo)); desenhar(); })));
   };
 
@@ -435,7 +438,8 @@ export function criarConfiguracoes(t: Textos, a: AcoesDeConfiguracao): Configura
         if (!aberta) devConsole.toggle();
       });
     });
-    corpo.append(linha(c.sobre.monitor, c.sobre.monitorDica, monitor), p);
+    const medidor = linha(c.sobre.fps.rotulo, c.sobre.fps.dica, interruptor(fpsLigado(), (v) => guardarFps(v)));
+    corpo.append(linha(c.sobre.monitor, c.sobre.monitorDica, monitor), medidor, p);
   };
 
   function desenhar(): void {

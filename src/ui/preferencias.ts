@@ -24,6 +24,44 @@ function gravar(chave: string, valor: string): void {
   }
 }
 
+/** O medidor de FPS da área de desenho está ligado? (Padrão: desligado; é diagnóstico.) */
+export function fpsLigado(): boolean {
+  return ler('fps') === '1';
+}
+
+/** Liga/desliga o medidor de FPS: guarda a escolha e avisa a área de desenho na hora. */
+export function guardarFps(ligado: boolean): void {
+  gravar('fps', ligado ? '1' : '0');
+  window.dispatchEvent(new CustomEvent('feathercad-fps', { detail: ligado }));
+}
+
+/** O zoom da roda é animado (suave)? Padrão: sim. */
+export function zoomSuave(): boolean {
+  return ler('zoomSuave') !== '0';
+}
+
+export function guardarZoomSuave(ligado: boolean): void {
+  gravar('zoomSuave', ligado ? '1' : '0');
+}
+
+/** O desenho é pintado num Worker (segundo plano)? Padrão: sim. Vale ao reabrir (o tipo de contexto do canvas não muda depois). */
+export function pintarEmSegundoPlano(): boolean {
+  return ler('segundoPlano') !== '0';
+}
+
+export function guardarPintarEmSegundoPlano(ligado: boolean): void {
+  gravar('segundoPlano', ligado ? '1' : '0');
+}
+
+/** O texto real é desenhado também durante o zoom e o pan? Padrão: não (vira traço até o movimento parar). */
+export function textoNoMovimento(): boolean {
+  return ler('textoNoMovimento') === '1';
+}
+
+export function guardarTextoNoMovimento(ligado: boolean): void {
+  gravar('textoNoMovimento', ligado ? '1' : '0');
+}
+
 /** O estilo de fundo escolhido (padrão: grade). */
 export function fundoPreferido(): Fundo {
   const v = ler('fundo');
