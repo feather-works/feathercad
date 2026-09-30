@@ -105,6 +105,21 @@ export interface ProcessoMedido {
   rss: number;
   /** Pico histórico deste processo (`VmHWM`). */
   pico: number;
+  /** CPU desde a medição anterior, em % de um núcleo (200 = dois núcleos cheios). */
+  cpu: number;
+  /** GPU desde a medição anterior, em % do tempo das engines do processo. */
+  gpu: number;
+  /** VRAM residente do processo, em bytes. */
+  vram: number;
+}
+
+/** A placa de vídeo, como o kernel a mostra. */
+export interface GpuMedida {
+  nome: string;
+  /** 0–100; `null` se o driver não informa. */
+  uso: number | null;
+  vram_usada: number;
+  vram_total: number;
 }
 
 /** O retrato de memória da árvore inteira. Bytes. */
@@ -114,6 +129,10 @@ export interface MemoriaArvore {
   webview: number;
   pico: number;
   pico_principal: number;
+  /** Soma da CPU da árvore, em % de um núcleo. */
+  cpu_total: number;
+  nucleos: number;
+  gpu: GpuMedida | null;
   processos: ProcessoMedido[];
 }
 

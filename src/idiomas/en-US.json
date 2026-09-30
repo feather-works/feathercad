@@ -308,6 +308,7 @@
     "memoria": {
       "processos": "Processes",
       "indisponivel": "Measurement unavailable (installed app on Linux only).",
+      "usoGrafico": "CPU {cpu} · GPU {gpu} — last 2 minutes",
       "ultimos": "{teto} — last 2 minutes",
       "cartoes": {
         "total": {
@@ -325,13 +326,28 @@
         "pico": {
           "rotulo": "Highest peak",
           "dica": "The highest use since the app opened (VmHWM)"
+        },
+        "cpu": {
+          "rotulo": "CPU",
+          "dica": "The app tree's processor use, in % of one core (the ceiling is 100 % × {nucleos} cores)"
+        },
+        "gpu": {
+          "rotulo": "GPU",
+          "dica": "How much of the time the graphics card was busy (whole system, not just the app)"
+        },
+        "vram": {
+          "rotulo": "VRAM",
+          "dica": "Graphics card memory in use on the system"
         }
       },
       "colunas": {
         "pid": "PID",
         "processo": "Process",
         "agora": "Now",
-        "pico": "Peak"
+        "pico": "Peak",
+        "cpu": "CPU",
+        "gpu": "GPU",
+        "vram": "VRAM"
       }
     },
     "console": {

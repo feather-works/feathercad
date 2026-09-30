@@ -308,6 +308,7 @@
     "memoria": {
       "processos": "Processos",
       "indisponivel": "Medição indisponível (só no aplicativo instalado, no Linux).",
+      "usoGrafico": "CPU {cpu} · GPU {gpu} — últimos 2 minutos",
       "ultimos": "{teto} — últimos 2 minutos",
       "cartoes": {
         "total": {
@@ -325,13 +326,28 @@
         "pico": {
           "rotulo": "Maior pico",
           "dica": "O maior uso desde que o aplicativo abriu (VmHWM)"
+        },
+        "cpu": {
+          "rotulo": "CPU",
+          "dica": "Uso de processador da árvore do aplicativo, em % de um núcleo (o teto é 100 % × {nucleos} núcleos)"
+        },
+        "gpu": {
+          "rotulo": "GPU",
+          "dica": "Quanto do tempo a placa de vídeo esteve ocupada (todo o sistema, não só o aplicativo)"
+        },
+        "vram": {
+          "rotulo": "VRAM",
+          "dica": "Memória da placa de vídeo em uso no sistema"
         }
       },
       "colunas": {
         "pid": "PID",
         "processo": "Processo",
         "agora": "Agora",
-        "pico": "Pico"
+        "pico": "Pico",
+        "cpu": "CPU",
+        "gpu": "GPU",
+        "vram": "VRAM"
       }
     },
     "console": {

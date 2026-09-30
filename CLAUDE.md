@@ -60,7 +60,7 @@ cd src-tauri && cargo clippy
   um componente por arquivo com o seu CSS; `ribbon-dados.ts` é a Ribbon como
   dado; `z.ts` é a escala de `z-index`.
 - **Monitor (F12)**, copiado do FeatherSheet em 29/09/2026 a pedido do usuário:
-  página `monitor.html` + `src/monitor/` (abas Memória, Console, Métricas), janela
+  página `monitor.html` + `src/monitor/` (abas Memória, Console, Métricas; **a aba Memória mostra também CPU e GPU** desde 30/09/2026: `memoria_arvore.rs` lê CPU por processo em `/proc/<pid>/stat` e GPU por processo nos `fdinfo` do DRM (`drm-engine-*`, `drm-resident-vram`, cliente único por `pdev/client-id`), com % calculada no Rust pela diferença entre amostras; a GPU do sistema vem do sysfs (`gpu_busy_percent`, `mem_info_vram_*`; AMD testado, NVIDIA via `nvidia-smi` e Intel só por nome, **não testados**); só Linux — no Windows o Monitor de memória ainda devolve `None`), janela
   própria pelo comando `abrir_janela_monitor`; captura do console em
   `src/ui/console-depuracao.ts` e conversa entre janelas por `BroadcastChannel`
   (`monitor-ponte.ts`); Rust: `src-tauri/src/metricas.rs` (`[motor]`) e

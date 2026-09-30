@@ -20,7 +20,8 @@ body { margin: 0; background: var(--fundo-area); color: var(--texto); font-famil
 .mon-tabela { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .mon-tabela th, .mon-tabela td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--borda); vertical-align: top; }
 .mon-tabela th { position: sticky; top: 0; background: var(--fundo-area); color: var(--texto-suave); font-weight: 500; }
-.mon-tabela td:last-child { text-align: right; white-space: nowrap; }
+.mon-tabela td:nth-child(n+3) { text-align: right; white-space: nowrap; }
+.mon-tabela th:nth-child(n+3) { text-align: right; }
 .mon-lenta td { color: var(--danger, #d93025); }
 .mon-barra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .mon-barra button, .mon-barra select, .mon-barra input[type="search"] { padding: 4px 10px; border: 1px solid var(--borda); border-radius: 6px; background: var(--fundo-area); color: var(--texto); font: inherit; }
