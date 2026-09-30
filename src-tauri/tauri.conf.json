@@ -28,7 +28,7 @@
   "bundle": {
     "active": true,
     "targets": ["deb", "appimage", "rpm", "nsis", "msi"],
-    "category": "GraphicsAndDesign",
+    "category": "public.app-category.graphics-design",
     "shortDescription": "CAD 2D com DXF e formato próprio eficiente",
     "longDescription": "FeatherCAD — CAD 2D da suíte FeatherOffice. Motor em Rust, lê e grava DXF, formato próprio .fcdz. Sem conta e sem telemetria.",
     "icon": [
@@ -40,6 +40,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "windows": {
+      "webviewInstallMode": { "type": "offlineInstaller", "silent": true },
+      "nsis": { "languages": ["PortugueseBR", "English"], "displayLanguageSelector": false }
+    },
     "fileAssociations": [
       { "ext": ["fcdz"], "name": "Desenho do FeatherCAD", "description": "Desenho do FeatherCAD", "mimeType": "application/x-feathercad", "role": "Editor" },
       { "ext": ["dxf"], "name": "Desenho DXF", "mimeType": "image/vnd.dxf", "role": "Editor" }
