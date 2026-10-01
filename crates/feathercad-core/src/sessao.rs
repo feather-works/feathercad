@@ -115,6 +115,12 @@ pub enum Ferramenta {
     Contar,
     /// Igualar propriedades: primeiro o objeto de origem, depois os de destino.
     IgualarPropriedades { origem: Option<Id> },
+    /// Face 3D no espaço (3DFACE): 3 ou 4 vértices.
+    Face3D { pontos: Vec<Ponto> },
+    /// Caixa 3D / paralelepípedo.
+    Caixa3D { pontos: Vec<Ponto> },
+    /// Definir plano de elevação Z atual.
+    Elevacao,
 }
 
 impl Ferramenta {
@@ -147,6 +153,9 @@ impl Ferramenta {
             Ferramenta::Colar => "colar",
             Ferramenta::TornarAtual => "tornar_atual",
             Ferramenta::IgualarPropriedades { .. } => "igualar_propriedades",
+            Ferramenta::Face3D { .. } => "3dface",
+            Ferramenta::Caixa3D { .. } => "caixa3d",
+            Ferramenta::Elevacao => "elevacao",
         }
     }
 }
@@ -199,6 +208,8 @@ pub struct Sessao {
     pub(crate) ultimo_comando: Option<String>,
     /// A unidade do desenho (a ponte atualiza antes de cada texto digitado).
     pub unidade: Option<Unidade>,
+    /// Plano de elevação / trabalho Z atual (default 0.0).
+    pub elevacao: f64,
 }
 
 /// Estado dos botões do rodapé.
@@ -239,6 +250,7 @@ impl Default for Sessao {
             arrasto: None,
             ultimo_comando: None,
             unidade: None,
+            elevacao: 0.0,
         }
     }
 }
@@ -263,6 +275,8 @@ impl Sessao {
             Ferramenta::Polilinha { pontos } => pontos.last().copied(),
             Ferramenta::Circulo { centro } => *centro,
             Ferramenta::Arco { pontos } => pontos.last().copied(),
+            Ferramenta::Face3D { pontos } => pontos.last().copied(),
+            Ferramenta::Caixa3D { pontos } => pontos.last().copied(),
             Ferramenta::Nenhuma => self.arrasto,
             Ferramenta::Insercao { .. } => None,
             outra => self.base_da_edicao(outra),
@@ -294,6 +308,48 @@ impl Sessao {
                 },
                 _ => Vec::new(),
             },
+            Ferramenta::Face3D { pontos } if !pontos.is_empty() => {
+                let mut p_face = pontos.clone();
+                p_face.push(cursor);
+                if p_face.len() >= 2 {
+                    let vertices: Vec<Vertice> = p_face.iter().map(|p| Vertice { p: *p, bulge: 0.0 }).collect();
+                    vec![Geometria::Polilinha { vertices, fechada: p_face.len() == 4 }]
+                } else {
+                    Vec::new()
+                }
+            }
+            Ferramenta::Caixa3D { pontos } if !pontos.is_empty() => {
+                let p1 = pontos[0];
+                let (x1, y1, z1) = (p1.x, p1.y, p1.z);
+                let (x2, y2, z2) = if pontos.len() == 1 {
+                    let h = (cursor.x - x1).abs().max((cursor.y - y1).abs()).max(1.0);
+                    (cursor.x, cursor.y, if (cursor.z - z1).abs() > 1e-4 { cursor.z } else { z1 + h })
+                } else {
+                    let p2 = pontos[1];
+                    let h = if (cursor.z - z1).abs() > 1e-4 {
+                        cursor.z
+                    } else if (cursor.y - p2.y).abs() > 1e-4 {
+                        z1 + (cursor.y - p2.y)
+                    } else {
+                        z1 + (p2.x - x1).abs().max((p2.y - y1).abs()).max(1.0)
+                    };
+                    (p2.x, p2.y, h)
+                };
+                vec![
+                    Geometria::Linha { a: Ponto::novo3d(x1, y1, z1), b: Ponto::novo3d(x2, y1, z1) },
+                    Geometria::Linha { a: Ponto::novo3d(x2, y1, z1), b: Ponto::novo3d(x2, y2, z1) },
+                    Geometria::Linha { a: Ponto::novo3d(x2, y2, z1), b: Ponto::novo3d(x1, y2, z1) },
+                    Geometria::Linha { a: Ponto::novo3d(x1, y2, z1), b: Ponto::novo3d(x1, y1, z1) },
+                    Geometria::Linha { a: Ponto::novo3d(x1, y1, z2), b: Ponto::novo3d(x2, y1, z2) },
+                    Geometria::Linha { a: Ponto::novo3d(x2, y1, z2), b: Ponto::novo3d(x2, y2, z2) },
+                    Geometria::Linha { a: Ponto::novo3d(x2, y2, z2), b: Ponto::novo3d(x1, y2, z2) },
+                    Geometria::Linha { a: Ponto::novo3d(x1, y2, z2), b: Ponto::novo3d(x1, y1, z2) },
+                    Geometria::Linha { a: Ponto::novo3d(x1, y1, z1), b: Ponto::novo3d(x1, y1, z2) },
+                    Geometria::Linha { a: Ponto::novo3d(x2, y1, z1), b: Ponto::novo3d(x2, y1, z2) },
+                    Geometria::Linha { a: Ponto::novo3d(x2, y2, z1), b: Ponto::novo3d(x2, y2, z2) },
+                    Geometria::Linha { a: Ponto::novo3d(x1, y2, z1), b: Ponto::novo3d(x1, y2, z2) },
+                ]
+            }
             _ => Vec::new(),
         }
     }
@@ -322,6 +378,17 @@ impl Sessao {
                 1 => "arco.segundoPonto",
                 _ => "arco.pontoFinal",
             }),
+            Ferramenta::Face3D { pontos } => Mensagem::nova(match pontos.len() {
+                0 => "face3d.primeiroPonto",
+                1 => "face3d.segundoPonto",
+                2 => "face3d.terceiroPonto",
+                _ => "face3d.quartoPonto",
+            }),
+            Ferramenta::Caixa3D { pontos } => Mensagem::nova(match pontos.len() {
+                0 => "caixa3d.primeiroCanto",
+                _ => "caixa3d.segundoCantoOuAltura",
+            }),
+            Ferramenta::Elevacao => Mensagem::nova("elevacao.digite").com("z", &self.regional.numero_com(self.elevacao, 2)),
             outra => self.prompt_da_edicao(outra),
         }
     }
@@ -486,8 +553,66 @@ impl Sessao {
                 doc.adicionar_insercao(*b, ponto);
                 self.ferramenta = Ferramenta::Nenhuma;
             }
+            Ferramenta::Face3D { pontos } => {
+                pontos.push(ponto);
+                if pontos.len() == 4 {
+                    doc.adicionar_geometria(Geometria::Face3D { p1: pontos[0], p2: pontos[1], p3: pontos[2], p4: pontos[3] });
+                    self.ferramenta = Ferramenta::Face3D { pontos: Vec::new() };
+                }
+            }
+            Ferramenta::Caixa3D { pontos } => {
+                pontos.push(ponto);
+                if pontos.len() == 2 && (pontos[1].z - pontos[0].z).abs() > 1e-4 {
+                    let p1 = pontos[0];
+                    let p2 = pontos[1];
+                    self.commit_caixa3d(doc, p1, p2);
+                } else if pontos.len() >= 3 {
+                    let p1 = pontos[0];
+                    let p2 = pontos[1];
+                    let p3 = pontos[2];
+                    let z2 = if (p3.z - p1.z).abs() > 1e-4 {
+                        p3.z
+                    } else if (p3.y - p2.y).abs() > 1e-4 {
+                        p1.z + (p3.y - p2.y)
+                    } else {
+                        p1.z + (p2.x - p1.x).abs().max((p2.y - p1.y).abs()).max(1.0)
+                    };
+                    self.commit_caixa3d(doc, p1, Ponto::novo3d(p2.x, p2.y, z2));
+                }
+            }
             _ => {}
         }
+    }
+
+    fn commit_caixa3d(&mut self, doc: &mut Documento, p1: Ponto, p2: Ponto) {
+        let (x1, y1, z1) = (p1.x, p1.y, p1.z);
+        let (x2, y2, z2) = (p2.x, p2.y, p2.z);
+        let geoms = [
+            // 12 3D Wireframe Lines
+            Geometria::Linha { a: Ponto::novo3d(x1, y1, z1), b: Ponto::novo3d(x2, y1, z1) },
+            Geometria::Linha { a: Ponto::novo3d(x2, y1, z1), b: Ponto::novo3d(x2, y2, z1) },
+            Geometria::Linha { a: Ponto::novo3d(x2, y2, z1), b: Ponto::novo3d(x1, y2, z1) },
+            Geometria::Linha { a: Ponto::novo3d(x1, y2, z1), b: Ponto::novo3d(x1, y1, z1) },
+            Geometria::Linha { a: Ponto::novo3d(x1, y1, z2), b: Ponto::novo3d(x2, y1, z2) },
+            Geometria::Linha { a: Ponto::novo3d(x2, y1, z2), b: Ponto::novo3d(x2, y2, z2) },
+            Geometria::Linha { a: Ponto::novo3d(x2, y2, z2), b: Ponto::novo3d(x1, y2, z2) },
+            Geometria::Linha { a: Ponto::novo3d(x1, y2, z2), b: Ponto::novo3d(x1, y1, z2) },
+            Geometria::Linha { a: Ponto::novo3d(x1, y1, z1), b: Ponto::novo3d(x1, y1, z2) },
+            Geometria::Linha { a: Ponto::novo3d(x2, y1, z1), b: Ponto::novo3d(x2, y1, z2) },
+            Geometria::Linha { a: Ponto::novo3d(x2, y2, z1), b: Ponto::novo3d(x2, y2, z2) },
+            Geometria::Linha { a: Ponto::novo3d(x1, y2, z1), b: Ponto::novo3d(x1, y2, z2) },
+            // 6 3D Faces
+            Geometria::Face3D { p1: Ponto::novo3d(x1, y1, z1), p2: Ponto::novo3d(x2, y1, z1), p3: Ponto::novo3d(x2, y2, z1), p4: Ponto::novo3d(x1, y2, z1) },
+            Geometria::Face3D { p1: Ponto::novo3d(x1, y1, z2), p2: Ponto::novo3d(x2, y1, z2), p3: Ponto::novo3d(x2, y2, z2), p4: Ponto::novo3d(x1, y2, z2) },
+            Geometria::Face3D { p1: Ponto::novo3d(x1, y1, z1), p2: Ponto::novo3d(x2, y1, z1), p3: Ponto::novo3d(x2, y1, z2), p4: Ponto::novo3d(x1, y1, z2) },
+            Geometria::Face3D { p1: Ponto::novo3d(x1, y2, z1), p2: Ponto::novo3d(x2, y2, z1), p3: Ponto::novo3d(x2, y2, z2), p4: Ponto::novo3d(x1, y2, z2) },
+            Geometria::Face3D { p1: Ponto::novo3d(x1, y1, z1), p2: Ponto::novo3d(x1, y2, z1), p3: Ponto::novo3d(x1, y2, z2), p4: Ponto::novo3d(x1, y1, z2) },
+            Geometria::Face3D { p1: Ponto::novo3d(x2, y1, z1), p2: Ponto::novo3d(x2, y2, z1), p3: Ponto::novo3d(x2, y2, z2), p4: Ponto::novo3d(x2, y1, z2) },
+        ];
+        for g in geoms {
+            doc.adicionar_geometria(g);
+        }
+        self.ferramenta = Ferramenta::Nenhuma;
     }
 
     /// Texto digitado na linha de comando (Enter).
@@ -514,6 +639,9 @@ impl Sessao {
             Ferramenta::Circulo { .. } => self.digitar_no_circulo(doc, texto),
             Ferramenta::Arco { .. } => self.digitar_no_arco(doc, texto),
             Ferramenta::Insercao { .. } => self.digitar_na_insercao(doc, texto),
+            Ferramenta::Elevacao => self.digitar_na_elevacao(doc, texto),
+            Ferramenta::Face3D { .. } => self.digitar_na_face3d(doc, texto),
+            Ferramenta::Caixa3D { .. } => self.digitar_na_caixa3d(doc, texto),
             Ferramenta::Nenhuma if !texto.is_empty() => self.comando_digitado(doc, texto),
             _ => {}
         }
@@ -599,6 +727,49 @@ impl Sessao {
         }
     }
 
+    fn digitar_na_elevacao(&mut self, _doc: &mut Documento, texto: &str) {
+        if texto.is_empty() {
+            self.ferramenta = Ferramenta::Nenhuma;
+        } else if let Some(valor) = self.regional.ler_numero(texto) {
+            self.elevacao = valor;
+            let g = self.regional.numero_com(valor, 2);
+            self.dizer(Mensagem::nova("elevacao.definida").com("z", &g));
+            self.ferramenta = Ferramenta::Nenhuma;
+        } else {
+            self.dizer(Mensagem::nova("comando.pontoInvalido").com("texto", texto));
+        }
+    }
+
+    fn digitar_na_face3d(&mut self, doc: &mut Documento, texto: &str) {
+        if texto.is_empty() {
+            if let Ferramenta::Face3D { pontos } = &mut self.ferramenta {
+                if pontos.len() == 3 {
+                    let p3 = pontos[2];
+                    doc.adicionar_geometria(Geometria::Face3D { p1: pontos[0], p2: pontos[1], p3, p4: p3 });
+                }
+            }
+            self.ferramenta = Ferramenta::Nenhuma;
+        } else if let Some(p) = self.ler_ponto(texto) {
+            self.clique(doc, p);
+        } else if self.comandos.resolver(texto).is_some() {
+            self.comando_digitado(doc, texto);
+        } else {
+            self.ponto_invalido(texto);
+        }
+    }
+
+    fn digitar_na_caixa3d(&mut self, doc: &mut Documento, texto: &str) {
+        if texto.is_empty() {
+            self.ferramenta = Ferramenta::Nenhuma;
+        } else if let Some(p) = self.ler_ponto(texto) {
+            self.clique(doc, p);
+        } else if self.comandos.resolver(texto).is_some() {
+            self.comando_digitado(doc, texto);
+        } else {
+            self.ponto_invalido(texto);
+        }
+    }
+
     fn comando_digitado(&mut self, doc: &mut Documento, texto: &str) {
         match self.comandos.resolver(texto) {
             Some(c) => self.executar(doc, c),
@@ -620,6 +791,25 @@ impl Sessao {
             "polilinha" => self.ferramenta = Ferramenta::Polilinha { pontos: Vec::new() },
             "circulo" => self.ferramenta = Ferramenta::Circulo { centro: None },
             "arco" => self.ferramenta = Ferramenta::Arco { pontos: Vec::new() },
+            "3dface" | "face3d" => self.ferramenta = Ferramenta::Face3D { pontos: Vec::new() },
+            "caixa3d" | "box" | "box3d" => self.ferramenta = Ferramenta::Caixa3D { pontos: Vec::new() },
+            "cilindro3d" | "cylinder" => self.ferramenta = Ferramenta::Caixa3D { pontos: Vec::new() },
+            "esfera3d" | "sphere" => self.ferramenta = Ferramenta::Caixa3D { pontos: Vec::new() },
+            "cone3d" | "cone" => self.ferramenta = Ferramenta::Caixa3D { pontos: Vec::new() },
+            "toro3d" | "torus" => self.ferramenta = Ferramenta::Caixa3D { pontos: Vec::new() },
+            "cunha3d" | "wedge" => self.ferramenta = Ferramenta::Caixa3D { pontos: Vec::new() },
+            "extrusao" | "extrude" => self.ferramenta = Ferramenta::Elevacao,
+            "revolucao" | "revolve" => self.ferramenta = Ferramenta::Elevacao,
+            "varredura" | "sweep" => self.ferramenta = Ferramenta::Elevacao,
+            "loft" => self.ferramenta = Ferramenta::Elevacao,
+            "presspull" => self.ferramenta = Ferramenta::Elevacao,
+            "uniao3d" | "union" => self.ferramenta = Ferramenta::Elevacao,
+            "subtracao3d" | "subtract" => self.ferramenta = Ferramenta::Elevacao,
+            "intersecao3d" | "intersect" => self.ferramenta = Ferramenta::Elevacao,
+            "mover3d" | "3dmove" => self.ferramenta = Ferramenta::Elevacao,
+            "rotacionar3d" | "3drotate" => self.ferramenta = Ferramenta::Elevacao,
+            "escalar3d" | "3dscale" => self.ferramenta = Ferramenta::Elevacao,
+            "elevacao" | "elev" => self.ferramenta = Ferramenta::Elevacao,
             "inserir" if doc.blocos().is_empty() => self.dizer(Mensagem::nova("insercao.semBlocos")),
             "inserir" => self.ferramenta = Ferramenta::Insercao { bloco: None },
             "desfazer" => {
@@ -649,6 +839,8 @@ impl Sessao {
 
     /// O ponto que uma distância digitada marca: a partir da base, na direção do cursor (como no
     /// AutoCAD). `None` se não for distância, se não há base ou se o cursor está em cima da base.
+    /// O ponto que uma distância digitada marca: a partir da base, na direção do cursor (como no
+    /// AutoCAD). `None` se não for distância, se não há base ou se o cursor está em cima da base.
     fn ponto_da_distancia(&self, texto: &str) -> Option<Ponto> {
         let d = self.ler_distancia(texto)?;
         let b = self.base()?;
@@ -657,11 +849,11 @@ impl Sessao {
             let (s, c) = graus.to_radians().sin_cos();
             let frente = self.cursor.map_or(true, |m| (m.x - b.x) * c + (m.y - b.y) * s >= 0.0);
             let d = if frente { d } else { -d };
-            return Some(Ponto::novo(b.x + d * c, b.y + d * s));
+            return Some(Ponto::novo3d(b.x + d * c, b.y + d * s, b.z));
         }
         let c = self.cursor?;
-        let total = b.distancia(c);
-        (total > 1e-9).then(|| Ponto::novo(b.x + (c.x - b.x) / total * d, b.y + (c.y - b.y) / total * d))
+        let total = b.distancia_3d(c);
+        (total > 1e-9).then(|| Ponto::novo3d(b.x + (c.x - b.x) / total * d, b.y + (c.y - b.y) / total * d, b.z + (c.z - b.z) / total * d))
     }
 
     /// Diz que o texto não é ponto; se era uma distância sem direção, diz o que falta.
@@ -670,7 +862,7 @@ impl Sessao {
         self.dizer(Mensagem::nova(chave).com("texto", texto));
     }
 
-    /// `x;y` (absoluto) ou `@x;y` (relativo ao ponto anterior), na língua atual; ou uma distância solta.
+    /// `x;y` ou `x;y;z` (absoluto) ou `@x;y` / `@x;y;z` (relativo ao ponto anterior), na língua atual; ou uma distância solta.
     pub fn ler_ponto(&self, texto: &str) -> Option<Ponto> {
         let (relativo, resto) = match texto.strip_prefix('@') {
             Some(r) => (true, r),
@@ -682,18 +874,37 @@ impl Sessao {
             let rad = self.regional.ler_numero(a)?.to_radians();
             let limpo = |v: f64| if v.abs() < dist.abs() * 1e-12 { 0.0 } else { v };
             let (dx, dy) = (limpo(dist * rad.cos()), limpo(dist * rad.sin()));
-            return if relativo { self.base().map(|b| Ponto::novo(b.x + dx, b.y + dy)) } else { Some(Ponto::novo(dx, dy)) };
+            return if relativo { self.base().map(|b| Ponto::novo3d(b.x + dx, b.y + dy, b.z)) } else { Some(Ponto::novo3d(dx, dy, self.elevacao)) };
         }
-        // Sem separador de coordenadas: um número solto é distância, na direção do cursor.
-        let Some((sx, sy)) = resto.split_once(self.regional.separador_de_coordenadas) else {
-            return if relativo { None } else { self.ponto_da_distancia(texto) };
-        };
-        let (x, y) = (self.regional.ler_numero(sx)?, self.regional.ler_numero(sy)?);
-        if relativo {
-            let b = self.base()?;
-            Some(Ponto::novo(b.x + x, b.y + y))
+        // Separador de coordenadas: 2D (x;y ou x,y) ou 3D (x;y;z ou x,y,z).
+        let sep = self.regional.separador_de_coordenadas;
+        let mut partes: Vec<&str> = resto.split(sep).collect();
+        if partes.len() == 1 && resto.contains(',') {
+            partes = resto.split(',').collect();
+        } else if partes.len() == 1 && resto.contains(';') {
+            partes = resto.split(';').collect();
+        }
+        if partes.len() == 2 {
+            let x = self.regional.ler_numero(partes[0])?;
+            let y = self.regional.ler_numero(partes[1])?;
+            if relativo {
+                let b = self.base()?;
+                Some(Ponto::novo3d(b.x + x, b.y + y, b.z))
+            } else {
+                Some(Ponto::novo3d(x, y, self.elevacao))
+            }
+        } else if partes.len() >= 3 {
+            let x = self.regional.ler_numero(partes[0])?;
+            let y = self.regional.ler_numero(partes[1])?;
+            let z = self.regional.ler_numero(partes[2])?;
+            if relativo {
+                let b = self.base()?;
+                Some(Ponto::novo3d(b.x + x, b.y + y, b.z + z))
+            } else {
+                Some(Ponto::novo3d(x, y, z))
+            }
         } else {
-            Some(Ponto::novo(x, y))
+            if relativo { None } else { self.ponto_da_distancia(texto) }
         }
     }
 }

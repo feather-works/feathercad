@@ -138,7 +138,7 @@ fn vizinhos(cortes: &[f64], tc: f64) -> (Option<f64>, Option<f64>) {
 /// Apara a forma `alvo` no ponto `clique`: some o trecho entre os dois cortes vizinhos ao clique.
 pub fn aparar(doc: &Documento, alvo: Id, clique: Ponto) -> Result<Vec<Mudanca>, Recusa> {
     let e = doc.entidade(alvo).ok_or(Recusa::NaoSuportado)?;
-    let nova = |g: Geometria| NovaEntidade { camada: e.camada, cor: e.cor, geometria: g, props: Default::default() };
+    let nova = |g: Geometria| NovaEntidade { camada: e.camada, cor: e.cor, geometria: g, props: Default::default(), espaco: e.espaco.clone() };
     match &e.geometria {
         Geometria::Linha { a, b } => {
             let curva = Curva::Seg(*a, *b);
@@ -298,29 +298,77 @@ pub fn concordar(doc: &Documento, (id1, clique1): (Id, Ponto), (id2, clique2): (
     };
     let mut ms = vec![Mudanca::Trocar(id1, Geometria::Linha { a: fica1, b: t1 }), Mudanca::Trocar(id2, Geometria::Linha { a: fica2, b: t2 })];
     if let Some(g) = arco {
-        ms.push(Mudanca::Novo(NovaEntidade { camada: e1.camada, cor: e1.cor, geometria: g, props: Default::default() }));
+        ms.push(Mudanca::Novo(NovaEntidade { camada: e1.camada, cor: e1.cor, geometria: g, props: Default::default(), espaco: e1.espaco.clone() }));
     }
     Ok(ms)
 }
 
-/// O contorno fechado de uma forma (círculo, polilinha fechada), como laço de vértices com bulge.
+/// O contorno fechado de uma forma (círculo, polilinha fechada, face 3D), como laço de vértices com bulge.
 fn laco_da_forma(g: &Geometria) -> Option<Vec<Vertice>> {
     match g {
-        Geometria::Circulo { centro, raio } => Some(vec![Vertice { p: Ponto::novo(centro.x - raio, centro.y), bulge: 1.0 }, Vertice { p: Ponto::novo(centro.x + raio, centro.y), bulge: 1.0 }]),
+        Geometria::Circulo { centro, raio } => Some(vec![Vertice { p: Ponto::novo3d(centro.x - raio, centro.y, centro.z), bulge: 1.0 }, Vertice { p: Ponto::novo3d(centro.x + raio, centro.y, centro.z), bulge: 1.0 }]),
         Geometria::Polilinha { vertices, fechada: true } if vertices.len() >= 3 => Some(vertices.clone()),
+        Geometria::Face3D { p1, p2, p3, p4 } => Some(vec![
+            Vertice { p: *p1, bulge: 0.0 },
+            Vertice { p: *p2, bulge: 0.0 },
+            Vertice { p: *p3, bulge: 0.0 },
+            Vertice { p: *p4, bulge: 0.0 },
+        ]),
         _ => None,
     }
 }
 
-fn area_do_laco(l: &[Ponto]) -> f64 {
-    (0..l.len()).map(|i| (l[i].x * l[(i + 1) % l.len()].y - l[(i + 1) % l.len()].x * l[i].y) / 2.0).sum::<f64>().abs()
+fn normal_do_laco(laco: &[Ponto]) -> (f64, f64, f64) {
+    let mut nx = 0.0;
+    let mut ny = 0.0;
+    let mut nz = 0.0;
+    let n = laco.len();
+    for i in 0..n {
+        let (a, b) = (laco[i], laco[(i + 1) % n]);
+        nx += (a.y - b.y) * (a.z + b.z);
+        ny += (a.z - b.z) * (a.x + b.x);
+        nz += (a.x - b.x) * (a.y + b.y);
+    }
+    (nx, ny, nz)
 }
 
-fn contem(laco: &[Ponto], p: Ponto) -> bool {
+fn area_do_laco_3d(l: &[Ponto]) -> f64 {
+    if l.len() < 3 {
+        return 0.0;
+    }
+    let (nx, ny, nz) = normal_do_laco(l);
+    0.5 * (nx * nx + ny * ny + nz * nz).sqrt()
+}
+
+fn para_2d_proj(p: Ponto, eixo_dominante: usize) -> (f64, f64) {
+    match eixo_dominante {
+        0 => (p.y, p.z),
+        1 => (p.x, p.z),
+        _ => (p.x, p.y),
+    }
+}
+
+fn contem_3d(laco: &[Ponto], p: Ponto) -> bool {
+    if laco.len() < 3 {
+        return false;
+    }
+    let (nx, ny, nz) = normal_do_laco(laco);
+    let (abs_x, abs_y, abs_z) = (nx.abs(), ny.abs(), nz.abs());
+    let eixo = if abs_x >= abs_y && abs_x >= abs_z {
+        0
+    } else if abs_y >= abs_x && abs_y >= abs_z {
+        1
+    } else {
+        2
+    };
+    let laco_2d: Vec<(f64, f64)> = laco.iter().map(|q| para_2d_proj(*q, eixo)).collect();
+    let p_2d = para_2d_proj(p, eixo);
+
     let mut dentro = false;
-    for i in 0..laco.len() {
-        let (a, b) = (laco[i], laco[(i + 1) % laco.len()]);
-        if (a.y > p.y) != (b.y > p.y) && p.x < a.x + (p.y - a.y) / (b.y - a.y) * (b.x - a.x) {
+    let n = laco_2d.len();
+    for i in 0..n {
+        let (a, b) = (laco_2d[i], laco_2d[(i + 1) % n]);
+        if (a.1 > p_2d.1) != (b.1 > p_2d.1) && p_2d.0 < a.0 + (p_2d.1 - a.1) / (b.1 - a.1) * (b.0 - a.0) {
             dentro = !dentro;
         }
     }
@@ -347,19 +395,19 @@ pub fn hachura_com_padrao(doc: &Documento, p: Ponto, nome: &str, escala: f64) ->
         .collect();
     // Além de círculo e polilinha fechada, vale a área fechada por traços soltos (quatro linhas formando
     // um quadrado, linhas e arcos): entra se for menor que o menor contorno fechado que já contém o ponto.
-    let menor_fechado = candidatos.iter().filter(|(_, pts)| contem(pts, p)).map(|(_, pts)| area_do_laco(pts)).min_by(f64::total_cmp);
+    let menor_fechado = candidatos.iter().filter(|(_, pts)| contem_3d(pts, p)).map(|(_, pts)| area_do_laco_3d(pts)).min_by(f64::total_cmp);
     if let Some(pts) = regiao_em(doc, p) {
-        if menor_fechado.map_or(true, |m| area_do_laco(&pts) < m * (1.0 - 1e-6)) {
+        if menor_fechado.map_or(true, |m| area_do_laco_3d(&pts) < m * (1.0 - 1e-6)) {
             candidatos.push((pts.iter().map(|q| Vertice { p: *q, bulge: 0.0 }).collect(), pts));
         }
     }
     let (externo, pts_externo) = candidatos
         .iter()
-        .filter(|(_, pts)| contem(pts, p))
-        .min_by(|a, b| area_do_laco(&a.1).total_cmp(&area_do_laco(&b.1)))
+        .filter(|(_, pts)| contem_3d(pts, p))
+        .min_by(|a, b| area_do_laco_3d(&a.1).total_cmp(&area_do_laco_3d(&b.1)))
         .ok_or(Recusa::SemContorno)?;
     let mut contornos = vec![externo.clone()];
-    contornos.extend(candidatos.iter().filter(|(v, pts)| v != externo && pts.first().is_some_and(|q| contem(pts_externo, *q)) && area_do_laco(pts) < area_do_laco(pts_externo)).map(|(v, _)| v.clone()));
+    contornos.extend(candidatos.iter().filter(|(v, pts)| v != externo && pts.first().is_some_and(|q| contem_3d(pts_externo, *q)) && area_do_laco_3d(pts) < area_do_laco_3d(pts_externo)).map(|(v, _)| v.clone()));
     let (padrao, nome) = crate::padroes::para_contornos(nome, escala, &contornos);
     Ok(Geometria::Hachura { contornos, padrao, nome })
 }

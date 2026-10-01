@@ -31,7 +31,8 @@ fn formato_do_caminho(caminho: &Path) -> Res<Fmt> {
         Some("dxf") => Ok(DXF),
         Some("fcdz") => Ok(FCDZ),
         Some("fct") => Ok(Fmt::Compacto),
-        _ => Err("só trabalho com `.dxf`, `.fcdz` e `.fct`".into()),
+        Some("xyz" | "pts" | "csv" | "txt") => Ok(DXF),
+        _ => Err("só trabalho com `.dxf`, `.fcdz`, `.fct` ou nuvem de pontos (`.xyz`, `.pts`, `.csv`, `.txt`)".into()),
     }
 }
 
@@ -58,12 +59,17 @@ pub fn carregar(caminho: &str) -> Res<(Documento, Vec<String>)> {
 
 /// Os bytes do documento no formato da extensão de `caminho` (e os avisos do que foi simplificado).
 pub fn gravar_bytes(doc: &Documento, caminho: &Path) -> Res<(Vec<u8>, Vec<String>)> {
-    match formato_do_caminho(caminho)? {
-        Fmt::Compacto => Ok((compacto::exportar(doc, None, false).0.into_bytes(), Vec::new())),
-        Fmt::Io(n) => {
-            let g = feathercad_io::gravar(doc, if n == 0 { Formato::Dxf } else { Formato::Fcdz })?;
+    match caminho.extension().and_then(|e| e.to_str()).map(str::to_lowercase).as_deref() {
+        Some("fct") => Ok((compacto::exportar(doc, None, false).0.into_bytes(), Vec::new())),
+        Some("dxf") => {
+            let g = feathercad_io::gravar(doc, Formato::Dxf)?;
             Ok((g.bytes, avisos_de(&g.avisos)))
         }
+        Some("fcdz") => {
+            let g = feathercad_io::gravar(doc, Formato::Fcdz)?;
+            Ok((g.bytes, avisos_de(&g.avisos)))
+        }
+        _ => Err("só gravo em `.dxf`, `.fcdz` ou `.fct`".into()),
     }
 }
 
@@ -104,7 +110,8 @@ impl Agente {
     }
 
     /// Grava no caminho dado (ou no de onde abriu). Não sobrescreve arquivo existente sem `sobrescrever`.
-    pub fn salvar(&mut self, caminho: Option<&str>, sobrescrever: bool) -> Res<Value> {
+    /// Se `verificar_checklist` for verdadeiro ou `dominio` for informado, valida o checklist antes de salvar.
+    pub fn salvar(&mut self, caminho: Option<&str>, sobrescrever: bool, verificar_checklist: bool, dominio: Option<&str>) -> Res<Value> {
         let destino = match (caminho, &self.arquivo) {
             (Some(c), _) => PathBuf::from(c),
             (None, Some(a)) => a.clone(),
@@ -114,6 +121,25 @@ impl Agente {
         if destino.exists() && !sobrescrever && !mesmo_arquivo {
             return Err(format!("`{}` já existe; passe `sobrescrever: true` se é isso mesmo", destino.display()));
         }
+
+        if let Some(dom) = dominio.or(if verificar_checklist { Some("geral") } else { None }) {
+            let chk = crate::consulta::checklist_do_dominio(&self.doc, dom);
+            if !chk["aprovado"].as_bool().unwrap_or(true) {
+                let pendencias: Vec<String> = chk["checklist"]
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .filter(|i| !i["passou"].as_bool().unwrap_or(false))
+                    .map(|i| format!("• {}: {}", i["item"].as_str().unwrap_or(""), i["detalhes"].as_str().unwrap_or("")))
+                    .collect();
+                return Err(format!(
+                    "Salvamento Bloqueado! Checklist do domínio `{}` REPROVADO:\n{}\n\nCorrija as pendências acimas antes de salvar.",
+                    dom,
+                    pendencias.join("\n")
+                ));
+            }
+        }
+
         let (bytes, avisos) = gravar_bytes(&self.doc, &destino)?;
         std::fs::write(&destino, &bytes).map_err(|e| format!("não consegui gravar `{}`: {e}", destino.display()))?;
         self.doc.marcar_salvo();

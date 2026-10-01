@@ -69,6 +69,7 @@ pub fn tipo_de(g: &Geometria) -> &'static str {
         Geometria::Ponto { .. } => "ponto",
         Geometria::Hachura { .. } => "hachura",
         Geometria::Insercao { .. } => "bloco",
+        Geometria::Face3D { .. } => "face3d",
     }
 }
 
@@ -104,6 +105,7 @@ fn detalhes(doc: &Documento, g: &Geometria) -> Value {
         Geometria::Ponto { p } => json!({ "ponto": par(*p) }),
         Geometria::Hachura { contornos, nome, padrao } => json!({ "padrao": nome, "solida": padrao.is_empty(), "contornos": contornos.len() }),
         Geometria::Insercao { bloco, ponto, escala_x, escala_y, rotacao } => json!({ "bloco": doc.blocos().get(*bloco).map(|b| b.nome.clone()), "ponto": par(*ponto), "escala": [arred(*escala_x), arred(*escala_y)], "rotacao": arred(*rotacao) }),
+        Geometria::Face3D { p1, p2, p3, p4 } => json!({ "p1": [arred(p1.x), arred(p1.y), arred(p1.z)], "p2": [arred(p2.x), arred(p2.y), arred(p2.z)], "p3": [arred(p3.x), arred(p3.y), arred(p3.z)], "p4": [arred(p4.x), arred(p4.y), arred(p4.z)] }),
     }
 }
 
@@ -137,6 +139,7 @@ pub fn ponto_de_rotulo(g: &Geometria) -> Option<Ponto> {
         }
         Geometria::Texto { ponto, .. } | Geometria::Insercao { ponto, .. } | Geometria::Ponto { p: ponto } => Some(*ponto),
         Geometria::Hachura { contornos, .. } => contornos.first().and_then(|c| c.first()).map(|v| v.p),
+        Geometria::Face3D { p1, p2, p3, p4 } => Some(Ponto::novo((p1.x + p2.x + p3.x + p4.x) / 4.0, (p1.y + p2.y + p3.y + p4.y) / 4.0)),
     }
 }
 

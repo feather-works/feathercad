@@ -1,15 +1,14 @@
 /**
  * A fiação: cria as peças, liga uma na outra e repassa cada estado novo do motor
- * a todas. Duas "telas" dentro da janela: a página inicial (aba Início) e o
- * desenho (Ribbon, área, linha de comando e rodapé). Quem abre/salva arquivo é
- * o Rust (ver `arquivos.ts`); aqui só se decide **quando** perguntar sobre
- * alterações não salvas.
+ * a todas. Suporta múltiplas abas de desenho abertas simultaneamente.
+ * Quem abre/salva arquivo é o Rust (ver `arquivos.ts`); aqui se gerencia o ciclo
+ * de vida de cada aba e alternância entre elas.
  */
 
 import type { Estado, Motor } from '../ponte/index.ts';
 import { medir } from '../ponte/metricas.ts';
 import { comandosDe, regionalDe, texto, textos } from '../idiomas/index.ts';
-import { criarAbasArquivo, type AbaAtiva } from './abas-arquivo.ts';
+import { criarAbasArquivo } from './abas-arquivo.ts';
 import { registrarAvisos } from './avisos.ts';
 import { perguntarExportacao } from './caixa-exportar.ts';
 import { escolherHachura } from './caixa-hachura.ts';
@@ -32,22 +31,48 @@ import { instalarEstilos } from './styles.ts';
 import { teclaDoEvento } from './teclado.ts';
 import { definirModo, modoSalvo, proximoModo } from './tema.ts';
 import { avisar } from './toast.ts';
-import { desenhoVerificarDisco, noApp } from '../ponte/nativo.ts';
+import { abrirJanelaMonitor, desenhoVerificarDisco, noApp } from '../ponte/nativo.ts';
+import { devConsole } from './console-depuracao.ts';
 import { criarTitulo } from './titulo.ts';
+
+interface TabDoc {
+  id: string;
+  nome: string;
+  caminho?: string;
+  formato?: 'dxf' | 'fcdz';
+  bytes?: Uint8Array;
+  sujo: boolean;
+}
 
 /** Monta a janela dentro de `raiz`, ligada ao `motor`. */
 export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
   instalarEstilos();
   const t = textos();
-  let ativa: AbaAtiva = 'inicio';
-  let temDesenho = false;
+
+  const abasDoc: TabDoc[] = [];
+  let abaAtivaId: string = 'inicio';
+  let contadorSemTitulo = 1;
   let atual: Estado = motor.estado();
+
+  const temDesenho = (): boolean => abaAtivaId !== 'inicio';
 
   const aplicar = (e: Estado): void => {
     atual = e;
-    titulo.atualizar(e, temDesenho);
+    const tabAtual = abasDoc.find((a) => a.id === abaAtivaId);
+    if (tabAtual) {
+      tabAtual.sujo = e.sujo;
+      if (e.arquivo) {
+        tabAtual.caminho = e.arquivo.caminho;
+        tabAtual.nome = e.arquivo.nome;
+      }
+    }
+    const emDesenho = temDesenho();
+    titulo.atualizar(e, emDesenho);
     ribbon.atualizar(e);
-    abas.atualizar(e, ativa, temDesenho);
+    abas.atualizar(
+      abasDoc.map((a) => ({ id: a.id, nome: a.nome, caminho: a.caminho, sujo: a.sujo })),
+      abaAtivaId
+    );
     comando.atualizar(e);
     rodape.atualizar(e);
     area.atualizar(e);
@@ -55,55 +80,100 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
     painelProps.atualizar(e);
     config.atualizar();
   };
+
   const gesto = (nome: string, fn: () => Estado): void => {
     aplicar(medir('ação', nome, fn));
   };
 
-  /** Mostra a página inicial ou o desenho. */
-  const mostrar = (aba: AbaAtiva): void => {
-    ativa = aba;
-    const noDesenho = aba === 'desenho';
-    ribbon.el.hidden = !noDesenho;
-    desenhoWrap.hidden = !noDesenho;
-    inicio.el.hidden = noDesenho;
+  function guardarEstadoDaAbaAtual(): void {
+    if (abaAtivaId === 'inicio') return;
+    const tab = abasDoc.find((a) => a.id === abaAtivaId);
+    if (!tab) return;
+
+    tab.sujo = atual.sujo;
+    tab.caminho = atual.arquivo?.caminho;
+    tab.nome = atual.arquivo?.nome ?? tab.nome;
+    tab.formato = (atual.arquivo?.formato as 'dxf' | 'fcdz') ?? tab.formato ?? 'dxf';
+
+    try {
+      tab.bytes = motor.documentoGravar('fcdz');
+    } catch (err) {
+      console.error('Erro ao guardar estado da aba:', err);
+    }
+  }
+
+  function ativarAba(id: string): void {
+    if (id === 'inicio') {
+      guardarEstadoDaAbaAtual();
+      abaAtivaId = 'inicio';
+      ribbon.el.hidden = true;
+      desenhoWrap.hidden = true;
+      inicio.el.hidden = false;
+      aplicar(atual);
+      void inicio.atualizar();
+      return;
+    }
+
+    const tab = abasDoc.find((a) => a.id === id);
+    if (!tab) return;
+
+    if (abaAtivaId !== id && abaAtivaId !== 'inicio') {
+      guardarEstadoDaAbaAtual();
+    }
+
+    abaAtivaId = id;
+
+    if (tab.bytes && tab.bytes.length > 0) {
+      motor.documentoAbrir(tab.bytes);
+      if (tab.caminho && tab.formato) {
+        motor.documentoArquivoDefinir(tab.caminho, tab.formato, !tab.sujo);
+      }
+      atual = motor.estado();
+    }
+
+    ribbon.el.hidden = false;
+    desenhoWrap.hidden = false;
+    inicio.el.hidden = true;
+
     aplicar(atual);
-    if (noDesenho) area.atualizar(atual);
-    else void inicio.atualizar();
-  };
+    area.ajustar();
+  }
 
   const falhou = (chave: 'abrir' | 'salvar' | 'exportar' | 'folha', e: unknown): void => {
     const motivo = e instanceof Error ? e.message : String(e);
-    console.error(`[erro] ${chave}: ${motivo}`); // o console leva o erro ao Monitor
+    console.error(`[erro] ${chave}: ${motivo}`);
     avisar(texto(`erro.${chave}`, { motivo }));
   };
 
   /** Salva (ou "salvar como"). `true` se gravou; `false` se cancelou ou deu erro. */
   async function salvar(como: boolean): Promise<boolean> {
-    if (!temDesenho) return false;
+    if (!temDesenho()) return false;
+    const tab = abasDoc.find((a) => a.id === abaAtivaId);
+    if (!tab) return false;
+
     try {
       const e = await salvarDesenho(motor, como);
       if (e) {
+        tab.sujo = e.sujo;
+        tab.caminho = e.arquivo?.caminho;
+        tab.nome = e.arquivo?.nome ?? tab.nome;
+        tab.formato = (e.arquivo?.formato as 'dxf' | 'fcdz') ?? 'dxf';
+        tab.bytes = motor.documentoGravar('fcdz');
+
         aplicar(e);
-        registrarAvisos(e, e.arquivo?.nome ?? t.app.semTitulo);
+        registrarAvisos(e, tab.nome);
+        return true;
       }
-      return e !== null;
+      return false;
     } catch (e) {
       falhou('salvar', e);
       return false;
     }
   }
 
-  /** Antes de trocar ou fechar o desenho: se há alteração, pergunta. `false` = o usuário desistiu. */
-  async function liberar(): Promise<boolean> {
-    if (!temDesenho || !atual.sujo) return true;
-    const r = await confirmarAlteracoes(t, atual.arquivo?.nome ?? t.app.semTitulo);
-    if (r === 'cancelar') return false;
-    return r === 'descartar' || (await salvar(false));
-  }
-
-  /** Exporta as folhas em PDF: pergunta papel, orientação e folhas; o Rust monta o arquivo. */
+  /** Exporta as folhas em PDF. */
   async function exportar(): Promise<void> {
-    if (!temDesenho) return;
+    if (!temDesenho()) return;
     try {
       const opcoes = await perguntarExportacao(t, motor.documentoFolhas(), atual.unidade ?? '');
       if (!opcoes) return;
@@ -114,11 +184,11 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
     }
   }
 
-  /** Insere uma folha (prancheta): o motor escolhe onde ela fica e, sem escala pedida, a menor em que o desenho cabe. */
   async function inserirFolha(): Promise<void> {
-    if (!temDesenho) return;
+    if (!temDesenho()) return;
     try {
-      const pedido = await perguntarFolhaNova(t, motor.folhaListar());
+      const temSelecao = atual.selecionados > 0;
+      const pedido = await perguntarFolhaNova(t, motor.folhaListar(), temSelecao);
       if (!pedido) return;
       aplicar(medir('ação', 'folha_inserir', () => motor.folhaInserir(pedido)).estado);
       area.ajustar();
@@ -127,9 +197,8 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
     }
   }
 
-  /** Troca a escala de uma folha, ou a ajusta ao desenho; a caixa fica aberta para se ver o efeito. */
   async function escalaDaFolha(): Promise<void> {
-    if (!temDesenho) return;
+    if (!temDesenho()) return;
     try {
       await perguntarEscalaDaFolha(t, motor.folhaListar(), (escolha) => {
         try {
@@ -146,9 +215,8 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
     }
   }
 
-  /** Edita os campos do carimbo de uma folha (cliente, título, revisão…). */
   async function carimboDaFolha(): Promise<void> {
-    if (!temDesenho) return;
+    if (!temDesenho()) return;
     try {
       const r = await perguntarCarimbo(t, motor.folhaListar(), (i) => motor.folhaCampos(i));
       if (r) aplicar(motor.folhaCamposDefinir(r.indice, r.campos).estado);
@@ -158,35 +226,110 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
   }
 
   async function novo(): Promise<void> {
-    if (!(await liberar())) return;
-    // Todo desenho novo começa perguntando a unidade (mm, cm ou m); Esc desiste do Novo.
     const unidade = await perguntarUnidade(t, unidadePreferida());
     if (!unidade) return;
     guardarUnidade(unidade);
-    temDesenho = true;
-    aplicar(novoDesenho(motor, unidade));
-    mostrar('desenho');
+
+    guardarEstadoDaAbaAtual();
+
+    const id = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const nome = `${t.app.semTitulo} ${contadorSemTitulo++}`;
+
+    novoDesenho(motor, unidade);
+    const bytes = motor.documentoGravar('fcdz');
+
+    const novaTab: TabDoc = {
+      id,
+      nome,
+      sujo: false,
+      bytes,
+    };
+
+    abasDoc.push(novaTab);
+    ativarAba(id);
   }
 
   async function abrir(caminho?: string): Promise<void> {
-    if (!(await liberar())) return;
     try {
       const e = await abrirDesenho(motor, caminho);
       if (!e) return;
-      temDesenho = true;
-      aplicar(e);
-      registrarAvisos(e, e.arquivo?.nome ?? t.app.semTitulo);
-      mostrar('desenho');
+
+      const caminhoFinal = e.arquivo?.caminho;
+      if (caminhoFinal) {
+        const existente = abasDoc.find((a) => a.caminho === caminhoFinal);
+        if (existente) {
+          ativarAba(existente.id);
+          return;
+        }
+      }
+
+      guardarEstadoDaAbaAtual();
+
+      const id = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const nome = e.arquivo?.nome ?? t.app.semTitulo;
+      const bytes = motor.documentoGravar('fcdz');
+
+      const novaTab: TabDoc = {
+        id,
+        nome,
+        caminho: e.arquivo?.caminho,
+        formato: e.arquivo?.formato as 'dxf' | 'fcdz',
+        sujo: e.sujo,
+        bytes,
+      };
+
+      const primeiraTab = abasDoc[0];
+      if (abasDoc.length === 1 && primeiraTab && !primeiraTab.sujo && !primeiraTab.caminho) {
+        abasDoc[0] = novaTab;
+      } else {
+        abasDoc.push(novaTab);
+      }
+
+      ativarAba(id);
+      registrarAvisos(e, nome);
     } catch (e) {
       falhou('abrir', e);
     }
   }
 
-  async function fechar(): Promise<void> {
-    if (!(await liberar())) return;
-    temDesenho = false;
-    aplicar(motor.documentoNovo());
-    mostrar('inicio');
+  async function fecharAba(id: string): Promise<void> {
+    const tabIndex = abasDoc.findIndex((a) => a.id === id);
+    if (tabIndex === -1) return;
+
+    const tab = abasDoc[tabIndex];
+
+    if (tab && tab.sujo) {
+      if (abaAtivaId !== id) {
+        ativarAba(id);
+      }
+      const r = await confirmarAlteracoes(t, tab.nome);
+      if (r === 'cancelar') return;
+      if (r === 'salvar') {
+        const ok = await salvar(false);
+        if (!ok) return;
+      }
+    }
+
+    abasDoc.splice(tabIndex, 1);
+
+    if (abaAtivaId === id) {
+      if (abasDoc.length > 0) {
+        const proximaIndex = Math.min(tabIndex, abasDoc.length - 1);
+        const proximaTab = abasDoc[proximaIndex];
+        if (proximaTab) {
+          ativarAba(proximaTab.id);
+        } else {
+          ativarAba('inicio');
+        }
+      } else {
+        ativarAba('inicio');
+      }
+    } else {
+      abas.atualizar(
+        abasDoc.map((a) => ({ id: a.id, nome: a.nome, caminho: a.caminho, sujo: a.sujo })),
+        abaAtivaId
+      );
+    }
   }
 
   const titulo = criarTitulo(t, {
@@ -204,15 +347,18 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
     configuracoes: () => config.alternar(),
   });
   titulo.modoDoTema(modoSalvo());
+
   const config = criarConfiguracoes(t, {
     motor,
     estado: () => atual,
     aplicar,
-    temDesenho: () => temDesenho,
+    temDesenho,
     salvar: (como) => void salvar(como),
   });
+
   const painelCamadas = criarPainelDeCamadas(t, motor, aplicar);
   const painelProps = criarPainelDePropriedades(t, motor, aplicar);
+
   const ribbon = criarRibbon(
     t,
     (c) => gesto(`botão ${c}`, () => motor.executar(c)),
@@ -223,16 +369,48 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
       else if (acao === 'folha_escala') void escalaDaFolha();
       else if (acao === 'folha_carimbo') void carimboDaFolha();
       else if (acao === 'hachura_padrao') void escolherHachura(t, motor).catch((e) => falhou('folha', e));
+      else if (acao === 'vista_ajustar') area.ajustar();
+      else if (acao === 'zoom_mais') area.zoomMais();
+      else if (acao === 'zoom_menos') area.zoomMenos();
+      else if (acao === 'alternar_tema') {
+        definirModo(proximoModo(modoSalvo()));
+        titulo.modoDoTema(modoSalvo());
+        config.atualizar();
+      } else if (acao === 'configuracoes') config.alternar('aparencia');
+      else if (acao === 'mcp') config.alternar('mcp');
+      else if (acao === 'sobre') config.alternar('sobre');
+      else if (acao === 'apelidos') config.alternar('apelidos');
+      else if (acao === 'unidades') {
+        void (async () => {
+          const u = await perguntarUnidade(t, unidadePreferida());
+          if (u) {
+            guardarUnidade(u);
+            aplicar(motor.unidadeDefinir(u));
+          }
+        })();
+      } else if (acao === 'exportar_pdf') void exportar();
+      else if (acao === 'salvar_dxf') void salvar(true);
+      else if (acao === 'salvar_fcdz') void salvar(true);
+      else if (acao === 'monitor') {
+        if (noApp()) {
+          void abrirJanelaMonitor();
+        } else {
+          devConsole.show();
+        }
+      }
     },
-    criarWidgetsDaRibbon(t, motor, aplicar),
+    criarWidgetsDaRibbon(t, motor, aplicar)
   );
+
   const abas = criarAbasArquivo(t, {
-    aoInicio: () => mostrar('inicio'),
-    aoDesenho: () => mostrar('desenho'),
-    aoFechar: () => void fechar(),
+    aoInicio: () => ativarAba('inicio'),
+    aoSelecionarAba: (id) => ativarAba(id),
+    aoFecharAba: (id) => void fecharAba(id),
     aoNovo: () => void novo(),
   });
+
   const inicio = criarPaginaInicial({ t, aoAbrir: (c) => void abrir(c), aoNovo: () => void novo() });
+
   const menu = criarMenuContexto((i) => {
     const [familia, nome] = i.id.split(':') as [string, string | undefined];
     if (i.id === 'enter') gesto('digitar', () => motor.digitar(''));
@@ -245,6 +423,7 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
       else config.alternar();
     } else gesto(i.id, () => motor.executar(i.id));
   });
+
   const area = criarAreaDesenho({
     motor,
     t,
@@ -253,6 +432,7 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
     aoCursor: (r) => rodape.coordenadas(r),
     aoZoom: (z) => rodape.zoom(z),
   });
+
   const comando = criarLinhaComando(t, (texto) => gesto('digitar', () => motor.digitar(texto)));
   const rodape = criarRodape(
     t,
@@ -269,48 +449,73 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
       guardarSnapModos(modos);
       gesto('snap modos', () => motor.osnapModosDefinir(modos));
     },
+    (espaco) => gesto('layout alternar', () => { const e = motor.layoutAlternar(espaco); aplicar(e); return e; }),
+    (nome, papel, w, h) => gesto('layout criar', () => { const e = motor.layoutCriar(nome, papel, w, h); aplicar(e); return e; }),
   );
 
   const desenhoWrap = document.createElement('div');
   desenhoWrap.className = 'desenho-wrap';
   desenhoWrap.append(area.el, comando.el, rodape.el, painelCamadas.el, painelProps.el);
+
   const corpo = document.createElement('div');
   corpo.className = 'corpo';
   corpo.append(inicio.el, desenhoWrap);
+
   raiz.append(titulo.el, ribbon.el, abas.el, corpo, config.el, menu.el);
 
   const acoesDeJanela = { novo, abrir: () => abrir(), salvar: () => salvar(false), salvar_como: () => salvar(true) };
 
   window.addEventListener('keydown', (ev) => {
     const alvo = ev.target instanceof HTMLElement ? ev.target : null;
-    // Digitando numa caixa (busca, nome de camada, linha de comando…): as teclas soltas são dela.
     const emCampo = alvo?.closest('input, select, textarea') != null;
+
+    if (ev.ctrlKey && (ev.key === 'w' || ev.key === 'W' || ev.key === 'F4')) {
+      ev.preventDefault();
+      if (abaAtivaId !== 'inicio') {
+        void fecharAba(abaAtivaId);
+      }
+      return;
+    }
+
+    if (ev.ctrlKey && ev.key === 'Tab') {
+      ev.preventDefault();
+      if (abasDoc.length > 0) {
+        const currIdx = abasDoc.findIndex((a) => a.id === abaAtivaId);
+        let nextIdx = ev.shiftKey ? currIdx - 1 : currIdx + 1;
+        if (currIdx === -1) nextIdx = 0;
+        else if (nextIdx >= abasDoc.length) nextIdx = 0;
+        else if (nextIdx < 0) nextIdx = abasDoc.length - 1;
+        const nextTab = abasDoc[nextIdx];
+        if (nextTab) {
+          ativarAba(nextTab.id);
+        }
+      }
+      return;
+    }
+
     const tecla = teclaDoEvento(ev);
     if (ev.ctrlKey && ev.key === ',') {
       ev.preventDefault();
       config.alternar();
       return;
     }
-    if (tecla === 'Ctrl+1' && ativa === 'desenho') {
+    if (tecla === 'Ctrl+1' && temDesenho()) {
       ev.preventDefault();
       painelProps.alternar();
       return;
     }
     if (tecla === null) {
-      // Enter fora da caixa de comando confirma (seleção, fim do comando), como no AutoCAD.
-      if (ativa === 'desenho' && !emCampo && ev.key === 'Enter') {
+      if (temDesenho() && !emCampo && ev.key === 'Enter') {
         ev.preventDefault();
         gesto('digitar', () => motor.digitar(''));
         return;
       }
-      // Tecla comum: cai na linha de comando, como no AutoCAD (só no desenho).
-      if (ativa === 'desenho' && !emCampo && ev.key.length === 1) comando.focar();
+      if (temDesenho() && !emCampo && ev.key.length === 1) comando.focar();
       return;
     }
-    // Ctrl+C/X/V numa caixa de texto copiam texto, não objetos do desenho.
     if (emCampo && (tecla === 'Ctrl+C' || tecla === 'Ctrl+X' || tecla === 'Ctrl+V')) return;
-    // Delete numa caixa de texto apaga texto, não o desenho.
-    if (tecla === 'Delete' && (emCampo || ativa !== 'desenho')) return;
+    if (tecla === 'Delete' && (emCampo || !temDesenho())) return;
+
     const r = motor.atalho(tecla);
     if (!r.tratado) return;
     ev.preventDefault();
@@ -326,24 +531,19 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
     motor.ortoAnguloDefinir(ortoAnguloPreferido());
     motor.osnapModosDefinir(snapModosPreferidos());
   } catch (e) {
-    // O motor (Rust) é mais antigo que a interface: acontece quando o `tauri dev` não recompilou.
     raiz.replaceChildren(Object.assign(document.createElement('pre'), { className: 'motor-antigo', textContent: `${t.erro.motorDesatualizado}\n\n${e instanceof Error ? e.message : String(e)}` }));
     return;
   }
+
   aplicar(motor.fundoDefinir(fundoPreferido()));
-  mostrar('inicio');
+  ativarAba('inicio');
   vigiarArquivo();
 
-  /**
-   * O desenho aberto pode ser regravado por fora (o servidor MCP, outro programa): a cada segundo
-   * o Rust olha a data do arquivo e, se mudou, recarrega; aqui só se desenha o resultado. Fica em
-   * silêncio enquanto um gesto está no meio (ferramenta ativa ou arrasto), para não atrapalhar.
-   */
   function vigiarArquivo(): void {
     if (!noApp()) return;
     let ocupado = false;
     setInterval(() => {
-      if (ocupado || !temDesenho || atual.ferramenta !== 'nenhuma' || atual.arrastando) return;
+      if (ocupado || !temDesenho() || atual.ferramenta !== 'nenhuma' || atual.arrastando) return;
       ocupado = true;
       desenhoVerificarDisco()
         .then((m) => {

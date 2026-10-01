@@ -3,7 +3,7 @@
 
 use feathercad_core::aparar::hachura_com_padrao;
 use feathercad_core::camadas::Propriedade;
-use feathercad_core::documento::{AlinhaH, AlinhaV, Documento, Geometria, Id, Mudanca, NovaEntidade, Propriedades, TipoLinha};
+use feathercad_core::documento::{AlinhaH, AlinhaV, Documento, Espaco, Geometria, Id, Mudanca, NovaEntidade, Propriedades, TipoLinha};
 use feathercad_core::edicao::{retangulo, transformar};
 use feathercad_core::geom::{arco_por_3_pontos, Ponto, Transf, Vertice};
 use serde_json::{json, Value};
@@ -148,7 +148,7 @@ pub fn criar(doc: &mut Documento, args: &Value) -> Res<Value> {
         Some(n) => camada_por_nome(doc, n)?,
         None => doc.camada_atual(),
     };
-    let ms = geos.iter().map(|g| Mudanca::Novo(NovaEntidade { camada, cor, geometria: g.clone(), props: Propriedades::default() })).collect();
+    let ms = geos.iter().map(|g| Mudanca::Novo(NovaEntidade { camada, cor, geometria: g.clone(), props: Propriedades::default(), espaco: Espaco::default() })).collect();
     let ids = doc.aplicar_mudancas(ms);
     let criadas: Vec<Value> = ids.iter().zip(&geos).map(|(id, g)| json!({ "id": id, "tipo": tipo_de(g) })).collect();
     Ok(json!({ "criadas": criadas, "camada": doc.camadas()[camada].nome }))
@@ -216,11 +216,11 @@ pub fn editar(doc: &mut Documento, args: &Value) -> Res<Value> {
             (_, Some(t)) if op == "copiar" => {
                 let mut acumulada = *t;
                 for _ in 0..quantidade {
-                    ms.push(Mudanca::Novo(NovaEntidade { camada: e.camada, cor: e.cor, geometria: transformar(&e.geometria, &acumulada), props: e.props.clone() }));
+                    ms.push(Mudanca::Novo(NovaEntidade { camada: e.camada, cor: e.cor, geometria: transformar(&e.geometria, &acumulada), props: e.props.clone(), espaco: e.espaco.clone() }));
                     acumulada = acumulada.depois_de(t);
                 }
             }
-            (_, Some(t)) if copia_espelho || copia_girar => ms.push(Mudanca::Novo(NovaEntidade { camada: e.camada, cor: e.cor, geometria: transformar(&e.geometria, t), props: e.props.clone() })),
+            (_, Some(t)) if copia_espelho || copia_girar => ms.push(Mudanca::Novo(NovaEntidade { camada: e.camada, cor: e.cor, geometria: transformar(&e.geometria, t), props: e.props.clone(), espaco: e.espaco.clone() })),
             (_, Some(t)) => ms.push(Mudanca::Trocar(*id, transformar(&e.geometria, t))),
             _ => return Err(format!("operação desconhecida `{op}` (mover, copiar, girar, escala, espelhar, apagar, propriedades, texto)")),
         }
@@ -335,7 +335,7 @@ pub fn desfazer(doc: &mut Documento, refazer: bool) -> Value {
 pub fn aplicar_compacto(doc: &mut Documento, lido: &crate::compacto::Lido) -> Res<Vec<Id>> {
     for c in &lido.camadas {
         let i = camada_por_nome(doc, &c.nome)?;
-        for p in [Propriedade::Cor(c.cor), Propriedade::Ligada(c.ligada), Propriedade::Bloqueada(c.bloqueada)] {
+        for p in c.cor.map(Propriedade::Cor).into_iter().chain([Propriedade::Ligada(c.ligada), Propriedade::Bloqueada(c.bloqueada)]) {
             doc.definir_propriedade_de_camadas(&[i], p).map_err(|e| format!("camada `{}`: {}", c.nome, e.chave()))?;
         }
         if c.congelada {
@@ -345,7 +345,7 @@ pub fn aplicar_compacto(doc: &mut Documento, lido: &crate::compacto::Lido) -> Re
     let mut ms = Vec::with_capacity(lido.formas.len());
     for (nome, cor, g) in &lido.formas {
         let camada = camada_por_nome(doc, nome)?;
-        ms.push(Mudanca::Novo(NovaEntidade { camada, cor: *cor, geometria: g.clone(), props: Propriedades::default() }));
+        ms.push(Mudanca::Novo(NovaEntidade { camada, cor: *cor, geometria: g.clone(), props: Propriedades::default(), espaco: Espaco::default() }));
     }
     Ok(doc.aplicar_mudancas(ms))
 }

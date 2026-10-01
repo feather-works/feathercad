@@ -82,6 +82,13 @@ fn formato_do_caminho(caminho: &Path) -> Option<Formato> {
     caminho.extension().and_then(|e| e.to_str()).and_then(Formato::da_extensao)
 }
 
+fn eh_nuvem_pontos(caminho: &Path) -> bool {
+    matches!(
+        caminho.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref(),
+        Some("xyz" | "pts" | "csv" | "txt")
+    )
+}
+
 /// Abre um desenho: o do `caminho` (recentes, projetos) ou, sem ele, o que o
 /// usuário escolher na caixa. `None` se cancelou.
 #[tauri::command]
@@ -94,7 +101,9 @@ pub async fn desenho_abrir(app: AppHandle, caminho: Option<String>) -> Result<Op
                 caixa = caixa.set_directory(pasta);
             }
             let escolhido = caixa
+                .add_filter("Todos os formatos (*.dxf, *.fcdz, *.xyz, *.pts, *.csv, *.txt)", &["dxf", "fcdz", "xyz", "pts", "csv", "txt"])
                 .add_filter("Desenhos (DXF, FCDZ)", &["dxf", "fcdz"])
+                .add_filter("Nuvem de Pontos / Topografia (XYZ, PTS, CSV, TXT)", &["xyz", "pts", "csv", "txt"])
                 .add_filter("DXF", &["dxf"])
                 .add_filter("FeatherCAD (.fcdz)", &["fcdz"])
                 .blocking_pick_file();
@@ -102,13 +111,24 @@ pub async fn desenho_abrir(app: AppHandle, caminho: Option<String>) -> Result<Op
             f.into_path().map_err(|e| format!("Caminho inválido: {e}"))?
         }
     };
-    let formato = formato_do_caminho(&caminho).ok_or_else(|| format!("\"{}\" não é um desenho .dxf ou .fcdz.", caminho.display()))?;
+    let eh_nuvem = eh_nuvem_pontos(&caminho);
+    let formato = formato_do_caminho(&caminho);
+    if !eh_nuvem && formato.is_none() {
+        return Err(format!("\"{}\" não é um desenho .dxf/.fcdz nem uma nuvem de pontos (.xyz, .pts, .csv, .txt).", caminho.display()));
+    }
     let bytes = std::fs::read(&caminho).map_err(|e| format!("Não consegui ler \"{}\": {e}", caminho.display()))?;
     ponte(&app, "documento_abrir", &bytes)?;
-    let corpo = json!({ "caminho": caminho.to_string_lossy(), "formato": formato.extensao(), "salvo": false });
-    ponte(&app, "documento_arquivo_definir", corpo.to_string().as_bytes())?;
-    app.state::<VistoNoDisco>().definir(data_do_arquivo(&caminho));
-    lembrar(&app, &caminho)?;
+    if eh_nuvem {
+        let stem = caminho.file_stem().and_then(|s| s.to_str()).unwrap_or("topografia");
+        let novo_caminho = caminho.with_file_name(format!("{stem}.dxf"));
+        let corpo = json!({ "caminho": novo_caminho.to_string_lossy(), "formato": "dxf", "salvo": false });
+        ponte(&app, "documento_arquivo_definir", corpo.to_string().as_bytes())?;
+    } else if let Some(fmt) = formato {
+        let corpo = json!({ "caminho": caminho.to_string_lossy(), "formato": fmt.extensao(), "salvo": false });
+        ponte(&app, "documento_arquivo_definir", corpo.to_string().as_bytes())?;
+        app.state::<VistoNoDisco>().definir(data_do_arquivo(&caminho));
+        lembrar(&app, &caminho)?;
+    }
     estado(&app).map(Some)
 }
 

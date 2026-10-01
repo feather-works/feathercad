@@ -36,7 +36,8 @@ const PROFUNDIDADE: u8 = 8;
 /// O que uma linha `camada` declara.
 pub struct CamadaLida {
     pub nome: String,
-    pub cor: u32,
+    /// `None` = a linha não deu cor: fica a que a camada já tem (a de uma declaração anterior, ou a de fábrica).
+    pub cor: Option<u32>,
     pub ligada: bool,
     pub congelada: bool,
     pub bloqueada: bool,
@@ -107,6 +108,7 @@ fn linha_da_forma(g: &Geometria) -> Option<String> {
         Geometria::Texto { ponto, altura, rotacao, conteudo, .. } => format!("T {} {} {} {}", pt(*ponto), numero(*altura), numero(*rotacao), texto_entre_aspas(conteudo)),
         Geometria::Ponto { p } => format!(". {}", pt(*p)),
         Geometria::Hachura { contornos, padrao, nome } => format!("H {} {}", if padrao.is_empty() { "solida".to_string() } else if feathercad_core::padroes::reconhecer(nome).is_some() { nome.to_lowercase() } else { "padrao".to_string() }, contornos.iter().map(|c| como_laco(c)).collect::<Vec<_>>().join(" | ")),
+        Geometria::Face3D { p1, p2, p3, p4 } => format!("F3D {} {} {} {}", pt(*p1), pt(*p2), pt(*p3), pt(*p4)),
         Geometria::Insercao { .. } => return None,
     })
 }
@@ -324,6 +326,16 @@ fn forma(letra: &str, p: &[String]) -> Res<Geometria> {
             Ok(Geometria::Polilinha { vertices: v, fechada })
         }
         "H" => hachura(p),
+        "F3D" => {
+            precisa(8)?;
+            let n = nums(&p[..8])?;
+            Ok(Geometria::Face3D {
+                p1: Ponto::novo(n[0], n[1]),
+                p2: Ponto::novo(n[2], n[3]),
+                p3: Ponto::novo(n[4], n[5]),
+                p4: Ponto::novo(n[6], n[7]),
+            })
+        }
         outra => Err(format!("comando `{outra}` desconhecido")),
     }
 }
@@ -331,13 +343,13 @@ fn forma(letra: &str, p: &[String]) -> Res<Geometria> {
 /// Uma linha de camada: `camada NOME [#cor] [off] [congelada] [bloqueada]`.
 fn camada_da_linha(p: &[String]) -> Res<CamadaLida> {
     let nome = p.get(1).ok_or("`camada` sem nome")?.clone();
-    let mut c = CamadaLida { nome, cor: 0xFF_FF_FF, ligada: true, congelada: false, bloqueada: false };
+    let mut c = CamadaLida { nome, cor: None, ligada: true, congelada: false, bloqueada: false };
     for w in &p[2..] {
         match w.as_str() {
             "off" => c.ligada = false,
             "congelada" => c.congelada = true,
             "bloqueada" => c.bloqueada = true,
-            outra => c.cor = cor_de(outra).ok_or_else(|| format!("`{outra}` não é cor (#RRGGBB) nem estado de camada"))?,
+            outra => c.cor = Some(cor_de(outra).ok_or_else(|| format!("`{outra}` não é cor (#RRGGBB) nem estado de camada"))?),
         }
     }
     Ok(c)
@@ -385,6 +397,15 @@ mod testes {
     }
 
     #[test]
+    fn camada_declarada_de_novo_sem_cor_mantem_a_cor() {
+        let l = importar("camada A #FF0000\nL 0 0 1 1\ncamada B #00FF00\nL 0 0 1 1\ncamada A\nL 0 0 2 2\n").unwrap();
+        let mut d = Documento::default();
+        crate::mutacoes::aplicar_compacto(&mut d, &l).unwrap();
+        let a = d.camadas().iter().find(|c| c.nome == "A").unwrap();
+        assert_eq!(a.cor, 0xFF_00_00, "a 2ª declaração sem cor não volta para branco");
+    }
+
+    #[test]
     fn ida_e_volta_de_todas_as_formas() {
         let mut d = Documento::default();
         d.adicionar_linha(p(0.0, 0.0), p(100.0, 50.0));
@@ -428,8 +449,8 @@ mod testes {
     #[test]
     fn abre_blocos_em_formas_soltas() {
         let mut d = Documento::default();
-        let b = feathercad_core::documento::Bloco { nome: "B".into(), base: p(0.0, 0.0), entidades: vec![feathercad_core::documento::NovaEntidade { camada: 0, cor: None, geometria: Geometria::Linha { a: p(0.0, 0.0), b: p(1.0, 0.0) }, props: Default::default() }] };
-        let d2 = Documento::de_partes_com_blocos(d.camadas().to_vec(), 0, vec![b], vec![feathercad_core::documento::NovaEntidade { camada: 0, cor: None, geometria: Geometria::Insercao { bloco: 0, ponto: p(10.0, 5.0), escala_x: 2.0, escala_y: 2.0, rotacao: 0.0 }, props: Default::default() }]);
+        let b = feathercad_core::documento::Bloco { nome: "B".into(), base: p(0.0, 0.0), entidades: vec![feathercad_core::documento::NovaEntidade { camada: 0, cor: None, geometria: Geometria::Linha { a: p(0.0, 0.0), b: p(1.0, 0.0) }, props: Default::default(), espaco: Default::default() }] };
+        let d2 = Documento::de_partes_com_blocos(d.camadas().to_vec(), 0, vec![b], vec![feathercad_core::documento::NovaEntidade { camada: 0, cor: None, geometria: Geometria::Insercao { bloco: 0, ponto: p(10.0, 5.0), escala_x: 2.0, escala_y: 2.0, rotacao: 0.0 }, props: Default::default(), espaco: Default::default() }]);
         d = d2;
         let (texto, est) = exportar(&d, None, false);
         assert_eq!(est.blocos_abertos, 1);

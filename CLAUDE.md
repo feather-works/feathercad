@@ -24,6 +24,9 @@ ferramenta ativa, foco, paleta aberta) fica no TS.
 - `docs/FUNCIONALIDADES.md` — o que do AutoCAD 2D entra, em que fase, e o que não entra.
   certo: língua em JSON, motor só Rust, lints ligados, fonte única da Ribbon.
 - `docs/DXF-REFERENCIA.md` — estrutura do DXF (ezdxf).
+- `docs/PLANO-MCP.md` — plano (01/10/2026) para o MCP fazer sozinho o que hoje exige Python:
+  formato `.fct`, tabela/gráfico/detalhe, alinhamento/superelevação/greide/via, nuvem de pontos;
+  com os valores de referência do projeto ferroviário de teste.
 - `testes/amostras/` (ezdxf, ver `LEIA-ME.md`) e `testes/amostras-terceiros/`
   — corpus para o teste de ida e volta.
 

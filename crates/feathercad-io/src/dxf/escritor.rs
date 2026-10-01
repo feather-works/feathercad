@@ -4,7 +4,7 @@
 use std::fmt::Write;
 
 use feathercad_core::documento::{AlinhaH, AlinhaV, Documento, Geometria, TipoLinha};
-use feathercad_core::geom::{triangular, Vertice};
+use feathercad_core::geom::{triangular, Ponto, Vertice};
 use feathercad_core::quadro::{lacos_da_hachura, tracos_do_padrao};
 use feathercad_core::sessao::Mensagem;
 
@@ -105,23 +105,31 @@ fn cabeca(doc: &Documento, e: &Peca, tipo: &str, s: &mut String, aproximadas: &m
     }
 }
 
+fn ponto3d(s: &mut String, base: i32, p: Ponto) {
+    tag(s, base, p.x);
+    tag(s, base + 10, p.y);
+    tag(s, base + 20, p.z);
+}
+
 fn ponto3(s: &mut String, base: i32, x: f64, y: f64) {
-    tag(s, base, x);
-    tag(s, base + 10, y);
-    tag(s, base + 20, 0);
+    ponto3d(s, base, Ponto::novo(x, y));
 }
 
 /// R12 não tem `LWPOLYLINE`: a polilinha vai como `POLYLINE` + `VERTEX`… + `SEQEND`.
 fn polilinha(doc: &Documento, e: &Peca, vertices: &[Vertice], fechada: bool, s: &mut String, aproximadas: &mut usize) {
+    let eh_3d = vertices.iter().any(|v| v.p.z.abs() > 1e-6);
     cabeca(doc, e, "POLYLINE", s, aproximadas);
     tag(s, 66, 1);
     ponto3(s, 10, 0.0, 0.0);
-    tag(s, 70, i32::from(fechada));
+    tag(s, 70, i32::from(fechada) | if eh_3d { 8 } else { 0 });
     let camada = codificar_u(doc.camadas().get(e.camada).map_or("0", |c| c.nome.as_str()));
     for v in vertices {
         tag(s, 0, "VERTEX");
         tag(s, 8, &camada);
-        ponto3(s, 10, v.p.x, v.p.y);
+        ponto3d(s, 10, v.p);
+        if eh_3d {
+            tag(s, 70, 32);
+        }
         if v.bulge != 0.0 {
             tag(s, 42, v.bulge);
         }
@@ -133,7 +141,7 @@ fn polilinha(doc: &Documento, e: &Peca, vertices: &[Vertice], fechada: bool, s: 
 fn texto(doc: &Documento, e: &Peca, g: &Geometria, s: &mut String, aproximadas: &mut usize) {
     let Geometria::Texto { ponto, altura, rotacao, conteudo, h, v } = g else { return };
     cabeca(doc, e, "TEXT", s, aproximadas);
-    ponto3(s, 10, ponto.x, ponto.y);
+    ponto3d(s, 10, *ponto);
     tag(s, 40, altura);
     tag(s, 1, codificar_u(&conteudo.replace(['\n', '\r'], " ")));
     if *rotacao != 0.0 {
@@ -150,7 +158,7 @@ fn texto(doc: &Documento, e: &Peca, g: &Geometria, s: &mut String, aproximadas: 
     }
     if ch != 0 || cv != 0 {
         // Com alinhamento, o ponto que vale é o 11: repete o de inserção.
-        ponto3(s, 11, ponto.x, ponto.y);
+        ponto3d(s, 11, *ponto);
     }
     if cv != 0 {
         tag(s, 73, cv);
@@ -230,8 +238,15 @@ fn forma(doc: &Documento, e: &Peca, g: &Geometria, s: &mut String, aproximadas: 
     match g {
         Geometria::Linha { a, b } => {
             cabeca(doc, e, "LINE", s, aproximadas);
-            ponto3(s, 10, a.x, a.y);
-            ponto3(s, 11, b.x, b.y);
+            ponto3d(s, 10, *a);
+            ponto3d(s, 11, *b);
+        }
+        Geometria::Face3D { p1, p2, p3, p4 } => {
+            cabeca(doc, e, "3DFACE", s, aproximadas);
+            ponto3d(s, 10, *p1);
+            ponto3d(s, 11, *p2);
+            ponto3d(s, 12, *p3);
+            ponto3d(s, 13, *p4);
         }
         Geometria::Polilinha { vertices, fechada } => polilinha(doc, e, vertices, *fechada, s, aproximadas),
         Geometria::Circulo { centro, raio } => {
@@ -249,7 +264,7 @@ fn forma(doc: &Documento, e: &Peca, g: &Geometria, s: &mut String, aproximadas: 
         g @ Geometria::Texto { .. } => texto(doc, e, g, s, aproximadas),
         Geometria::Ponto { p } => {
             cabeca(doc, e, "POINT", s, aproximadas);
-            ponto3(s, 10, p.x, p.y);
+            ponto3d(s, 10, *p);
         }
         Geometria::Hachura { .. } => {}
         Geometria::Insercao { bloco, ponto, escala_x, escala_y, rotacao } => {
@@ -317,6 +332,12 @@ pub fn gravar(doc: &Documento) -> (Vec<u8>, Vec<Mensagem>) {
     }
     if c.aproximadas > 0 {
         avisos.push(Mensagem::nova("aviso.corAproximada").com("n", &c.aproximadas.to_string()));
+    }
+    // O R12 não tem espessura de linha (o código 370 é do R2000): avisar em vez de perder em silêncio.
+    let com_espessura = |e: Option<f32>| e.is_some_and(|mm| mm > 0.0);
+    let sem_espessura = doc.camadas().iter().filter(|k| com_espessura(k.espessura)).count() + doc.entidades().iter().filter(|e| com_espessura(e.props.espessura)).count();
+    if sem_espessura > 0 {
+        avisos.push(Mensagem::nova("aviso.espessuraNaoGravada").com("n", &sem_espessura.to_string()));
     }
     (s.into_bytes(), avisos)
 }

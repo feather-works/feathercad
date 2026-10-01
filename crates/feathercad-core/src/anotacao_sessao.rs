@@ -46,7 +46,8 @@ impl Sessao {
     /// Grava formas novas (na camada atual, cor e propriedades "por camada") como **um** passo de desfazer.
     fn criar_formas(&mut self, doc: &mut Documento, formas: Vec<Geometria>) {
         let camada = doc.camada_atual();
-        doc.aplicar_mudancas(formas.into_iter().map(|g| Mudanca::Novo(NovaEntidade { camada, cor: None, geometria: g, props: Propriedades::default() })).collect());
+        let espaco = doc.espaco_ativo().clone();
+        doc.aplicar_mudancas(formas.into_iter().map(|g| Mudanca::Novo(NovaEntidade { camada, cor: None, geometria: g, props: Propriedades::default(), espaco: espaco.clone() })).collect());
     }
 
     pub(crate) fn base_da_anotacao(&self, f: &Ferramenta) -> Option<Ponto> {
@@ -308,7 +309,7 @@ impl Sessao {
     /// Copia (ou recorta) a seleção para a prancheta interna: nada sai do aplicativo.
     pub(crate) fn para_prancheta(&mut self, doc: &mut Documento, recortar: bool) {
         let ids: Vec<Id> = self.selecao.iter().copied().collect();
-        let itens: Vec<NovaEntidade> = ids.iter().filter_map(|id| doc.entidade(*id)).filter(|e| !doc.bloqueada(e)).map(|e| NovaEntidade { camada: e.camada, cor: e.cor, geometria: e.geometria.clone(), props: e.props.clone() }).collect();
+        let itens: Vec<NovaEntidade> = ids.iter().filter_map(|id| doc.entidade(*id)).filter(|e| !doc.bloqueada(e)).map(|e| NovaEntidade { camada: e.camada, cor: e.cor, geometria: e.geometria.clone(), props: e.props.clone(), espaco: e.espaco.clone() }).collect();
         if let (false, Some((min, _))) = (itens.is_empty(), caixa_dos(doc, &ids)) {
             let n = itens.len().to_string();
             self.prancheta = Some(Prancheta { base: min, itens });

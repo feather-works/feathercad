@@ -85,6 +85,8 @@ pub enum Geometria {
     /// Uma cópia de um bloco (`Documento::blocos()[bloco]`) em `ponto`, com escala e giro (graus).
     /// Ponto (`POINT`): uma marca de tamanho fixo na tela.
     Ponto { p: Ponto },
+    /// Face 3D no espaço (`3DFACE`): polígono plano no espaço tridimensional com até 4 vértices.
+    Face3D { p1: Ponto, p2: Ponto, p3: Ponto, p4: Ponto },
     /// Hachura: região delimitada por `contornos` (par-ímpar: ilha dentro de laço fica vazada).
     /// `padrao` vazio = preenchimento sólido; senão, as famílias de linhas que a cobrem.
     Hachura { contornos: Vec<Vec<Vertice>>, padrao: Vec<LinhaDePadrao>, nome: String },
@@ -103,6 +105,12 @@ impl Geometria {
             Geometria::Linha { a, b } => {
                 f(*a);
                 f(*b);
+            }
+            Geometria::Face3D { p1, p2, p3, p4 } => {
+                f(*p1);
+                f(*p2);
+                f(*p3);
+                f(*p4);
             }
             Geometria::Polilinha { vertices, .. } => vertices.iter().for_each(|v| f(v.p)),
             Geometria::Texto { ponto, .. } | Geometria::Insercao { ponto, .. } | Geometria::Ponto { p: ponto } => f(*ponto),
@@ -151,6 +159,39 @@ impl Geometria {
     }
 }
 
+/// O espaço de trabalho: Modelo (infinito 2D) ou Layout (papel).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Espaco {
+    #[default]
+    Modelo,
+    Layout(String),
+}
+
+/// Uma Janela de Visualização (Viewport / MVIEW) inserida no Paper Space de um Layout.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Viewport {
+    pub id: Id,
+    pub centro_papel: Ponto,
+    pub largura_papel: f64,
+    pub altura_papel: f64,
+    pub centro_modelo: Ponto,
+    pub escala_modelo: f64,
+    pub ativa: bool,
+    pub bloqueada: bool,
+}
+
+/// Um Layout (Paper Space) contendo a folha configurada e suas Viewports.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct InfoLayout {
+    pub nome: String,
+    pub papel: String,
+    pub largura_mm: f64,
+    pub altura_mm: f64,
+    pub viewports: Vec<Viewport>,
+    pub viewport_ativa: Option<Id>,
+}
+
 /// Algo desenhado: geometria + camada + cor própria (`None` = `PorCamada`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Entidade {
@@ -159,6 +200,8 @@ pub struct Entidade {
     pub cor: Option<u32>,
     pub geometria: Geometria,
     pub props: Propriedades,
+    #[allow(dead_code)]
+    pub espaco: Espaco,
 }
 
 /// Um bloco: um pedaço de desenho com nome, para ser inserido várias vezes (`INSERT`).
@@ -243,6 +286,7 @@ pub struct NovaEntidade {
     pub cor: Option<u32>,
     pub geometria: Geometria,
     pub props: Propriedades,
+    pub espaco: Espaco,
 }
 
 /// Um passo do histórico: o que **desfazer** faz para voltar.
@@ -370,6 +414,8 @@ pub struct Documento {
     pub(crate) caixas_dos_blocos: Vec<Option<(Ponto, Ponto)>>,
     pub(crate) entidades: Vec<Entidade>,
     pub(crate) proximo_id: Id,
+    pub(crate) layouts: Vec<InfoLayout>,
+    pub(crate) espaco_ativo: Espaco,
     versao: u64,
     limpo_na_versao: u64,
     pub(crate) desfazer: Vec<Passo>,
@@ -378,6 +424,42 @@ pub struct Documento {
 
 impl Default for Documento {
     fn default() -> Self {
+        let default_layouts = vec![
+            InfoLayout {
+                nome: "Layout 1".to_string(),
+                papel: "A4".to_string(),
+                largura_mm: 297.0,
+                altura_mm: 210.0,
+                viewports: vec![Viewport {
+                    id: 1,
+                    centro_papel: Ponto::novo(148.5, 105.0),
+                    largura_papel: 250.0,
+                    altura_papel: 170.0,
+                    centro_modelo: Ponto::novo(0.0, 0.0),
+                    escala_modelo: 1.0,
+                    ativa: true,
+                    bloqueada: false,
+                }],
+                viewport_ativa: Some(1),
+            },
+            InfoLayout {
+                nome: "Layout 2".to_string(),
+                papel: "A4".to_string(),
+                largura_mm: 297.0,
+                altura_mm: 210.0,
+                viewports: vec![Viewport {
+                    id: 1,
+                    centro_papel: Ponto::novo(148.5, 105.0),
+                    largura_papel: 250.0,
+                    altura_papel: 170.0,
+                    centro_modelo: Ponto::novo(0.0, 0.0),
+                    escala_modelo: 1.0,
+                    ativa: true,
+                    bloqueada: false,
+                }],
+                viewport_ativa: Some(1),
+            },
+        ];
         Self {
             unidade: None,
             camadas: vec![Camada::nova("0", 0xFF_FF_FF)],
@@ -386,6 +468,8 @@ impl Default for Documento {
             caixas_dos_blocos: Vec::new(),
             entidades: Vec::new(),
             proximo_id: 1,
+            layouts: default_layouts,
+            espaco_ativo: Espaco::Modelo,
             versao: 0,
             limpo_na_versao: 0,
             desfazer: Vec::new(),
@@ -413,7 +497,7 @@ impl Documento {
             let id = doc.proximo_id;
             doc.proximo_id += 1;
             let camada = if n.camada < total { n.camada } else { 0 };
-            doc.entidades.push(Entidade { id, camada, cor: n.cor, geometria: n.geometria, props: n.props });
+            doc.entidades.push(Entidade { id, camada, cor: n.cor, geometria: n.geometria, props: n.props, espaco: n.espaco });
         }
         doc.blocos = blocos;
         doc.caixas_dos_blocos = (0..doc.blocos.len()).map(|i| doc.caixa_do_bloco(i, 0)).collect();
@@ -543,7 +627,7 @@ impl Documento {
                     let id = self.proximo_id;
                     self.proximo_id += 1;
                     let camada = if n.camada < self.camadas.len() { n.camada } else { 0 };
-                    self.entidades.push(Entidade { id, camada, cor: n.cor, geometria: n.geometria, props: n.props });
+                    self.entidades.push(Entidade { id, camada, cor: n.cor, geometria: n.geometria, props: n.props, espaco: n.espaco });
                     inversos.push(Passo::Adicionou(id));
                     novos.push(id);
                 }
@@ -585,6 +669,54 @@ impl Documento {
         novos
     }
 
+    /// O espaço de trabalho ativo (Modelo ou Layout).
+    pub fn espaco_ativo(&self) -> &Espaco {
+        &self.espaco_ativo
+    }
+
+    /// Alterna o espaço ativo.
+    pub fn definir_espaco_ativo(&mut self, espaco: Espaco) {
+        if self.espaco_ativo != espaco {
+            self.espaco_ativo = espaco;
+            self.mudou();
+        }
+    }
+
+    /// Os layouts (Paper Space) do documento.
+    pub fn layouts(&self) -> &[InfoLayout] {
+        &self.layouts
+    }
+
+    pub fn layouts_mut(&mut self) -> &mut Vec<InfoLayout> {
+        &mut self.layouts
+    }
+
+    /// Cria um novo layout com papel e viewport padrão.
+    pub fn adicionar_layout(&mut self, nome: impl Into<String>, papel: impl Into<String>, largura_mm: f64, altura_mm: f64) -> &InfoLayout {
+        let nome_str = nome.into();
+        let papel_str = papel.into();
+        let vp = Viewport {
+            id: 1,
+            centro_papel: Ponto::novo(largura_mm / 2.0, altura_mm / 2.0),
+            largura_papel: (largura_mm - 40.0).max(10.0),
+            altura_papel: (altura_mm - 40.0).max(10.0),
+            centro_modelo: Ponto::novo(0.0, 0.0),
+            escala_modelo: 1.0,
+            ativa: true,
+            bloqueada: false,
+        };
+        self.layouts.push(InfoLayout {
+            nome: nome_str,
+            papel: papel_str,
+            largura_mm,
+            altura_mm,
+            viewports: vec![vp],
+            viewport_ativa: Some(1),
+        });
+        self.mudou();
+        self.layouts.last().unwrap()
+    }
+
     /// A cor final de uma entidade: a própria, ou a da camada (`PorCamada`).
     pub fn cor_resolvida(&self, e: &Entidade) -> u32 {
         e.cor.unwrap_or_else(|| self.camadas.get(e.camada).map_or(0xFF_FF_FF, |c| c.cor))
@@ -604,7 +736,7 @@ impl Documento {
     fn acrescentar(&mut self, geometria: Geometria) -> Id {
         let id = self.proximo_id;
         self.proximo_id += 1;
-        self.entidades.push(Entidade { id, camada: self.camada_atual, cor: None, geometria, props: Propriedades::default() });
+        self.entidades.push(Entidade { id, camada: self.camada_atual, cor: None, geometria, props: Propriedades::default(), espaco: self.espaco_ativo.clone() });
         self.desfazer.push(Passo::Adicionou(id));
         self.refazer.clear();
         self.mudou();
@@ -643,13 +775,25 @@ impl Documento {
             let mut juntar = |p: Ponto| {
                 caixa = Some(match caixa {
                     None => (p, p),
-                    Some((min, max)) => (Ponto::novo(min.x.min(p.x), min.y.min(p.y)), Ponto::novo(max.x.max(p.x), max.y.max(p.y))),
+                    Some((min, max)) => (
+                        Ponto::novo3d(min.x.min(p.x), min.y.min(p.y), min.z.min(p.z)),
+                        Ponto::novo3d(max.x.max(p.x), max.y.max(p.y), max.z.max(p.z)),
+                    ),
                 });
             };
             if let Geometria::Insercao { bloco, ponto, escala_x, escala_y, rotacao } = &e.geometria {
                 if let (Some((min, max)), Some(b)) = (self.caixa_guardada_do_bloco(*bloco), self.blocos.get(*bloco)) {
                     let t = Transf::de_insercao(b.base, *ponto, *escala_x, *escala_y, *rotacao);
-                    for c in [min, Ponto::novo(max.x, min.y), max, Ponto::novo(min.x, max.y)] {
+                    for c in [
+                        min,
+                        Ponto::novo3d(max.x, min.y, min.z),
+                        Ponto::novo3d(min.x, max.y, min.z),
+                        Ponto::novo3d(max.x, max.y, min.z),
+                        Ponto::novo3d(min.x, min.y, max.z),
+                        Ponto::novo3d(max.x, min.y, max.z),
+                        Ponto::novo3d(min.x, max.y, max.z),
+                        max,
+                    ] {
                         juntar(t.aplicar(c));
                     }
                 }

@@ -51,10 +51,51 @@ pub struct Gravado {
     pub avisos: Vec<Mensagem>,
 }
 
-/// Abre pelo **conteúdo** (um ZIP é `.fcdz`; o resto é tentado como DXF), não pela extensão.
+fn decodificar_texto(bytes: &[u8]) -> String {
+    let sem_bom = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
+    match std::str::from_utf8(sem_bom) {
+        Ok(t) => t.to_string(),
+        Err(_) => sem_bom.iter().map(|b| char::from(*b)).collect(),
+    }
+}
+
+fn tentar_abrir_nuvem(bytes: &[u8]) -> Option<Result<Aberto, String>> {
+    let texto = decodificar_texto(bytes);
+    let inicio = texto.trim_start();
+    if inicio.starts_with("0\n") || inicio.starts_with("0\r\n") || inicio.starts_with("999\n") || inicio.starts_with("999\r\n") {
+        return None;
+    }
+    match feathercad_core::topografia::ler_nuvem_pontos(&texto) {
+        Ok(pontos) if pontos.len() >= 3 => {
+            let mut doc = Documento::default();
+            match feathercad_core::topografia::criar_levantamento_topografico(
+                &mut doc,
+                &pontos,
+                &feathercad_core::topografia::OpcoesTopografia::default(),
+            ) {
+                Ok(resumo) => {
+                    let aviso = Mensagem::nova("aviso.nuvemCarregada")
+                        .com("pontos", &resumo.total_pontos.to_string())
+                        .com("curvas", &resumo.total_curvas.to_string());
+                    Some(Ok(Aberto {
+                        doc,
+                        avisos: vec![aviso],
+                        versao_dxf: None,
+                    }))
+                }
+                Err(e) => Some(Err(e)),
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Abre pelo **conteúdo** (um ZIP é `.fcdz`; nuvem vira levantamento topográfico; o resto é tentado como DXF).
 pub fn abrir(bytes: &[u8]) -> Result<Aberto, String> {
     if bytes.starts_with(b"PK") {
         fcdz::ler(bytes)
+    } else if let Some(resultado) = tentar_abrir_nuvem(bytes) {
+        resultado
     } else {
         dxf::leitor::ler(bytes)
     }

@@ -13,7 +13,7 @@ import { criarBarraNavegacao } from './barra-navegacao.ts';
 import { criarMedidorFps } from './medidor-fps.ts';
 import { pintarEmSegundoPlano, textoNoMovimento, zoomSuave } from './preferencias.ts';
 import { criarPintor } from './pintor-quadro.ts';
-import { pintarObjetos, type ObjetosDoQuadro } from './pintura.ts';
+import { pintarEixoUCS, pintarObjetos, type ObjetosDoQuadro } from './pintura.ts';
 import { criarVistaCubo } from './vista-cubo.ts';
 import { aoMudarTema, corDoTema, temaVisivel } from './tema.ts';
 import type { Estado, Fundo, ItemDeMenu, Motor, RespostaCursor, Segmento, TipoDeSnap, Vista } from '../ponte/index.ts';
@@ -172,7 +172,36 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
     vista = motor.vistaAjustar(vista);
     vistaMudou();
   };
-  el.append(criarVistaCubo(t), criarBarraNavegacao(t, zoomMais, zoomMenos, ajustar));
+  const vistaCubo = criarVistaCubo(
+    t,
+    (rx, rz) => {
+      vista = { ...vista, rotacao_x: rx, rotacao_z: rz };
+      vistaMudou();
+    },
+    (perspectiva) => {
+      vista = { ...vista, perspectiva };
+      vistaMudou();
+    }
+  );
+  const barraNav = criarBarraNavegacao(
+    t,
+    zoomMais,
+    zoomMenos,
+    ajustar,
+    () => {
+      // Toggle Órbita 3D
+      vista = { ...vista, rotacao_x: (vista.rotacao_x ?? 0) + 15, rotacao_z: (vista.rotacao_z ?? 0) + 15 };
+      vistaMudou();
+    },
+    undefined,
+    () => {
+      // Toggle Perspectiva / Ortográfica
+      vista = { ...vista, perspectiva: !vista.perspectiva };
+      vistaCubo.definirModoProjecao(Boolean(vista.perspectiva));
+      vistaMudou();
+    }
+  );
+  el.append(vistaCubo.el, barraNav);
 
   let vista: Vista = motor.vistaInicial(800, 600);
   /** A versão do último quadro pintado (o motor responde "nada mudou" se ela ainda vale e a vista é a mesma). */
@@ -208,7 +237,15 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   let emMovimentoAgora = false;
   let acabamento: ReturnType<typeof setTimeout> | null = null;
 
-  const mesmaVista = (a: Vista, b: Vista): boolean => a.escala === b.escala && a.centro.x === b.centro.x && a.centro.y === b.centro.y && a.largura === b.largura && a.altura === b.altura;
+  const mesmaVista = (a: Vista, b: Vista): boolean =>
+    a.escala === b.escala &&
+    a.centro.x === b.centro.x &&
+    a.centro.y === b.centro.y &&
+    (a.centro.z ?? 0) === (b.centro.z ?? 0) &&
+    a.largura === b.largura &&
+    a.altura === b.altura &&
+    (a.rotacao_x ?? 0) === (b.rotacao_x ?? 0) &&
+    (a.rotacao_z ?? 0) === (b.rotacao_z ?? 0);
 
   /**
    * Leva uma camada já pintada com a vista `v0` até a vista de agora só com `transform` (a placa de vídeo escala a
@@ -220,9 +257,26 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
       tela.style.transform = '';
       return;
     }
+    // Quando a rotação 3D muda, uma matriz afim 2D não se aplica e causaria deformação/salto da imagem antiga
+    if (
+      Math.abs((v0.rotacao_x ?? 0) - (vista.rotacao_x ?? 0)) > 1e-4 ||
+      Math.abs((v0.rotacao_z ?? 0) - (vista.rotacao_z ?? 0)) > 1e-4
+    ) {
+      tela.style.transform = '';
+      return;
+    }
     const k = vista.escala / v0.escala;
-    const tx = (vista.largura / 2) * (1 - k) + (v0.centro.x - vista.centro.x) * vista.escala;
-    const ty = (vista.altura / 2) * (1 - k) - (v0.centro.y - vista.centro.y) * vista.escala;
+    const radX = ((vista.rotacao_x ?? 0) * Math.PI) / 180;
+    const radZ = ((vista.rotacao_z ?? 0) * Math.PI) / 180;
+    const cosZ = Math.cos(radZ), sinZ = Math.sin(radZ);
+    const cosX = Math.cos(radX), sinX = Math.sin(radX);
+    const cx0 = v0.centro.x * cosZ + v0.centro.y * sinZ;
+    const cy0 = (-v0.centro.x * sinZ + v0.centro.y * cosZ) * cosX + (v0.centro.z ?? 0) * sinX;
+    const cx1 = vista.centro.x * cosZ + vista.centro.y * sinZ;
+    const cy1 = (-vista.centro.x * sinZ + vista.centro.y * cosZ) * cosX + (vista.centro.z ?? 0) * sinX;
+
+    const tx = (vista.largura / 2) * (1 - k) + (cx0 - cx1) * vista.escala;
+    const ty = (vista.altura / 2) * (1 - k) - (cy0 - cy1) * vista.escala;
     tela.style.transform = `matrix(${k}, 0, 0, ${k}, ${tx}, ${ty})`;
   }
 
@@ -371,12 +425,15 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
       marcaDeSnap(ctx, cursor.snap, cursor.x, cursor.y);
       ctx.lineWidth = 1;
     }
-    posicionarCaixa(caixaXY, cursor.x, cursor.y, `${cursor.texto_x}  ${cursor.texto_y}`);
+    const em3D = Math.abs(vista.rotacao_x ?? 0) > 1e-4 || Math.abs(vista.rotacao_z ?? 0) > 1e-4 || Math.abs(cursor.z ?? 0) > 1e-4;
+    const coordsTexto = em3D ? `${cursor.texto_x}  ${cursor.texto_y}  ${cursor.texto_z}` : `${cursor.texto_x}  ${cursor.texto_y}`;
+    posicionarCaixa(caixaXY, cursor.x, cursor.y, coordsTexto);
     if (cursor.texto_distancia !== null) {
       posicionarCaixa(caixaDA, cursor.x, cursor.y + 22, `${t.entrada.distancia} ${cursor.texto_distancia}  ${t.entrada.angulo} ${cursor.texto_angulo ?? ''}`);
     } else {
       caixaDA.hidden = true;
     }
+    pintarEixoUCS(ctx, vista, vista.largura, vista.altura);
   }
 
   /** A vista mudou de zoom: pede o quadro, o texto do zoom e refaz o cursor. */
@@ -384,6 +441,7 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
     acompanharCamadas();
     pedirQuadro();
     cx.aoZoom(motor.vistaTexto(vista));
+    vistaCubo.atualizar(vista.rotacao_x ?? 0, vista.rotacao_z ?? 0);
     if (mouse) moverCursor(mouse.x, mouse.y);
   }
 
@@ -397,6 +455,9 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
     }
     fps.medir('pintura', () => etapa('pintar_topo', pintarTopo));
     const atual = cursor;
+    if (atual) {
+      vistaCubo.atualizarCoordenadas(atual.x, atual.y, atual.z ?? 0);
+    }
     etapa('ao_cursor', () => cx.aoCursor(atual));
   }
 
@@ -443,12 +504,16 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   /** Pede um zoom de `fator` em volta de `(x, y)`: animado se a preferência está ligada, senão de uma vez. */
   function pedirZoom(x: number, y: number, fator: number): void {
     if (!zoomSuave()) {
-      zoomPendente = { x, y, fator: (zoomPendente?.fator ?? 1) * fator };
+      const acum = (zoomPendente?.fator ?? 1) * fator;
+      zoomPendente = { x, y, fator: Math.max(0.1, Math.min(10.0, acum)) };
       agendarQuadro();
       return;
     }
     const rodando = zoomAnimado !== null;
-    zoomAnimado = { x, y, falta: (zoomAnimado?.falta ?? 1) * fator, ultimo: zoomAnimado?.ultimo ?? performance.now() };
+    const acum = (zoomAnimado?.falta ?? 1) * fator;
+    // Trava para evitar disparo descontrolado no mouse/trackpad
+    const falta = Math.max(0.25, Math.min(4.0, acum));
+    zoomAnimado = { x, y, falta, ultimo: zoomAnimado?.ultimo ?? performance.now() };
     if (!rodando) requestAnimationFrame(passoDoZoom);
   }
 
@@ -502,8 +567,21 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   /** O botão desceu no vazio e abriu a janela de seleção: se o mouse andar até soltar, a janela fecha ali (arrastar). */
   let janelaPorArrasto: { x: number; y: number; aditivo: boolean } | null = null;
 
+  let orbitando: { x: number; y: number } | null = null;
+
   el.addEventListener('mousemove', (e) => {
     const p = posicao(e);
+    if (orbitando) {
+      const dx = p.x - orbitando.x;
+      const dy = p.y - orbitando.y;
+      orbitando = p;
+      let nRz = ((vista.rotacao_z ?? 0) + dx * 0.5) % 360;
+      if (nRz < 0) nRz += 360;
+      let nRx = Math.max(-180, Math.min(180, (vista.rotacao_x ?? 0) + dy * 0.5));
+      vista = { ...vista, rotacao_x: nRx, rotacao_z: nRz };
+      vistaMudou();
+      return;
+    }
     if (arrastando) {
       panPendente = { dx: panPendente.dx + p.x - arrastando.x, dy: panPendente.dy + p.y - arrastando.y };
       arrastando = p;
@@ -515,6 +593,11 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   el.addEventListener('mousedown', (e) => {
     const p = posicao(e);
     if (e.button === 1) {
+      if (e.shiftKey) {
+        orbitando = p;
+        e.preventDefault();
+        return;
+      }
       const agora = Date.now();
       if (agora - ultimoCliqueDaRoda < DUPLO_CLIQUE_MS) {
         vista = motor.vistaAjustar(vista);
@@ -550,6 +633,7 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
   el.addEventListener('contextmenu', (e) => e.preventDefault());
   window.addEventListener('mouseup', (e) => {
     arrastando = null;
+    orbitando = null;
     aplicarMovimentoPendente();
     if (janelaPorArrasto && e.button === 0) {
       const inicio = janelaPorArrasto;
@@ -558,6 +642,9 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
       // Andou: soltar fecha a janela (esquerda→direita azul, direita→esquerda verde). Não andou: segue o 2º clique.
       if (Math.hypot(p.x - inicio.x, p.y - inicio.y) >= LIMIAR_DO_ARRASTO_PX) {
         cx.aoMudar(motor.clique(vista, p.x, p.y, inicio.aditivo));
+        moverCursor(p.x, p.y);
+      } else {
+        cx.aoMudar(motor.cancelar());
         moverCursor(p.x, p.y);
       }
     }
@@ -584,8 +671,12 @@ export function criarAreaDesenho(cx: Contexto): AreaDesenho {
     (e) => {
       e.preventDefault();
       const p = posicao(e);
-      // Várias voltas da roda no mesmo quadro de tela viram um zoom só (os fatores se multiplicam).
-      const fator = e.deltaY < 0 ? FATOR_DO_ZOOM : 1 / FATOR_DO_ZOOM;
+      let dy = e.deltaY;
+      if (e.deltaMode === 1) dy *= 30; // DOM_DELTA_LINE
+      else if (e.deltaMode === 2) dy *= 600; // DOM_DELTA_PAGE
+      const dyTravado = Math.max(-120, Math.min(120, dy));
+      // Proporcional ao deslocamento da roda (1 clique clássico ~100px dá FATOR_DO_ZOOM = 1.25)
+      const fator = Math.pow(FATOR_DO_ZOOM, -dyTravado / 100);
       mouse = p;
       pedirZoom(p.x, p.y, fator);
     },

@@ -153,3 +153,55 @@ export function fonteDePropriedades(motor: Motor): (e: { versao: number; selecio
     return resumo;
   };
 }
+
+export interface ControleDeTexto {
+  el: HTMLInputElement;
+  mostrar(campo?: CampoDePropriedade, rotuloVariado?: string): void;
+}
+
+export function controleDeTexto(dica: string, aplicar?: (valor: string) => void): ControleDeTexto {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'prop-controle prop-controle-input';
+  input.title = dica;
+  input.disabled = true;
+  let ultimoValor = '';
+
+  const enviar = () => {
+    if (!input.disabled && input.value !== ultimoValor && aplicar) {
+      ultimoValor = input.value;
+      aplicar(input.value);
+    }
+  };
+
+  input.addEventListener('change', enviar);
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') {
+      enviar();
+      input.blur();
+    } else if (ev.key === 'Escape') {
+      input.value = ultimoValor;
+      input.blur();
+    }
+    ev.stopPropagation();
+  });
+
+  return {
+    el: input,
+    mostrar(campo, rotuloVariado = '*VARIADO*') {
+      if (!campo || campo.estado === 'vazio') {
+        input.value = '';
+        input.disabled = true;
+        ultimoValor = '';
+      } else if (campo.estado === 'variado') {
+        input.value = rotuloVariado;
+        input.disabled = false;
+        ultimoValor = rotuloVariado;
+      } else {
+        input.value = campo.valor;
+        input.disabled = false;
+        ultimoValor = campo.valor;
+      }
+    },
+  };
+}

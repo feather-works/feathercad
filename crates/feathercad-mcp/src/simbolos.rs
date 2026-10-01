@@ -6,7 +6,7 @@
 //! unidade do desenho. Assim `tomada_media` tem o mesmo tamanho no papel em qualquer escala e unidade.
 //! Os textos (circuito, comando, potência) ficam sempre na horizontal, qualquer que seja o giro.
 
-use feathercad_core::documento::{AlinhaH, AlinhaV, Documento, Geometria, Id, Mudanca, NovaEntidade, Propriedades, TipoLinha};
+use feathercad_core::documento::{AlinhaH, AlinhaV, Documento, Espaco, Geometria, Id, Mudanca, NovaEntidade, Propriedades, TipoLinha};
 use feathercad_core::edicao::transformar;
 use feathercad_core::geom::{Ponto, Transf, Vertice};
 use serde_json::{json, Value};
@@ -383,7 +383,7 @@ pub fn gravar(doc: &mut Documento, formas: Vec<(Geometria, Option<TipoLinha>)>, 
         Some(n) => camada_por_nome(doc, n)?,
         None => doc.camada_atual(),
     };
-    let ms = formas.into_iter().enumerate().map(|(i, (geometria, tipo))| Mudanca::Novo(NovaEntidade { camada, cor, geometria, props: Propriedades { tipo_linha: tipo, espessura: if i == 0 { espessura_da_primeira } else { None }, ..Propriedades::default() } })).collect();
+    let ms = formas.into_iter().enumerate().map(|(i, (geometria, tipo))| Mudanca::Novo(NovaEntidade { camada, cor, geometria, props: Propriedades { tipo_linha: tipo, espessura: if i == 0 { espessura_da_primeira } else { None }, ..Propriedades::default() }, espaco: Espaco::default() })).collect();
     Ok(doc.aplicar_mudancas(ms))
 }
 

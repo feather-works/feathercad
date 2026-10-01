@@ -406,7 +406,7 @@ impl Sessao {
             .map(|e| {
                 let g = transformar(&e.geometria, t);
                 if copiar {
-                    Mudanca::Novo(NovaEntidade { camada: e.camada, cor: e.cor, geometria: g, props: Default::default() })
+                    Mudanca::Novo(NovaEntidade { camada: e.camada, cor: e.cor, geometria: g, props: Default::default(), espaco: e.espaco.clone() })
                 } else {
                     Mudanca::Trocar(e.id, g)
                 }
@@ -445,7 +445,7 @@ impl Sessao {
         let refs: Vec<&_> = originais.iter().collect();
         let ms: Vec<Mudanca> = matriz(&refs, linhas as usize, colunas as usize, numeros[2], numeros[3])
             .into_iter()
-            .map(|(k, g)| Mudanca::Novo(NovaEntidade { camada: originais[k].camada, cor: originais[k].cor, geometria: g, props: Default::default() }))
+            .map(|(k, g)| Mudanca::Novo(NovaEntidade { camada: originais[k].camada, cor: originais[k].cor, geometria: g, props: Default::default(), espaco: originais[k].espaco.clone() }))
             .collect();
         let n = ms.len().to_string();
         doc.aplicar_mudancas(ms);
@@ -618,7 +618,7 @@ impl Sessao {
         };
         match self.deslocada_ou_recusa(doc, &original.geometria, ponto) {
             Ok(geometria) => {
-                doc.aplicar_mudancas(vec![Mudanca::Novo(NovaEntidade { camada: original.camada, cor: original.cor, geometria, props: crate::documento::Propriedades { grupo: None, ..original.props.clone() } })]);
+                doc.aplicar_mudancas(vec![Mudanca::Novo(NovaEntidade { camada: original.camada, cor: original.cor, geometria, props: crate::documento::Propriedades { grupo: None, ..original.props.clone() }, espaco: original.espaco.clone() })]);
                 self.limpar_selecao();
                 self.ferramenta = Ferramenta::Deslocar { alvo: None };
             }

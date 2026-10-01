@@ -69,7 +69,7 @@ pub fn cor_na_tela(cor: u32, fundo_claro: bool) -> u32 {
 }
 
 /// Sem recorte: a área é o plano todo (para a prévia, que sempre se desenha inteira).
-const PLANO_TODO: (Ponto, Ponto) = (Ponto { x: -1e300, y: -1e300 }, Ponto { x: 1e300, y: 1e300 });
+const PLANO_TODO: (Ponto, Ponto) = (Ponto { x: -1e300, y: -1e300, z: 0.0 }, Ponto { x: 1e300, y: 1e300, z: 0.0 });
 
 /// Os traços de uma forma, em pixels da tela, sem recortar pela janela (a prévia do que está sendo desenhado).
 pub fn tracos(geo: &Geometria, vista: &Vista) -> Vec<((f64, f64), (f64, f64))> {
@@ -102,6 +102,12 @@ fn segmentos_da(geo: &Geometria, area: (Ponto, Ponto), tolerancia: f64, fora: &m
             if toca(area, *a, *b) {
                 fora.push((*a, *b));
             }
+        }
+        Geometria::Face3D { p1, p2, p3, p4 } => {
+            if toca(area, *p1, *p2) { fora.push((*p1, *p2)); }
+            if toca(area, *p2, *p3) { fora.push((*p2, *p3)); }
+            if toca(area, *p3, *p4) { fora.push((*p3, *p4)); }
+            if toca(area, *p4, *p1) { fora.push((*p4, *p1)); }
         }
         Geometria::Polilinha { vertices, fechada } => {
             let (mut min, mut max) = (vertices[0].p, vertices[0].p);
@@ -436,12 +442,102 @@ fn passo_do_padrao(l: &LinhaDePadrao) -> f64 {
     (-l.dx * seno + l.dy * cosseno).abs()
 }
 
+struct Plano3D {
+    p0: Ponto,
+    e1: (f64, f64, f64),
+    e2: (f64, f64, f64),
+}
+
+impl Plano3D {
+    fn de_lacos(lacos: &[Vec<Ponto>]) -> Self {
+        let Some(p0) = lacos.first().and_then(|l| l.first()).copied() else {
+            return Self { p0: Ponto::novo(0.0, 0.0), e1: (1.0, 0.0, 0.0), e2: (0.0, 1.0, 0.0) };
+        };
+        let p1 = lacos.iter().flatten().find(|p| p.distancia(p0) > 1e-6).copied().unwrap_or(Ponto::novo3d(p0.x + 1.0, p0.y, p0.z));
+        let dx = p1.x - p0.x;
+        let dy = p1.y - p0.y;
+        let dz = p1.z - p0.z;
+
+        let mut nx = 0.0;
+        let mut ny = 0.0;
+        let mut nz = 0.0;
+        for laco in lacos {
+            let n = laco.len();
+            for i in 0..n {
+                let (a, b) = (laco[i], laco[(i + 1) % n]);
+                nx += (a.y - b.y) * (a.z + b.z);
+                ny += (a.z - b.z) * (a.x + b.x);
+                nz += (a.x - b.x) * (a.y + b.y);
+            }
+        }
+        let len_n = (nx * nx + ny * ny + nz * nz).sqrt();
+        let n_unit = if len_n > 1e-9 {
+            (nx / len_n, ny / len_n, nz / len_n)
+        } else {
+            (0.0, 0.0, 1.0)
+        };
+
+        // Projetar o vetor p1 - p0 sobre o plano perpendicular a n_unit para formar e1
+        let dot = dx * n_unit.0 + dy * n_unit.1 + dz * n_unit.2;
+        let v1_x = dx - dot * n_unit.0;
+        let v1_y = dy - dot * n_unit.1;
+        let v1_z = dz - dot * n_unit.2;
+        let len_v1 = (v1_x * v1_x + v1_y * v1_y + v1_z * v1_z).sqrt();
+
+        let e1 = if len_v1 > 1e-9 {
+            (v1_x / len_v1, v1_y / len_v1, v1_z / len_v1)
+        } else {
+            let ax = n_unit.0.abs();
+            let ay = n_unit.1.abs();
+            let az = n_unit.2.abs();
+            let arb = if ax <= ay && ax <= az {
+                (1.0, 0.0, 0.0)
+            } else if ay <= az {
+                (0.0, 1.0, 0.0)
+            } else {
+                (0.0, 0.0, 1.0)
+            };
+            let cx = arb.1 * n_unit.2 - arb.2 * n_unit.1;
+            let cy = arb.2 * n_unit.0 - arb.0 * n_unit.2;
+            let cz = arb.0 * n_unit.1 - arb.1 * n_unit.0;
+            let len_c = (cx * cx + cy * cy + cz * cz).sqrt().max(1e-12);
+            (cx / len_c, cy / len_c, cz / len_c)
+        };
+
+        let e2_x = n_unit.1 * e1.2 - n_unit.2 * e1.1;
+        let e2_y = n_unit.2 * e1.0 - n_unit.0 * e1.2;
+        let e2_z = n_unit.0 * e1.1 - n_unit.1 * e1.0;
+        let len2 = (e2_x * e2_x + e2_y * e2_y + e2_z * e2_z).sqrt().max(1e-12);
+        let e2 = (e2_x / len2, e2_y / len2, e2_z / len2);
+
+        Self { p0, e1, e2 }
+    }
+
+    fn para_2d(&self, p: Ponto) -> (f64, f64) {
+        let (dx, dy, dz) = (p.x - self.p0.x, p.y - self.p0.y, p.z - self.p0.z);
+        (dx * self.e1.0 + dy * self.e1.1 + dz * self.e1.2, dx * self.e2.0 + dy * self.e2.1 + dz * self.e2.2)
+    }
+
+    fn para_3d(&self, u: f64, v: f64) -> Ponto {
+        Ponto::novo3d(
+            self.p0.x + u * self.e1.0 + v * self.e2.0,
+            self.p0.y + u * self.e1.1 + v * self.e2.1,
+            self.p0.z + u * self.e1.2 + v * self.e2.2,
+        )
+    }
+}
+
 /// Os trechos (em unidades do desenho) em que uma família de linhas paralelas cruza a região dos `lacos`.
 /// `None` se a família tem linhas demais para o `espaco_max` dado.
 fn linhas_do_padrao(lacos: &[Vec<Ponto>], l: &LinhaDePadrao, maximo: f64) -> Option<Vec<(Ponto, Ponto)>> {
+    let plano3d = Plano3D::de_lacos(lacos);
     let (seno, cosseno) = l.angulo.to_radians().sin_cos();
     let (u, v) = ((cosseno, seno), (-seno, cosseno));
-    let de_padrao = |p: Ponto| ((p.x - l.base.x) * u.0 + (p.y - l.base.y) * u.1, (p.x - l.base.x) * v.0 + (p.y - l.base.y) * v.1);
+    let de_padrao = |p: Ponto| {
+        let (px, py) = plano3d.para_2d(p);
+        let (bx, by) = plano3d.para_2d(l.base);
+        ((px - bx) * u.0 + (py - by) * u.1, (px - bx) * v.0 + (py - by) * v.1)
+    };
     // Só a parte do deslocamento perpendicular à linha separa uma linha da outra.
     let passo = (-l.dx * seno + l.dy * cosseno).abs();
     if passo < 1e-12 {
@@ -468,8 +564,13 @@ fn linhas_do_padrao(lacos: &[Vec<Ponto>], l: &LinhaDePadrao, maximo: f64) -> Opt
             }
         }
         xs.sort_by(f64::total_cmp);
+        let (bx, by) = plano3d.para_2d(l.base);
         for par in xs.chunks_exact(2) {
-            let ponto = |x: f64| Ponto::novo(l.base.x + x * u.0 + c * v.0, l.base.y + x * u.1 + c * v.1);
+            let ponto = |x: f64| {
+                let u_2d = bx + x * u.0 + c * v.0;
+                let v_2d = by + x * u.1 + c * v.1;
+                plano3d.para_3d(u_2d, v_2d)
+            };
             if l.tracos.is_empty() {
                 fora.push((ponto(par[0]), ponto(par[1])));
             } else {
@@ -525,7 +626,7 @@ fn desenhar_hachura(ctx: &Contexto<'_>, contornos: &[Vec<crate::geom::Vertice>],
             }
         }
     }
-    if padrao.is_empty() || denso || tracos.is_empty() {
+    if padrao.is_empty() || denso {
         preencher(saida, ctx, &lacos, t, cor);
     } else {
         for (a, b) in tracos {
@@ -608,6 +709,12 @@ fn desenhar(ctx: &Contexto<'_>, peca: &Peca<'_>, nivel: &Nivel, saida: &mut Said
             }
         }
         Geometria::Hachura { contornos, padrao, .. } => desenhar_hachura(ctx, contornos, padrao, t, cor_na_tela, saida),
+        Geometria::Face3D { p1, p2, p3, p4 } => {
+            escrever_segmento(saida, ctx.vista, t.aplicar(*p1), t.aplicar(*p2), cor_na_tela);
+            escrever_segmento(saida, ctx.vista, t.aplicar(*p2), t.aplicar(*p3), cor_na_tela);
+            escrever_segmento(saida, ctx.vista, t.aplicar(*p3), t.aplicar(*p4), cor_na_tela);
+            escrever_segmento(saida, ctx.vista, t.aplicar(*p4), t.aplicar(*p1), cor_na_tela);
+        }
         geo => {
             let (area, tolerancia) = if t.eh_identidade() { (ctx.area, ctx.tolerancia) } else { (PLANO_TODO, ctx.tolerancia / t.escala_maxima().max(1e-12)) };
             let mut pedacos = Vec::new();
@@ -630,9 +737,18 @@ pub fn montar(doc: &Documento, vista: &Vista, versao_conhecida: Option<u64>, fun
 }
 
 /// Como `montar`, para impressão: arcos e círculos com `tolerancia_px` de erro (a tela usa 0,5 px; o papel pede bem menos,
+fn area_de_corte(vista: &Vista) -> (Ponto, Ponto) {
+    if vista.rotacao_x.abs() > 1e-4 || vista.rotacao_z.abs() > 1e-4 {
+        PLANO_TODO
+    } else {
+        vista.area_visivel()
+    }
+}
+
+/// Como `montar`, para impressão: arcos e círculos com `tolerancia_px` de erro (a tela usa 0,5 px; o papel pede bem menos,
 /// senão um círculo pequeno sai como um octógono). Sempre é um quadro novo, sem fundo.
 pub fn montar_fino(doc: &Documento, vista: &Vista, fundo_claro: bool, tolerancia_px: f64) -> Vec<u8> {
-    let ctx = Contexto { doc, vista, area: vista.area_visivel(), tolerancia: tolerancia_px / vista.escala, fundo_claro, simplificar: false };
+    let ctx = Contexto { doc, vista, area: area_de_corte(vista), tolerancia: tolerancia_px / vista.escala, fundo_claro, simplificar: false };
     let mut dentro = Saida::default();
     let raiz = Nivel { t: Transf::IDENTIDADE, herdada: None, profundidade: 0, destaque: false };
     for e in doc.entidades() {
@@ -655,7 +771,7 @@ pub fn montar_arrastando(doc: &Documento, vista: &Vista, versao_conhecida: Optio
     if versao_conhecida == Some(versao) {
         return MAGIA_IGUAL.to_vec();
     }
-    let ctx = Contexto { doc, vista, area: vista.area_visivel(), tolerancia: TOLERANCIA_DO_ARCO_PX / vista.escala, fundo_claro, simplificar: true };
+    let ctx = Contexto { doc, vista, area: area_de_corte(vista), tolerancia: TOLERANCIA_DO_ARCO_PX / vista.escala, fundo_claro, simplificar: true };
     let mut dentro = Saida { lod: true, ..Saida::default() };
     let raiz = Nivel { t: Transf::IDENTIDADE, herdada: None, profundidade: 0, destaque: false };
     for e in doc.entidades() {
@@ -671,7 +787,7 @@ pub fn montar_arrastando(doc: &Documento, vista: &Vista, versao_conhecida: Optio
 /// Só os objetos `selecao`, movidos de `(dx, dy)`, na cor de seleção e sem fundo: a camada do arrasto ao vivo.
 /// Sempre é um quadro novo (a versão não importa: muda a cada movimento do mouse).
 pub fn montar_deslocado(doc: &Documento, vista: &Vista, fundo_claro: bool, selecao: &BTreeSet<Id>, dx: f64, dy: f64) -> Vec<u8> {
-    let ctx = Contexto { doc, vista, area: vista.area_visivel(), tolerancia: TOLERANCIA_DO_ARCO_PX / vista.escala, fundo_claro, simplificar: true };
+    let ctx = Contexto { doc, vista, area: area_de_corte(vista), tolerancia: TOLERANCIA_DO_ARCO_PX / vista.escala, fundo_claro, simplificar: true };
     let mut dentro = Saida::default();
     let raiz = Nivel { t: Transf::mover(dx, dy), herdada: None, profundidade: 0, destaque: false };
     for e in doc.entidades().iter().filter(|e| selecao.contains(&e.id)) {
@@ -709,7 +825,7 @@ mod lod {
     }
 
     fn vista(escala: f64) -> Vista {
-        Vista { centro: Ponto::novo(0.0, 0.0), escala, largura: 1000.0, altura: 800.0 }
+        Vista { centro: Ponto::novo(0.0, 0.0), escala, largura: 1000.0, altura: 800.0, rotacao_x: 0.0, rotacao_z: 0.0 }
     }
 
     #[test]
@@ -721,7 +837,7 @@ mod lod {
         let longe = montar(&d, &vista(0.5), None, None, false);
         assert!(segmentos_do_quadro(&longe) < 20, "{}", segmentos_do_quadro(&longe));
         // perto: 10 unidades em 1000 px → cada corda tem 10 px, nenhuma some
-        let perto = montar(&d, &Vista { centro: Ponto::novo(5.0, 0.0), escala: 100.0, largura: 1000.0, altura: 800.0 }, None, None, false);
+        let perto = montar(&d, &Vista { centro: Ponto::novo(5.0, 0.0), escala: 100.0, largura: 1000.0, altura: 800.0, rotacao_x: 0.0, rotacao_z: 0.0 }, None, None, false);
         assert!(segmentos_do_quadro(&perto) >= 1000, "{}", segmentos_do_quadro(&perto));
     }
 
@@ -746,17 +862,17 @@ mod lod {
             nome: "ARVORE".into(),
             base: Ponto::novo(0.0, 0.0),
             entidades: vec![
-                NovaEntidade { camada: 0, cor: None, geometria: crate::documento::Geometria::Circulo { centro: Ponto::novo(0.0, 0.0), raio: 1.0 }, props: Default::default() },
-                NovaEntidade { camada: 0, cor: None, geometria: crate::documento::Geometria::Linha { a: Ponto::novo(-1.0, 0.0), b: Ponto::novo(1.0, 0.0) }, props: Default::default() },
+                NovaEntidade { camada: 0, cor: None, geometria: crate::documento::Geometria::Circulo { centro: Ponto::novo(0.0, 0.0), raio: 1.0 }, props: Default::default(), espaco: crate::documento::Espaco::Modelo },
+                NovaEntidade { camada: 0, cor: None, geometria: crate::documento::Geometria::Linha { a: Ponto::novo(-1.0, 0.0), b: Ponto::novo(1.0, 0.0) }, props: Default::default(), espaco: crate::documento::Espaco::Modelo },
             ],
         };
-        let insercoes = (0..500).map(|i| NovaEntidade { camada: 0, cor: None, geometria: crate::documento::Geometria::Insercao { bloco: 0, ponto: Ponto::novo(f64::from(i) * 3.0, 0.0), escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default() }).collect();
+        let insercoes = (0..500).map(|i| NovaEntidade { camada: 0, cor: None, geometria: crate::documento::Geometria::Insercao { bloco: 0, ponto: Ponto::novo(f64::from(i) * 3.0, 0.0), escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default(), espaco: crate::documento::Espaco::Modelo }).collect();
         let d = Documento::de_partes_com_blocos(Vec::new(), 0, vec![arvore], insercoes);
         // escala 0,1: cada árvore (2 unidades) mede 0,2 px → um ponto por árvore
-        let longe = montar(&d, &Vista { centro: Ponto::novo(750.0, 0.0), escala: 0.1, largura: 1000.0, altura: 800.0 }, None, None, false);
+        let longe = montar(&d, &Vista { centro: Ponto::novo(750.0, 0.0), escala: 0.1, largura: 1000.0, altura: 800.0, rotacao_x: 0.0, rotacao_z: 0.0 }, None, None, false);
         assert!(segmentos_do_quadro(&longe) <= 500, "{}", segmentos_do_quadro(&longe));
         // escala 50: a árvore mede 100 px → círculo (muitas cordas) e a linha
-        let perto = montar(&d, &Vista { centro: Ponto::novo(0.0, 0.0), escala: 50.0, largura: 1000.0, altura: 800.0 }, None, None, false);
+        let perto = montar(&d, &Vista { centro: Ponto::novo(0.0, 0.0), escala: 50.0, largura: 1000.0, altura: 800.0, rotacao_x: 0.0, rotacao_z: 0.0 }, None, None, false);
         assert!(segmentos_do_quadro(&perto) > 10, "{}", segmentos_do_quadro(&perto));
     }
 }

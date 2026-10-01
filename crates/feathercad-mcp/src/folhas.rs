@@ -18,8 +18,10 @@ fn campos_de(v: Option<&Value>) -> Campos {
         disciplina: t("disciplina"),
         titulo: t("titulo"),
         subtitulo: t("subtitulo"),
+        responsavel: t("responsavel"),
         numero: t("numero"),
         revisao: t("revisao"),
+        revisao_descricao: t("revisao_descricao"),
         folha: t("folha"),
         divisoria: v.and_then(|o| o.get("divisoria")).and_then(Value::as_bool).unwrap_or(false),
     }
@@ -54,7 +56,10 @@ pub fn folha(doc: &mut Documento, args: &Value) -> Res<Value> {
         })),
         "inserir" => {
             let papel = texto_opcional(args, "papel").unwrap_or("A1");
-            let mut info = doc.folha_inserir(papel, numero_opcional(args, "escala"), &campos_de(args.get("campos")))?;
+            let ids_vec: Option<Vec<u64>> = args.get("ids").and_then(Value::as_array).map(|arr| {
+                arr.iter().filter_map(Value::as_u64).collect()
+            });
+            let mut info = doc.folha_inserir_ids(papel, numero_opcional(args, "escala"), &campos_de(args.get("campos")), ids_vec.as_deref())?;
             let destino = match args.get("ponto") {
                 Some(p) => Some(ponto(p, "ponto")?),
                 None => args.get("origem").and_then(Value::as_bool).unwrap_or(false).then(|| Ponto::novo(0.0, 0.0)),

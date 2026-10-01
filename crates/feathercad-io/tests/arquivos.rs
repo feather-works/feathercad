@@ -117,13 +117,21 @@ fn camada_desligada_congelada_e_layer_sem_distincao_de_caixa() {
 }
 
 #[test]
-fn espaco_do_papel_fica_de_fora_e_vertices_nao_viram_lixo() {
+fn camadas_criadas_antes_da_tabela_atualizam_cor_e_ligada() {
+    let dxf = "0\nSECTION\n2\nENTITIES\n0\nLINE\n8\nTRILHOS\n10\n0\n20\n0\n11\n1\n21\n1\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n0\nLAYER\n2\nTRILHOS\n62\n1\n0\nENDTAB\n0\nENDSEC\n0\nEOF";
+    let a = abrir(dxf.as_bytes()).unwrap();
+    let c = a.doc.camadas();
+    assert_eq!(c[0].nome, "TRILHOS");
+    assert_eq!(c[0].cor, 0xFF0000, "a cor da camada é atualizada mesmo se criada antes da tabela LAYER");
+}
+
+#[test]
+fn espaco_do_papel_entra_no_layout_e_vertices_nao_viram_lixo() {
     let dxf = "0\nSECTION\n2\nENTITIES\n0\nLINE\n67\n1\n8\n0\n10\n0\n20\n0\n11\n1\n21\n1\n0\nPOLYLINE\n8\n0\n0\nVERTEX\n10\n0\n20\n0\n0\nVERTEX\n10\n1\n20\n1\n0\nSEQEND\n0\nXLINE\n8\n0\n10\n0\n20\n0\n0\nENDSEC\n0\nEOF\n";
     let a = abrir(dxf.as_bytes()).unwrap();
-    assert_eq!(a.doc.entidades().len(), 1, "só a polilinha do modelo entra");
-    let chaves: Vec<_> = a.avisos.iter().map(|m| m.chave.as_str()).collect();
-    assert_eq!(chaves, ["aviso.entidadesIgnoradas", "aviso.espacoPapelIgnorado"]);
-    assert_eq!(a.avisos[0].vars["tipos"], "1 XLINE", "vértice e seqend não contam");
+    assert_eq!(a.doc.entidades().len(), 2, "a linha do papel e a polilinha entram");
+    assert!(matches!(a.doc.entidades()[0].espaco, feathercad_core::documento::Espaco::Layout(_)));
+    assert_eq!(a.doc.entidades()[1].espaco, feathercad_core::documento::Espaco::Modelo);
 }
 
 #[test]
@@ -336,7 +344,7 @@ fn texto_ida_e_volta_com_acento_alinhamento_e_giro() {
     let mut d = Documento::default();
     let de = |conteudo: &str, h, v, rot| Geometria::Texto { ponto: p(3.0, 4.0), altura: 2.0, rotacao: rot, conteudo: conteudo.into(), h, v };
     let lista = [de("Cozinha ção", AlinhaH::Esquerda, AlinhaV::Base, 0.0), de("Sala", AlinhaH::Centro, AlinhaV::Meio, 45.0), de("Ø12", AlinhaH::Direita, AlinhaV::Topo, 0.0), de("baixo", AlinhaH::Esquerda, AlinhaV::Baixo, 0.0)];
-    let novo = Documento::de_partes(d.camadas().to_vec(), 0, lista.iter().cloned().map(|geometria| feathercad_core::documento::NovaEntidade { camada: 0, cor: Some(0xFF0000), geometria, props: Default::default() }).collect());
+    let novo = Documento::de_partes(d.camadas().to_vec(), 0, lista.iter().cloned().map(|geometria| feathercad_core::documento::NovaEntidade { camada: 0, cor: Some(0xFF0000), geometria, props: Default::default(), espaco: feathercad_core::documento::Espaco::Modelo }).collect());
     d = novo;
     for formato in [Formato::Dxf, Formato::Fcdz] {
         let a = abrir(&gravar(&d, formato).unwrap().bytes).unwrap();
@@ -346,15 +354,12 @@ fn texto_ida_e_volta_com_acento_alinhamento_e_giro() {
 }
 
 #[test]
-fn vp4_abre_a_polilinha_e_o_texto_e_so_o_papel_fica_de_fora() {
+fn vp4_abre_a_polilinha_e_o_texto_incluindo_papel() {
     let raiz = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testes/amostras/VP4.dxf");
     let a = abrir(&fs::read(raiz).unwrap()).unwrap();
     let g = geometrias(&a.doc);
     assert!(g.iter().any(|g| matches!(g, Geometria::Polilinha { .. })), "a LWPOLYLINE do VP4 entrou");
     assert!(g.iter().filter(|g| matches!(g, Geometria::Texto { .. })).count() >= 1, "os TEXT do VP4 entraram");
-    let chaves: Vec<_> = a.avisos.iter().map(|m| m.chave.as_str()).collect();
-    assert!(!chaves.contains(&"aviso.entidadesIgnoradas") || !a.avisos[0].vars["tipos"].contains("LWPOLYLINE"), "{:?}", a.avisos);
-    assert!(chaves.contains(&"aviso.espacoPapelIgnorado"), "o papel segue ignorado (layouts são fase 2)");
 }
 
 // ---------- círculo e arco ----------
@@ -365,8 +370,8 @@ fn circulo_e_arco_ida_e_volta_no_dxf_e_no_fcdz() {
         vec![Camada { ligada: true, ..Camada::nova("0", 0xFF_FF_FF) }],
         0,
         vec![
-            feathercad_core::documento::NovaEntidade { camada: 0, cor: None, geometria: Geometria::Circulo { centro: p(1.5, -2.0), raio: 3.25 }, props: Default::default() },
-            feathercad_core::documento::NovaEntidade { camada: 0, cor: Some(0x00FF00), geometria: Geometria::Arco { centro: p(0.0, 0.0), raio: 10.0, inicio: 300.0, fim: 45.0 }, props: Default::default() },
+            feathercad_core::documento::NovaEntidade { camada: 0, cor: None, geometria: Geometria::Circulo { centro: p(1.5, -2.0), raio: 3.25 }, props: Default::default(), espaco: feathercad_core::documento::Espaco::Modelo },
+            feathercad_core::documento::NovaEntidade { camada: 0, cor: Some(0x00FF00), geometria: Geometria::Arco { centro: p(0.0, 0.0), raio: 10.0, inicio: 300.0, fim: 45.0 }, props: Default::default(), espaco: feathercad_core::documento::Espaco::Modelo },
         ],
     );
     for formato in [Formato::Dxf, Formato::Fcdz] {
@@ -417,7 +422,7 @@ fn corpus_nao_avisa_mais_circulo_nem_arco() {
 // ---------- blocos (INSERT) ----------
 
 fn nova(geometria: Geometria) -> NovaEntidade {
-    NovaEntidade { camada: 0, cor: None, geometria, props: Default::default() }
+    NovaEntidade { camada: 0, cor: None, geometria, props: Default::default(), espaco: feathercad_core::documento::Espaco::Modelo }
 }
 
 /// "porta" (uma linha) dentro de "sala" (uma linha + a porta inserida), e a sala inserida duas vezes.
@@ -687,7 +692,7 @@ fn solid_vira_area_cheia_na_ordem_certa_e_3dface_vira_contorno_fechado_e_point_u
     assert!(padrao.is_empty());
     let pts: Vec<(f64, f64)> = contornos[0].iter().map(|v| (v.p.x, v.p.y)).collect();
     assert_eq!(pts, [(0.0, 0.0), (4.0, 0.0), (4.0, 3.0), (0.0, 3.0)], "1, 2, 4, 3: sem cruzar");
-    assert!(matches!(&g[1], Geometria::Polilinha { vertices, fechada: true } if vertices.len() == 3), "o 4º canto repetido some");
+    assert!(matches!(&g[1], Geometria::Face3D { p1, p2, p3, p4 } if *p1 == p(0.0, 0.0) && *p2 == p(1.0, 0.0) && *p3 == p(1.0, 1.0) && *p4 == p(1.0, 1.0)), "o 3DFACE vira Face3D");
     assert_eq!(g[2], Geometria::Ponto { p: p(7.0, 8.0) });
 }
 
@@ -782,4 +787,33 @@ fn a_unidade_do_desenho_faz_ida_e_volta_nos_dois_formatos() {
     for formato in [Formato::Dxf, Formato::Fcdz] {
         assert_eq!(abrir(&gravar(&sem, formato).unwrap().bytes).unwrap().doc.unidade(), None);
     }
+}
+
+#[test]
+fn abrir_nuvem_de_pontos_como_levantamento_topografico() {
+    let csv = "E,N,Z\n0,0,10\n10,0,12\n10,10,14\n0,10,11\n5,5,15\n";
+    let aberto = abrir(csv.as_bytes()).unwrap();
+    assert_eq!(aberto.versao_dxf, None);
+    assert!(!aberto.doc.entidades().is_empty());
+    assert!(aberto.doc.camadas().iter().any(|c| c.nome == "TOPOGRAFIA_CURVAS_MESTRAS"));
+    assert!(aberto.doc.camadas().iter().any(|c| c.nome == "TOPOGRAFIA_TIN"));
+    assert_eq!(aberto.avisos.len(), 1);
+    assert_eq!(aberto.avisos[0].chave, "aviso.nuvemCarregada");
+}
+
+#[test]
+fn dxf_r12_avisa_que_a_espessura_de_linha_nao_e_gravada_e_o_fcdz_guarda() {
+    // Camada TRILHO com 0,50 mm (370 = 50) vinda de um DXF R2000+, e uma linha nela.
+    let dxf = "0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n0\nLAYER\n2\nTRILHO\n70\n0\n62\n7\n6\nCONTINUOUS\n370\n50\n0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n0\nLINE\n8\nTRILHO\n10\n0\n20\n0\n11\n10\n21\n0\n0\nENDSEC\n0\nEOF\n";
+    let d = abrir(dxf.as_bytes()).unwrap().doc;
+    let i = d.camadas().iter().position(|c| c.nome == "TRILHO").unwrap();
+    assert_eq!(d.camadas()[i].espessura, Some(0.5));
+    let g = gravar(&d, Formato::Dxf).unwrap();
+    assert!(g.avisos.iter().any(|m| m.chave == "aviso.espessuraNaoGravada" && m.vars.get("n").map(String::as_str) == Some("1")), "{:?}", g.avisos);
+    let volta = abrir(&gravar(&d, Formato::Fcdz).unwrap().bytes).unwrap().doc;
+    assert_eq!(volta.camadas()[i].espessura, Some(0.5), "o .fcdz guarda a espessura");
+    // Sem espessura, sem aviso.
+    let mut limpo = Documento::default();
+    limpo.adicionar_linha(feathercad_core::geom::Ponto::novo(0.0, 0.0), feathercad_core::geom::Ponto::novo(1.0, 0.0));
+    assert!(!gravar(&limpo, Formato::Dxf).unwrap().avisos.iter().any(|m| m.chave == "aviso.espessuraNaoGravada"));
 }

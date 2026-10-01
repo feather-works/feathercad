@@ -103,10 +103,11 @@ impl Default for Opcoes {
 type Caixa = (Ponto, Ponto);
 
 /// As folhas do desenho: as inseridas pelo botão (blocos `FOLHA-n`) e os retângulos fechados da camada `FOLHA` que não estão
-/// dentro de outro, da esquerda para a direita.
+/// dentro de outro. Ordem: primeiro as inseridas, pelo número da folha no carimbo (o `05` de `05/12`; sem número, a ordem de
+/// criação, que é o número de fábrica); depois os retângulos, da esquerda para a direita. A posição no desenho só desempata.
 /// Sem nenhuma, uma folha só, com o desenho inteiro.
 pub fn folhas(doc: &Documento) -> Vec<Caixa> {
-    let mut retangulos: Vec<Caixa> = doc
+    let retangulos: Vec<Caixa> = doc
         .entidades()
         .iter()
         .filter(|e| doc.camadas().get(e.camada).is_some_and(|c| c.nome.eq_ignore_ascii_case("FOLHA")))
@@ -115,14 +116,24 @@ pub fn folhas(doc: &Documento) -> Vec<Caixa> {
             _ => None,
         })
         .collect();
-    retangulos.extend(doc.folhas_inseridas().iter().map(|f| (f.min, f.max)));
-    let copia = retangulos.clone();
-    retangulos.retain(|(a, b)| !copia.iter().any(|(c, d)| (c, d) != (a, b) && c.x <= a.x && c.y <= a.y && d.x >= b.x && d.y >= b.y && (d.x - c.x) * (d.y - c.y) > (b.x - a.x) * (b.y - a.y)));
-    retangulos.sort_by(|(a, _), (b, _)| a.x.total_cmp(&b.x).then(b.y.total_cmp(&a.y)));
+    // Chave de ordem: (0, número da folha, criação) para as inseridas; (1, 0, 0) para os retângulos (só a posição conta).
+    let mut lista: Vec<((u8, u32, usize), Caixa)> = retangulos.into_iter().map(|c| ((1, 0, 0), c)).collect();
+    lista.extend(doc.folhas_inseridas().iter().map(|f| ((0, numero_da_folha(doc, f.indice).unwrap_or(f.indice as u32 + 1), f.indice), (f.min, f.max))));
+    let copia: Vec<Caixa> = lista.iter().map(|(_, c)| *c).collect();
+    lista.retain(|(_, (a, b))| !copia.iter().any(|(c, d)| (c, d) != (a, b) && c.x <= a.x && c.y <= a.y && d.x >= b.x && d.y >= b.y && (d.x - c.x) * (d.y - c.y) > (b.x - a.x) * (b.y - a.y)));
+    lista.sort_by(|(ka, (a, _)), (kb, (b, _))| ka.cmp(kb).then(a.x.total_cmp(&b.x)).then(b.y.total_cmp(&a.y)));
+    let mut retangulos: Vec<Caixa> = lista.into_iter().map(|(_, c)| c).collect();
     if retangulos.is_empty() {
         retangulos.extend(caixa_do_desenho(doc));
     }
     retangulos
+}
+
+/// O número da folha escrito no carimbo (`05/12` → 5, `FL-3` → 3); `None` se o campo está vazio ou não tem número.
+fn numero_da_folha(doc: &Documento, indice: usize) -> Option<u32> {
+    let campo = doc.folha_campos(indice).ok()?.folha;
+    let digitos: String = campo.chars().skip_while(|c| !c.is_ascii_digit()).take_while(char::is_ascii_digit).collect();
+    digitos.parse().ok()
 }
 
 fn caixa_de(pontos: impl Iterator<Item = Ponto>) -> Caixa {
@@ -147,6 +158,7 @@ fn caixa_do_desenho(doc: &Documento) -> Option<Caixa> {
             Geometria::Ponto { p } => pts.push(*p),
             Geometria::Insercao { ponto, .. } => pts.push(*ponto),
             Geometria::Hachura { contornos, .. } => pts.extend(contornos.iter().flatten().map(|v| v.p)),
+            Geometria::Face3D { p1, p2, p3, p4 } => pts.extend([*p1, *p2, *p3, *p4]),
         }
     }
     if pts.is_empty() {
@@ -505,7 +517,7 @@ fn pagina(doc: &Documento, janela: Caixa, op: &Opcoes) -> Result<(f64, f64, Vec<
     if op.papel == Papel::DA_FOLHA {
         let f = (14400.0 / PT_POR_MM / largura_u.max(altura_u)).min(1.0);
         let (w, h) = (largura_u * f * PT_POR_MM, altura_u * f * PT_POR_MM);
-        let vista = Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala: w / largura_u, largura: w, altura: h };
+        let vista = Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala: w / largura_u, largura: w, altura: h, rotacao_x: 0.0, rotacao_z: 0.0 };
         let bytes = quadro::montar_fino(doc, &vista, true, TOLERANCIA_DO_ARCO_NO_PAPEL_PX);
         return Ok((w, h, conteudo(&ler_quadro(&bytes)?, h, op.modo_papel)));
     }
@@ -517,7 +529,7 @@ fn pagina(doc: &Documento, janela: Caixa, op: &Opcoes) -> Result<(f64, f64, Vec<
     };
     let (w, h) = if deitado { (maior, menor) } else { (menor, maior) };
     let escala = (w / largura_u).min(h / altura_u);
-    let vista = Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala, largura: w, altura: h };
+    let vista = Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala, largura: w, altura: h, rotacao_x: 0.0, rotacao_z: 0.0 };
     let bytes = quadro::montar_fino(doc, &vista, true, TOLERANCIA_DO_ARCO_NO_PAPEL_PX);
     Ok((w, h, conteudo(&ler_quadro(&bytes)?, h, op.modo_papel)))
 }
@@ -599,7 +611,7 @@ pub fn miniatura_svg(doc: &Documento, largura: f64, altura: f64) -> Option<Strin
     }
     let margem = 0.94;
     let escala = (largura / largura_u).min(altura / altura_u) * margem;
-    let vista = Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala, largura, altura };
+    let vista = Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala, largura, altura, rotacao_x: 0.0, rotacao_z: 0.0 };
     let q = ler_quadro(&quadro::montar_fino(doc, &vista, false, 0.3)).ok()?;
     let cor = |c: u32| format!("#{:06X}", c & 0xFF_FFFF);
     let mut svg = format!("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 {largura} {altura}\" preserveAspectRatio=\"xMidYMid meet\"><rect width=\"100%\" height=\"100%\" fill=\"#1F252C\"/>");

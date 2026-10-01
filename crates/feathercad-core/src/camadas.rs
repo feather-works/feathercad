@@ -229,7 +229,7 @@ impl Documento {
         let (camada, cor) = (primeira.camada, primeira.cor);
         self.desfazer.push(Passo::Tudo(Box::new(Captura { camadas: self.camadas.clone(), atual: self.camada_atual, entidades: self.entidades.clone(), blocos: self.blocos.clone() })));
         self.refazer.clear();
-        let entidades = escolhidas.iter().map(|e| crate::documento::NovaEntidade { camada: e.camada, cor: e.cor, geometria: e.geometria.clone(), props: e.props.clone() }).collect();
+        let entidades = escolhidas.iter().map(|e| crate::documento::NovaEntidade { camada: e.camada, cor: e.cor, geometria: e.geometria.clone(), props: e.props.clone(), espaco: e.espaco.clone() }).collect();
         self.blocos.push(crate::documento::Bloco { nome: nome.to_string(), base, entidades });
         let indice = self.blocos.len() - 1;
         self.caixas_dos_blocos.push(self.caixa_do_bloco(indice, 0));
@@ -237,7 +237,7 @@ impl Documento {
         self.entidades.retain(|e| !sair.contains(&e.id));
         let id = self.proximo_id;
         self.proximo_id += 1;
-        self.entidades.push(crate::documento::Entidade { id, camada, cor, geometria: crate::documento::Geometria::Insercao { bloco: indice, ponto: base, escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default() });
+        self.entidades.push(crate::documento::Entidade { id, camada, cor, geometria: crate::documento::Geometria::Insercao { bloco: indice, ponto: base, escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default(), espaco: self.espaco_ativo.clone() });
         self.mudou();
         Ok(indice)
     }
@@ -257,14 +257,14 @@ impl Documento {
             n += 1;
         }
         // camada 0 dentro do bloco: as formas tomam a camada e a cor da inserção
-        let entidades = formas.into_iter().map(|g| crate::documento::NovaEntidade { camada: 0, cor: None, geometria: g, props: Default::default() }).collect();
+        let entidades = formas.into_iter().map(|g| crate::documento::NovaEntidade { camada: 0, cor: None, geometria: g, props: Default::default(), espaco: crate::documento::Espaco::Modelo }).collect();
         self.blocos.push(crate::documento::Bloco { nome: format!("*D{n}"), base, entidades });
         let indice = self.blocos.len() - 1;
         self.caixas_dos_blocos.push(self.caixa_do_bloco(indice, 0));
         let id = self.proximo_id;
         self.proximo_id += 1;
         let camada = self.camada_atual;
-        self.entidades.push(crate::documento::Entidade { id, camada, cor: None, geometria: crate::documento::Geometria::Insercao { bloco: indice, ponto: base, escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default() });
+        self.entidades.push(crate::documento::Entidade { id, camada, cor: None, geometria: crate::documento::Geometria::Insercao { bloco: indice, ponto: base, escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default(), espaco: self.espaco_ativo.clone() });
         self.mudou();
         Some(id)
     }

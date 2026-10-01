@@ -25,6 +25,7 @@
       "inserir": "Inserir",
       "anotar": "Anotar",
       "parametrico": "Paramétrico",
+      "modelo3d": "Modelagem 3D",
       "exibir": "Exibir",
       "gerenciar": "Gerenciar",
       "saida": "Saída",
@@ -40,7 +41,27 @@
       "grupos": "Grupos",
       "utilitarios": "Utilitários",
       "area_transferencia": "Área de transferência",
-      "folha": "Folha"
+      "folha": "Folha",
+      "texto": "Texto",
+      "cotas": "Cotas",
+      "chamada": "Linhas de chamada",
+      "tabela": "Tabela",
+      "marcacao": "Medição",
+      "geometria": "Geometria",
+      "dimensional": "Dimensional",
+      "primitivas3d": "Primitivas 3D",
+      "operacoes3d": "Operações 3D",
+      "booleanas3d": "Booleanas 3D",
+      "gizmos3d": "Gizmos 3D",
+      "vistas": "Vistas",
+      "interface": "Interface",
+      "tema": "Tema",
+      "personalizacao": "Personalização",
+      "desenho_geren": "Desenho",
+      "exportar": "Exportar",
+      "impressao": "Impressão",
+      "nuvem": "Nuvem & IA",
+      "compartilhar": "Compartilhar"
     },
     "botoes": {
       "linha": {
@@ -74,6 +95,86 @@
       "hachura": {
         "rotulo": "Hachura",
         "dica": "Hachura um contorno fechado: clique dentro dele (H)"
+      },
+      "3dface": {
+        "rotulo": "Face 3D",
+        "dica": "Cria uma face plana de 3 ou 4 vértices no espaço 3D (3DFACE)"
+      },
+      "caixa3d": {
+        "rotulo": "Caixa 3D",
+        "dica": "Cria uma caixa tridimensional (BOX)"
+      },
+      "m3d_caixa3d": {
+        "rotulo": "Caixa 3D",
+        "dica": "Cria uma caixa tridimensional (BOX)"
+      },
+      "m3d_cilindro3d": {
+        "rotulo": "Cilindro 3D",
+        "dica": "Cria um cilindro sólido 3D (CYLINDER)"
+      },
+      "m3d_esfera3d": {
+        "rotulo": "Esfera 3D",
+        "dica": "Cria uma esfera sólida 3D (SPHERE)"
+      },
+      "m3d_cone3d": {
+        "rotulo": "Cone 3D",
+        "dica": "Cria um cone sólido 3D (CONE)"
+      },
+      "m3d_toro3d": {
+        "rotulo": "Toro 3D",
+        "dica": "Cria um toro sólido 3D (TORUS)"
+      },
+      "m3d_cunha3d": {
+        "rotulo": "Cunha 3D",
+        "dica": "Cria uma cunha sólida 3D (WEDGE)"
+      },
+      "m3d_extrusao": {
+        "rotulo": "Extrusão 3D",
+        "dica": "Extruda uma forma 2D no espaço 3D (EXTRUDE)"
+      },
+      "m3d_revolucao": {
+        "rotulo": "Revolução 3D",
+        "dica": "Gira uma forma 2D em torno de um eixo (REVOLVE)"
+      },
+      "m3d_varredura": {
+        "rotulo": "Varredura 3D",
+        "dica": "Varre um perfil ao longo de um caminho (SWEEP)"
+      },
+      "m3d_loft": {
+        "rotulo": "Loft 3D",
+        "dica": "Cria um sólido entre múltiplos perfis (LOFT)"
+      },
+      "m3d_presspull": {
+        "rotulo": "Presspull 3D",
+        "dica": "Empurra ou puxa áreas delimitadas em 3D (PRESSPULL)"
+      },
+      "m3d_uniao3d": {
+        "rotulo": "União 3D",
+        "dica": "Combina sólidos 3D em um único corpo (UNION)"
+      },
+      "m3d_subtracao3d": {
+        "rotulo": "Subtração 3D",
+        "dica": "Subtrai um sólido 3D de outro (SUBTRACT)"
+      },
+      "m3d_intersecao3d": {
+        "rotulo": "Interseção 3D",
+        "dica": "Cria um sólido a partir da interseção (INTERSECT)"
+      },
+      "m3d_mover3d": {
+        "rotulo": "Mover 3D",
+        "dica": "Move objetos ao longo dos eixos X, Y e Z 3D (3DMOVE)"
+      },
+      "m3d_rotacionar3d": {
+        "rotulo": "Rotacionar 3D",
+        "dica": "Gira objetos em torno de eixos 3D (3DROTATE)"
+      },
+      "m3d_escalar3d": {
+        "rotulo": "Escalar 3D",
+        "dica": "Redimensiona objetos em 3D (3DSCALE)"
+      },
+      "elevacao": {
+        "rotulo": "Elevação Z",
+        "dica": "Define o plano de elevação Z do trabalho atual (ELEV)"
       },
       "mover": {
         "rotulo": "Mover",
@@ -231,6 +332,162 @@
       "contar": {
         "rotulo": "Contar",
         "dica": "Clique num objeto: seleciona todos os iguais a ele e diz quantos são (QTD)"
+      },
+      "anot_texto": {
+        "rotulo": "Texto",
+        "dica": "Cria um texto de uma linha (TX)"
+      },
+      "anot_cota": {
+        "rotulo": "Cota",
+        "dica": "Cota linear: dois pontos e a posição da linha (COT)"
+      },
+      "anot_cota_alinhada": {
+        "rotulo": "Cota alinhada",
+        "dica": "Mede a distância real entre dois pontos (CAL)"
+      },
+      "anot_cota_raio": {
+        "rotulo": "Raio",
+        "dica": "Cota o raio de um círculo ou arco (CRA)"
+      },
+      "anot_cota_diametro": {
+        "rotulo": "Diâmetro",
+        "dica": "Cota o diâmetro de um círculo ou arco (CDI)"
+      },
+      "anot_chamada": {
+        "rotulo": "Chamada",
+        "dica": "Chamada com seta e texto (CH)"
+      },
+      "anot_tabela": {
+        "rotulo": "Tabela",
+        "dica": "Tabela: só a grade, com linhas e colunas (TAB)"
+      },
+      "anot_medir": {
+        "rotulo": "Medir",
+        "dica": "Mede distância (2 cliques) ou área (A) (MD)"
+      },
+      "anot_contar": {
+        "rotulo": "Contar",
+        "dica": "Clique num objeto: seleciona todos os iguais a ele e diz quantos são (QTD)"
+      },
+      "param_coincidente": {
+        "rotulo": "Coincidente",
+        "dica": "Restrição coincidente: une dois pontos"
+      },
+      "param_colinear": {
+        "rotulo": "Colinear",
+        "dica": "Restrição colinear: alinha retas"
+      },
+      "param_concentrico": {
+        "rotulo": "Concêntrico",
+        "dica": "Restrição concêntrica: mesmo centro"
+      },
+      "param_paralelo": {
+        "rotulo": "Paralelo",
+        "dica": "Restrição paralela: linhas paralelas"
+      },
+      "param_perpendicular": {
+        "rotulo": "Perpendicular",
+        "dica": "Restrição perpendicular: 90°"
+      },
+      "param_tangente": {
+        "rotulo": "Tangente",
+        "dica": "Restrição tangente: curva e reta"
+      },
+      "param_horizontal": {
+        "rotulo": "Horizontal",
+        "dica": "Restrição horizontal"
+      },
+      "param_vertical": {
+        "rotulo": "Vertical",
+        "dica": "Restrição vertical"
+      },
+      "param_linear": {
+        "rotulo": "Linear",
+        "dica": "Restrição dimensional linear"
+      },
+      "param_raio": {
+        "rotulo": "Raio",
+        "dica": "Restrição dimensional de raio"
+      },
+      "param_angulo": {
+        "rotulo": "Ângulo",
+        "dica": "Restrição dimensional angular"
+      },
+      "exib_enquadrar": {
+        "rotulo": "Enquadrar",
+        "dica": "Enquadra o desenho todo na tela"
+      },
+      "exib_zoom_mais": {
+        "rotulo": "Aproximar",
+        "dica": "Aumenta o zoom da tela"
+      },
+      "exib_zoom_menos": {
+        "rotulo": "Afastar",
+        "dica": "Diminui o zoom da tela"
+      },
+      "exib_propriedades": {
+        "rotulo": "Propriedades",
+        "dica": "Abre o painel de propriedades (Ctrl+1)"
+      },
+      "exib_camadas": {
+        "rotulo": "Camadas",
+        "dica": "Abre o gerenciador de propriedades de camadas"
+      },
+      "exib_monitor": {
+        "rotulo": "Monitor",
+        "dica": "Abre o monitor de desempenho do sistema (F12)"
+      },
+      "exib_tema": {
+        "rotulo": "Tema",
+        "dica": "Alterna entre tema claro / escuro / automático"
+      },
+      "geren_configuracoes": {
+        "rotulo": "Configurações",
+        "dica": "Abre as configurações (Ctrl+,)"
+      },
+      "geren_mcp": {
+        "rotulo": "Conectar MCP",
+        "dica": "Servidor MCP (IA / Antigravity)"
+      },
+      "geren_unidades": {
+        "rotulo": "Unidades",
+        "dica": "Configura as unidades do desenho (mm, cm, m)"
+      },
+      "geren_limpar": {
+        "rotulo": "Limpar",
+        "dica": "Limpa objetos e blocos não utilizados"
+      },
+      "saida_pdf": {
+        "rotulo": "PDF",
+        "dica": "Exporta as folhas do desenho em PDF"
+      },
+      "saida_dxf": {
+        "rotulo": "Salvar DXF",
+        "dica": "Salva o desenho no formato DXF"
+      },
+      "saida_fcdz": {
+        "rotulo": "Salvar FCDZ",
+        "dica": "Salva no formato binário nativo (.fcdz)"
+      },
+      "saida_folhas": {
+        "rotulo": "Folhas",
+        "dica": "Insere ou ajusta as folhas de impressão"
+      },
+      "colab_mcp": {
+        "rotulo": "Agente MCP",
+        "dica": "Servidor e protocolo MCP de IA"
+      },
+      "colab_ia": {
+        "rotulo": "Assistente IA",
+        "dica": "Assistente inteligente de projeto"
+      },
+      "colab_exportar": {
+        "rotulo": "Exportar",
+        "dica": "Exporta o projeto completo"
+      },
+      "colab_sobre": {
+        "rotulo": "Sobre",
+        "dica": "Sobre o FeatherCAD"
       }
     },
     "embreve": "Esta aba ainda será preenchida."
@@ -278,6 +535,20 @@
   "linha": {
     "primeiroPonto": "LINHA Especifique o primeiro ponto:",
     "proximoPonto": "LINHA Especifique o próximo ponto ou [Enter para terminar]:"
+  },
+  "elevacao": {
+    "digite": "Elevação Z atual: {z}. Digite o novo valor de elevação Z:",
+    "definida": "Plano de elevação Z alterado para {z}."
+  },
+  "face3d": {
+    "primeiroPonto": "3DFACE Especifique o primeiro ponto:",
+    "segundoPonto": "3DFACE Especifique o segundo ponto:",
+    "terceiroPonto": "3DFACE Especifique o terceiro ponto:",
+    "quartoPonto": "3DFACE Especifique o quarto ponto (ou Enter para fechar):"
+  },
+  "caixa3d": {
+    "primeiroCanto": "BOX Especifique o primeiro canto:",
+    "segundoCantoOuAltura": "BOX Especifique o canto oposto ou altura Z:"
   },
   "desfazer": {
     "feito": "Desfeito.",
@@ -371,7 +642,7 @@
       }
     },
     "overlay": {
-      "titulo": "⚙ Console de Depuração",
+      "titulo": "Console de Depuração",
       "filtrar": "Filtrar texto...",
       "todos": "Todos",
       "erros": "Erros",
@@ -412,7 +683,11 @@
     },
     "tipos": {
       "dxf": "DXF",
-      "fcdz": "Desenho FeatherCAD"
+      "fcdz": "Desenho FeatherCAD",
+      "xyz": "Nuvem de Pontos (XYZ)",
+      "pts": "Nuvem de Pontos (PTS)",
+      "csv": "Nuvem de Pontos (CSV)",
+      "txt": "Nuvem de Pontos (TXT)"
     },
     "visao": {
       "lista": "Lista",
@@ -442,7 +717,9 @@
     "hachuraNaoGravada": "{n} hachura(s) não foram gravadas no DXF (área com ilha, ou detalhe demais). Salve como .fcdz para não perdê-las.",
     "espacoPapelIgnorado": "{n} objeto(s) do espaço do papel foram ignorados.",
     "corAproximada": "{n} cor(es) foram aproximadas para a tabela de cores do DXF (ACI).",
-    "hachuraDecomposta": "{n} hachura(s) foram gravadas como linhas e triângulos: o DXF gravado hoje (R12) não tem hachura. Salve como .fcdz para manter a hachura de verdade."
+    "espessuraNaoGravada": "{n} espessura(s) de linha (de camada ou de objeto) não foram gravadas: o DXF gravado hoje (R12) não tem espessura. Salve como .fcdz para mantê-las.",
+    "hachuraDecomposta": "{n} hachura(s) foram gravadas como linhas e triângulos: o DXF gravado hoje (R12) não tem hachura. Salve como .fcdz para manter a hachura de verdade.",
+    "nuvemCarregada": "Nuvem de pontos carregada: {pontos} pontos processados, {curvas} curvas de nível geradas."
   },
   "navegacao": {
     "maisZoom": "Aproximar",
@@ -625,10 +902,21 @@
     "nenhum": "Nenhuma seleção",
     "objetos": "{n} objeto(s) selecionado(s)",
     "geral": "Geral",
+    "geometria": "Geometria",
+    "texto": "Texto",
     "camada": "Camada",
     "cor": "Cor",
     "tipoLinha": "Tipo de linha",
     "espessura": "Espessura de linha",
+    "posicaoX": "Posição X",
+    "posicaoY": "Posição Y",
+    "comprimento": "Comprimento",
+    "raio": "Raio",
+    "diametro": "Diâmetro",
+    "area": "Área",
+    "tamanhoGeral": "Tamanho geral",
+    "rotacao": "Rotação",
+    "conteudo": "Conteúdo",
     "porCamada": "PorCamada",
     "variado": "*VARIADO*",
     "fechar": "Fechar",
@@ -636,6 +924,7 @@
     "corInvalida": "Cor inválida: use #rrggbb ou PorCamada.",
     "tipoInvalido": "Tipo de linha inválido.",
     "espessuraInvalida": "Espessura inválida (0 a 2,11 mm).",
+    "numeroInvalido": "Número inválido.",
     "dica": "Propriedades dos objetos selecionados (Ctrl+1)",
     "cores": {
       "vermelho": "Vermelho",
@@ -955,7 +1244,26 @@
       "tornar_atual": "Tornar camada atual",
       "igualar_propriedades": "Igualar propriedades",
       "igualar_camada": "Igualar camada",
-      "contar": "Contar iguais"
+      "contar": "Contar iguais",
+      "3dface": "Face 3D",
+      "caixa3d": "Caixa 3D",
+      "cilindro3d": "Cilindro 3D",
+      "esfera3d": "Esfera 3D",
+      "cone3d": "Cone 3D",
+      "toro3d": "Toro 3D",
+      "cunha3d": "Cunha 3D",
+      "extrusao": "Extrusão 3D",
+      "revolucao": "Revolução 3D",
+      "varredura": "Varredura 3D",
+      "loft": "Loft 3D",
+      "presspull": "Presspull 3D",
+      "uniao3d": "União 3D",
+      "subtracao3d": "Subtração 3D",
+      "intersecao3d": "Interseção 3D",
+      "mover3d": "Mover 3D",
+      "rotacionar3d": "Rotacionar 3D",
+      "escalar3d": "Escalar 3D",
+      "elevacao": "Elevação Z"
     }
   },
   "folha": {
@@ -970,10 +1278,12 @@
       "cliente": "Cliente",
       "fase": "Fase do projeto",
       "disciplina": "Disciplina",
+      "responsavel": "Responsável técnico / Empresa",
       "tituloDesenho": "Título do desenho",
       "subtitulo": "Subtítulo",
       "numero": "Nº do desenho",
       "revisao": "Revisão",
+      "revisaoDescricao": "Descrição da revisão",
       "inserir": "Inserir",
       "cancelar": "Cancelar",
       "divisoria": "Linha divisória no meio da folha (duas vistas)",

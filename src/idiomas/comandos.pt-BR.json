@@ -152,7 +152,37 @@
     "agrupar": [
       "AGRUPAR",
       "AG"
-    ]
+    ],
+    "3dface": [
+      "3DFACE",
+      "FACE3D",
+      "FACE"
+    ],
+    "caixa3d": [
+      "CAIXA3D",
+      "BOX",
+      "CAIXA"
+    ],
+    "elevacao": [
+      "ELEVACAO",
+      "ELEV"
+    ],
+    "cilindro3d": ["CILINDRO3D", "CYLINDER"],
+    "esfera3d": ["ESFERA3D", "SPHERE"],
+    "cone3d": ["CONE3D", "CONE"],
+    "toro3d": ["TORO3D", "TORUS"],
+    "cunha3d": ["CUNHA3D", "WEDGE"],
+    "extrusao": ["EXTRUSAO", "EXTRUDE", "EXT"],
+    "revolucao": ["REVOLUCAO", "REVOLVE", "REV"],
+    "varredura": ["VARREDURA", "SWEEP"],
+    "loft": ["LOFT"],
+    "presspull": ["PRESSPULL"],
+    "uniao3d": ["UNIAO3D", "UNION", "UNI"],
+    "subtracao3d": ["SUBTRACAO3D", "SUBTRACT", "SUB"],
+    "intersecao3d": ["INTERSECAO3D", "INTERSECT", "IN"],
+    "mover3d": ["MOVER3D", "3DMOVE"],
+    "rotacionar3d": ["ROTACIONAR3D", "3DROTATE"],
+    "escalar3d": ["ESCALAR3D", "3DSCALE"]
   },
   "opcoes": {
     "fechar": [

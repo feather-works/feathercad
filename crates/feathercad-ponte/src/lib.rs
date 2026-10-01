@@ -34,7 +34,7 @@ const ALCANCE_OSNAP_PX: f64 = 12.0;
 const ALCANCE_DA_ESCOLHA_PX: f64 = 6.0;
 
 /// Os nomes de comando que a ponte atende (o teste confere contra o TypeScript).
-pub const COMANDOS_DA_PONTE: [&str; 51] = [
+pub const COMANDOS_DA_PONTE: [&str; 54] = [
     "estado",
     "comandos",
     "comandos_da_ponte",
@@ -86,6 +86,9 @@ pub const COMANDOS_DA_PONTE: [&str; 51] = [
     "documento_arquivo",
     "quadro",
     "quadro_arrasto",
+    "layout_criar",
+    "layout_alternar",
+    "viewport_inserir",
 ];
 
 /// O documento vivo + a sessão de trabalho.
@@ -135,6 +138,10 @@ struct PedidoFolhaNova {
     escala: Option<f64>,
     #[serde(default)]
     campos: feathercad_core::folha::Campos,
+    #[serde(default)]
+    cobrir_selecao: Option<bool>,
+    #[serde(default)]
+    ids: Option<Vec<feathercad_core::documento::Id>>,
 }
 
 #[derive(Deserialize)]
@@ -159,6 +166,26 @@ struct PedidoHachura {
     padrao: String,
     #[serde(default)]
     escala: Option<f64>,
+}
+
+#[derive(Deserialize)]
+struct PedidoLayoutCriar {
+    nome: String,
+    papel: String,
+    largura_mm: f64,
+    altura_mm: f64,
+}
+
+#[derive(Deserialize)]
+struct PedidoLayoutAlternar {
+    nome: String,
+}
+
+#[derive(Deserialize)]
+struct PedidoViewportInserir {
+    layout: String,
+    largura_papel: f64,
+    altura_papel: f64,
 }
 
 #[derive(Serialize)]
@@ -352,6 +379,8 @@ struct Estado {
     /// Só enquanto o Inserir espera o nome: os blocos para escolher (a interface digita o nome escolhido).
     blocos: Vec<String>,
     historico: Vec<Entrada>,
+    layouts: Vec<feathercad_core::documento::InfoLayout>,
+    espaco_ativo: feathercad_core::documento::Espaco,
 }
 
 #[derive(Serialize)]
@@ -366,8 +395,10 @@ struct Segmento {
 struct RespostaCursor {
     x: f64,
     y: f64,
+    z: f64,
     texto_x: String,
     texto_y: String,
+    texto_z: String,
     texto_distancia: Option<String>,
     texto_angulo: Option<String>,
     guias: Vec<Segmento>,
@@ -533,6 +564,9 @@ impl Ponte {
             "documento_arquivo" => json(&self.arquivo),
             "quadro" => self.quadro(corpo),
             "quadro_arrasto" => self.quadro_arrasto(corpo),
+            "layout_criar" => self.layout_criar(corpo),
+            "layout_alternar" => self.layout_alternar(corpo),
+            "viewport_inserir" => self.viewport_inserir(corpo),
             _ => Err(format!("comando desconhecido na ponte: `{comando}`")),
         }
     }
@@ -565,6 +599,8 @@ impl Ponte {
             prompt: s.prompt(),
             blocos: if matches!(s.ferramenta, feathercad_core::sessao::Ferramenta::Insercao { bloco: None }) { self.doc.nomes_de_blocos_inseriveis() } else { Vec::new() },
             historico: h[h.len().saturating_sub(HISTORICO_NO_ESTADO)..].to_vec(),
+            layouts: self.doc.layouts().to_vec(),
+            espaco_ativo: self.doc.espaco_ativo().clone(),
         })
     }
 
@@ -690,9 +726,103 @@ impl Ponte {
 
     /// O ponto do mouse já resolvido (snap, ortogonal, grade).
     fn resolver_mouse(&self, vista: &Vista, x: f64, y: f64) -> feathercad_core::cursor::Resolvido {
-        let bruto = vista.para_mundo(x, y);
+        let z_plano = self.sessao.base().map(|b| b.z).unwrap_or(self.sessao.elevacao);
+        let bruto = vista.para_mundo_em_z_com_ref(x, y, z_plano, self.sessao.base());
         let tolerancia = vista.pixels_em_unidades(ALCANCE_OSNAP_PX);
-        resolver(&self.doc, self.sessao.base(), bruto, tolerancia, &self.sessao.ajudas())
+
+        if self.sessao.ajudas().osnap {
+            if let Some(a) = feathercad_core::snap::achar(&self.doc, self.sessao.base(), bruto, tolerancia, &self.sessao.ajudas().modos) {
+                return feathercad_core::cursor::Resolvido { ponto: a.ponto, guias: Vec::new(), marca: true, tipo: Some(a.tipo) };
+            }
+        }
+
+        let r_xy = resolver(&self.doc, self.sessao.base(), bruto, tolerancia, &self.sessao.ajudas());
+
+        if let (Some(b), true) = (self.sessao.base(), vista.rotacao_x.abs() > 1e-4 || vista.rotacao_z.abs() > 1e-4) {
+            let (s0_x, s0_y) = vista.para_tela(b);
+
+            // 1. Z-axis projection (vertical ray in 3D)
+            let s1_z = vista.para_tela(Ponto::novo3d(b.x, b.y, b.z + 1.0));
+            let uz_x = s1_z.0 - s0_x;
+            let uz_y = s1_z.1 - s0_y;
+            let len_z_sq = uz_x * uz_x + uz_y * uz_y;
+
+            let (p_z, dist_z_perp) = if len_z_sq > 1e-6 {
+                let mx = x - s0_x;
+                let my = y - s0_y;
+                let dz = (mx * uz_x + my * uz_y) / len_z_sq;
+                let p = Ponto::novo3d(b.x, b.y, b.z + dz);
+                let (proj_x, proj_y) = (s0_x + dz * uz_x, s0_y + dz * uz_y);
+                let d_perp = ((x - proj_x).powi(2) + (y - proj_y).powi(2)).sqrt();
+                (p, d_perp)
+            } else {
+                (b, f64::INFINITY)
+            };
+
+            // 2. X-axis projection
+            let s1_x = vista.para_tela(Ponto::novo3d(b.x + 1.0, b.y, b.z));
+            let ux_x = s1_x.0 - s0_x;
+            let ux_y = s1_x.1 - s0_y;
+            let len_x_sq = ux_x * ux_x + ux_y * ux_y;
+
+            let (p_x, dist_x_perp) = if len_x_sq > 1e-6 {
+                let mx = x - s0_x;
+                let my = y - s0_y;
+                let dx = (mx * ux_x + my * ux_y) / len_x_sq;
+                let p = Ponto::novo3d(b.x + dx, b.y, b.z);
+                let (proj_x, proj_y) = (s0_x + dx * ux_x, s0_y + dx * ux_y);
+                let d_perp = ((x - proj_x).powi(2) + (y - proj_y).powi(2)).sqrt();
+                (p, d_perp)
+            } else {
+                (b, f64::INFINITY)
+            };
+
+            // 3. Y-axis projection
+            let s1_y = vista.para_tela(Ponto::novo3d(b.x, b.y + 1.0, b.z));
+            let uy_x = s1_y.0 - s0_x;
+            let uy_y = s1_y.1 - s0_y;
+            let len_y_sq = uy_x * uy_x + uy_y * uy_y;
+
+            let (p_y, dist_y_perp) = if len_y_sq > 1e-6 {
+                let mx = x - s0_x;
+                let my = y - s0_y;
+                let dy = (mx * uy_x + my * uy_y) / len_y_sq;
+                let p = Ponto::novo3d(b.x, b.y + dy, b.z);
+                let (proj_x, proj_y) = (s0_x + dy * uy_x, s0_y + dy * uy_y);
+                let d_perp = ((x - proj_x).powi(2) + (y - proj_y).powi(2)).sqrt();
+                (p, d_perp)
+            } else {
+                (b, f64::INFINITY)
+            };
+
+            let limit_px = if self.sessao.ajudas().orto { 120.0 } else { 35.0 };
+            if dist_z_perp < limit_px && dist_z_perp <= dist_x_perp && dist_z_perp <= dist_y_perp {
+                return feathercad_core::cursor::Resolvido {
+                    ponto: p_z,
+                    guias: vec![feathercad_core::cursor::Guia { a: b, b: p_z }],
+                    marca: false,
+                    tipo: None,
+                };
+            } else if self.sessao.ajudas().orto {
+                if dist_x_perp < dist_y_perp && dist_x_perp < limit_px {
+                    return feathercad_core::cursor::Resolvido {
+                        ponto: p_x,
+                        guias: vec![feathercad_core::cursor::Guia { a: b, b: p_x }],
+                        marca: false,
+                        tipo: None,
+                    };
+                } else if dist_y_perp < limit_px {
+                    return feathercad_core::cursor::Resolvido {
+                        ponto: p_y,
+                        guias: vec![feathercad_core::cursor::Guia { a: b, b: p_y }],
+                        marca: false,
+                        tipo: None,
+                    };
+                }
+            }
+        }
+
+        r_xy
     }
 
     fn clique(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
@@ -742,9 +872,11 @@ impl Ponte {
         json(&RespostaCursor {
             x,
             y,
+            z: r.ponto.z,
             texto_x: reg.numero(r.ponto.x),
             texto_y: reg.numero(r.ponto.y),
-            texto_distancia: base.map(|b| reg.numero(b.distancia(r.ponto))),
+            texto_z: reg.numero(r.ponto.z),
+            texto_distancia: base.map(|b| reg.numero(b.distancia_3d(r.ponto))),
             texto_angulo: base.map(|b| reg.numero(b.angulo_ate(r.ponto))),
             guias: r.guias.iter().map(|g| segmento(&m.vista, g.a, g.b)).collect(),
             previa: self.previa(&m.vista, r.ponto),
@@ -854,7 +986,14 @@ impl Ponte {
     /// Insere uma folha (`papel`, `escala` ou nada = a que cabe, campos do carimbo) e devolve o que mudou.
     fn folha_inserir(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
         let p: PedidoFolhaNova = ler("folha_inserir", corpo)?;
-        let folha = self.doc.folha_inserir(&p.papel, p.escala, &p.campos)?;
+        let ids_alvo = match (p.ids.as_deref(), p.cobrir_selecao) {
+            (Some(ids), _) if !ids.is_empty() => Some(ids.to_vec()),
+            (_, Some(true)) | (_, None) if !self.sessao.selecao().is_empty() => {
+                Some(self.sessao.selecao().iter().copied().collect())
+            }
+            _ => None,
+        };
+        let folha = self.doc.folha_inserir_ids(&p.papel, p.escala, &p.campos, ids_alvo.as_deref())?;
         json(&RespostaFolha { folha, estado: serde_json::from_slice(&self.estado()?).map_err(|e| e.to_string())? })
     }
 
@@ -950,6 +1089,43 @@ impl Ponte {
     fn fundo_definir(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
         let p: PedidoFundo = ler("fundo_definir", corpo)?;
         self.sessao.definir_fundo(p.modo);
+        self.estado()
+    }
+
+    fn layout_criar(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
+        let p: PedidoLayoutCriar = ler("layout_criar", corpo)?;
+        self.doc.adicionar_layout(p.nome, p.papel, p.largura_mm, p.altura_mm);
+        self.estado()
+    }
+
+    fn layout_alternar(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
+        let p: PedidoLayoutAlternar = ler("layout_alternar", corpo)?;
+        let espaco = if p.nome.eq_ignore_ascii_case("modelo") || p.nome.eq_ignore_ascii_case("model") {
+            feathercad_core::documento::Espaco::Modelo
+        } else {
+            feathercad_core::documento::Espaco::Layout(p.nome)
+        };
+        self.doc.definir_espaco_ativo(espaco);
+        self.estado()
+    }
+
+    fn viewport_inserir(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
+        let p: PedidoViewportInserir = ler("viewport_inserir", corpo)?;
+        if let Some(l) = self.doc.layouts_mut().iter_mut().find(|l| l.nome == p.layout) {
+            let id = (l.viewports.len() as u64) + 1;
+            let vp = feathercad_core::documento::Viewport {
+                id,
+                centro_papel: Ponto::novo(l.largura_mm / 2.0, l.altura_mm / 2.0),
+                largura_papel: p.largura_papel,
+                altura_papel: p.altura_papel,
+                centro_modelo: Ponto::novo(0.0, 0.0),
+                escala_modelo: 1.0,
+                ativa: true,
+                bloqueada: false,
+            };
+            l.viewports.push(vp);
+            l.viewport_ativa = Some(id);
+        }
         self.estado()
     }
 

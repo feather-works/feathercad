@@ -2,22 +2,34 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Um ponto 2D no espaço do desenho.
+/// Um ponto 3D/2D no espaço do desenho.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Ponto {
     pub x: f64,
     pub y: f64,
+    #[serde(default)]
+    pub z: f64,
 }
 
 impl Ponto {
-    /// Cria um ponto.
+    /// Cria um ponto 2D (Z = 0).
     pub fn novo(x: f64, y: f64) -> Self {
-        Self { x, y }
+        Self { x, y, z: 0.0 }
     }
 
-    /// Distância até outro ponto.
+    /// Cria um ponto 3D (X, Y, Z).
+    pub fn novo3d(x: f64, y: f64, z: f64) -> Self {
+        Self { x, y, z }
+    }
+
+    /// Distância 2D até outro ponto.
     pub fn distancia(self, outro: Ponto) -> f64 {
         (self.x - outro.x).hypot(self.y - outro.y)
+    }
+
+    /// Distância 3D até outro ponto.
+    pub fn distancia_3d(self, outro: Ponto) -> f64 {
+        ((self.x - outro.x).powi(2) + (self.y - outro.y).powi(2) + (self.z - outro.z).powi(2)).sqrt()
     }
 
     /// Ângulo do vetor `self → outro`, em graus de 0 a 360 (anti-horário).
@@ -56,7 +68,7 @@ pub fn amostrar_arco(centro: Ponto, raio: f64, inicio: f64, varredura: f64, tole
     (0..=n)
         .map(|i| {
             let ang = inicio + varredura * i as f64 / n as f64;
-            Ponto::novo(centro.x + raio * ang.cos(), centro.y + raio * ang.sin())
+            Ponto::novo3d(centro.x + raio * ang.cos(), centro.y + raio * ang.sin(), centro.z)
         })
         .collect()
 }
@@ -72,7 +84,7 @@ pub fn segmento_com_bulge(a: Ponto, b: Ponto, bulge: f64, tolerancia: f64) -> Ve
     let (ux, uy) = ((b.x - a.x) / corda, (b.y - a.y) / corda);
     // O centro fica sobre a mediatriz, à esquerda de a→b quando o arco é anti-horário.
     let desloc = (corda / 2.0) * (1.0 - bulge * bulge) / (2.0 * bulge);
-    let centro = Ponto::novo((a.x + b.x) / 2.0 - uy * desloc, (a.y + b.y) / 2.0 + ux * desloc);
+    let centro = Ponto::novo3d((a.x + b.x) / 2.0 - uy * desloc, (a.y + b.y) / 2.0 + ux * desloc, (a.z + b.z) / 2.0);
     let mut pontos = amostrar_arco(centro, centro.distancia(a), (a.y - centro.y).atan2(a.x - centro.x), 4.0 * bulge.atan(), tolerancia);
     // As pontas exatas, sem o erro de arredondamento do seno/cosseno.
     if let (Some(p0), Some(p1)) = (pontos.first_mut(), Some(a)) {
@@ -187,9 +199,9 @@ impl Transf {
         Some(Transf { a, b, c, d, e: -(a * self.e + c * self.f), f: -(b * self.e + d * self.f) })
     }
 
-    /// Leva um ponto do bloco para o desenho.
+    /// Leva um ponto do bloco para o desenho (preservando elevação Z).
     pub fn aplicar(&self, p: Ponto) -> Ponto {
-        Ponto::novo(self.a * p.x + self.c * p.y + self.e, self.b * p.x + self.d * p.y + self.f)
+        Ponto::novo3d(self.a * p.x + self.c * p.y + self.e, self.b * p.x + self.d * p.y + self.f, p.z)
     }
 
     /// `self` aplicada **depois** de `filha` (o bloco de dentro sob o de fora).

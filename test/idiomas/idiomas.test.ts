@@ -172,6 +172,7 @@ test('idiomas: toda chave de mensagem que o Rust pode devolver existe em todas a
     'aviso.hachuraNaoGravada',
     'aviso.hachuraDecomposta',
     'aviso.corAproximada',
+    'aviso.espessuraNaoGravada',
   ];
   for (const codigo of COMPLETAS) {
     for (const c of chaves) assert.notEqual(texto(c, { nome: 'x', texto: 'x', n: '1', tipos: 'x' }, codigo), c, `${codigo}: falta ${c}`);

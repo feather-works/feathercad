@@ -65,6 +65,7 @@ fn assinatura(g: &Geometria) -> Assinatura {
         Geometria::Ponto { .. } => Assinatura { tipo: 8, texto: sem_texto, medidas: [0.0; 3] },
         Geometria::Hachura { nome, contornos, .. } => Assinatura { tipo: 9, texto: nome.clone(), medidas: [contornos.len() as f64, 0.0, 0.0] },
         Geometria::Insercao { bloco, escala_x, escala_y, .. } => Assinatura { tipo: 10, texto: bloco.to_string(), medidas: [escala_x.abs(), escala_y.abs(), 0.0] },
+        Geometria::Face3D { p1, p2, p3, p4 } => Assinatura { tipo: 11, texto: sem_texto, medidas: [p1.distancia(*p2), p2.distancia(*p3), p3.distancia(*p4)] },
     }
 }
 

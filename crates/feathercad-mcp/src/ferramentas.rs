@@ -30,18 +30,27 @@ fn ids_de(args: &Value, nome: &str) -> BTreeSet<Id> {
 
 /// A imagem do desenho e uma legenda de como lê-la.
 fn ver(ag: &Agente, fonte: &Fonte, args: &Value) -> Res<Conteudo> {
+    let isometria = args.get("isometria").and_then(Value::as_bool).unwrap_or(false);
     let o = Opcoes {
         janela: args.get("janela").map(janela).transpose()?,
         largura_px: numero_opcional(args, "largura").map_or(1000, |n| n as u32),
         rotulos: args.get("rotulos").and_then(Value::as_bool).unwrap_or(true),
         grade: args.get("grade").and_then(Value::as_bool).unwrap_or(true),
         destacar: ids_de(args, "destacar"),
+        rotacao_x: numero_opcional(args, "rotacao_x").unwrap_or(if isometria { 55.0 } else { 0.0 }),
+        rotacao_z: numero_opcional(args, "rotacao_z").unwrap_or(if isometria { 45.0 } else { 0.0 }),
+        isometria,
     };
     let img = desenhar(&ag.doc, &o, fonte)?;
     let legenda = json!({
         "janela": { "min": par(img.janela.0), "max": par(img.janela.1) }, "pixels": [img.largura, img.altura],
         "unidades_por_pixel": arred(img.unidades_por_pixel), "unidade": ag.doc.unidade().map(feathercad_core::documento::Unidade::nome),
-        "como_ler": "números nas bordas = coordenadas do desenho; linhas mais escuras = eixos x=0 e y=0; #N = id da entidade; barra preta no canto = comprimento de escala",
+        "rotacao_x": o.rotacao_x, "rotacao_z": o.rotacao_z, "isometria": isometria,
+        "como_ler": if o.rotacao_x.abs() > 1e-4 || o.rotacao_z.abs() > 1e-4 {
+            "vista 3D em órbita/isometria; indicador de eixos no canto inferior esquerdo (X vermelho, Y verde, Z azul)"
+        } else {
+            "números nas bordas = coordenadas do desenho; linhas mais escuras = eixos x=0 e y=0; #N = id da entidade; barra preta no canto = comprimento de escala"
+        },
     });
     let b64 = base64::engine::general_purpose::STANDARD.encode(&img.png);
     Ok(vec![json!({ "type": "image", "data": b64, "mimeType": "image/png" }), json!({ "type": "text", "text": legenda.to_string() })])
@@ -80,6 +89,7 @@ fn editar_ou_criar(ag: &mut Agente, nome: &str, args: &Value) -> Res<Value> {
         "cad_simbolo" => simbolo(&mut ag.doc, args),
         "cad_componente" => crate::componentes::componente(&mut ag.doc, args),
         "cad_eletroduto" => eletroduto(&mut ag.doc, args),
+        "cad_topografia" => crate::topografia::topografia(ag, args),
         "cad_desfazer" => Ok(desfazer(&mut ag.doc, args.get("refazer").and_then(Value::as_bool).unwrap_or(false))),
         _ => Err(format!("ferramenta desconhecida `{nome}`")),
     }
@@ -90,9 +100,10 @@ pub fn chamar(ag: &mut Agente, fonte: &Fonte, nome: &str, args: &Value) -> Res<C
     match nome {
         "cad_novo" => ag.novo(texto_de(args, "unidade")?).map(|v| texto(&v)),
         "cad_abrir" => ag.abrir(texto_de(args, "caminho")?).map(|v| texto(&v)),
-        "cad_salvar" => ag.salvar(texto_opcional(args, "caminho"), args.get("sobrescrever").and_then(Value::as_bool).unwrap_or(false)).map(|v| texto(&v)),
+        "cad_salvar" => ag.salvar(texto_opcional(args, "caminho"), args.get("sobrescrever").and_then(Value::as_bool).unwrap_or(false), args.get("verificar_checklist").and_then(Value::as_bool).unwrap_or(false), texto_opcional(args, "dominio")).map(|v| texto(&v)),
         "cad_converter" => converter(texto_de(args, "origem")?, texto_de(args, "destino")?, args.get("sobrescrever").and_then(Value::as_bool).unwrap_or(false)).map(|v| texto(&v)),
         "cad_resumo" => Ok(texto(&resumo(ag))),
+        "cad_exemplos" => crate::exemplos::exemplos(args).map(|v| texto(&v)),
         "cad_simbolos" => Ok(texto(&listar())),
         "cad_componentes" => Ok(texto(&crate::componentes::listar(args))),
         "cad_ver" => ver(ag, fonte, args),

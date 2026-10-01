@@ -55,7 +55,7 @@ export function guardarPintarEmSegundoPlano(ligado: boolean): void {
 
 /** O texto real é desenhado também durante o zoom e o pan? Padrão: não (vira traço até o movimento parar). */
 export function textoNoMovimento(): boolean {
-  return ler('textoNoMovimento') === '1';
+  return ler('textoNoMovimento') !== '0';
 }
 
 export function guardarTextoNoMovimento(ligado: boolean): void {

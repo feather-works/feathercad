@@ -20,7 +20,7 @@ pub const ESCALAS: [(f64, &str); 7] = [(0.25, "0,25×"), (0.5, "0,5×"), (0.75, 
 /// O nome é um padrão da biblioteca (ou a sólida)? Devolve o nome canônico.
 pub fn reconhecer(nome: &str) -> Option<&'static str> {
     let n = nome.trim();
-    if n.eq_ignore_ascii_case(SOLIDA) {
+    if n.eq_ignore_ascii_case(SOLIDA) || n.eq_ignore_ascii_case("solida") || n.eq_ignore_ascii_case("sólida") || n.eq_ignore_ascii_case("solid") {
         return Some(SOLIDA);
     }
     NOMES.iter().copied().find(|c| c.eq_ignore_ascii_case(n))

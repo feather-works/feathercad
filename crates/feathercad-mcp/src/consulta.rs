@@ -221,7 +221,139 @@ pub fn regioes(d: &Documento, args: &Value) -> Res<Value> {
     Ok(json!({ "total": todas.len(), "retornadas": lista.len(), "regioes": lista }))
 }
 
-/// Erros de desenho comuns: comprimento zero, duplicadas, extremidades que **quase** se tocam.
+fn checklist_eletrica(d: &Documento) -> Vec<Value> {
+    let mut itens = Vec::new();
+    let tem_qdc = d.entidades().iter().any(|e| {
+        if let feathercad_core::documento::Geometria::Texto { conteudo, .. } = &e.geometria {
+            let u = conteudo.to_uppercase();
+            u.contains("QDC") || u.contains("QUADRO")
+        } else if let feathercad_core::documento::Geometria::Insercao { bloco, .. } = &e.geometria {
+            let u = d.blocos().get(*bloco).map(|b| b.nome.to_uppercase()).unwrap_or_default();
+            u.contains("QUADRO") || u.contains("QDC")
+        } else {
+            false
+        }
+    });
+    itens.push(json!({
+        "item": "Quadro de Distribuição (QDC)",
+        "passou": tem_qdc,
+        "detalhes": if tem_qdc { "Quadro de distribuição/QDC identificado no desenho." } else { "Falta incluir ao menos um Quadro de Distribuição (QDC)." }
+    }));
+
+    let tem_luz = d.entidades().iter().any(|e| {
+        let cname = d.camadas().get(e.camada).map(|c| c.nome.to_uppercase()).unwrap_or_default();
+        cname.contains("ELE") || cname.contains("LUZ") || matches!(e.geometria, feathercad_core::documento::Geometria::Circulo { .. })
+    });
+    itens.push(json!({
+        "item": "Pontos de Iluminação",
+        "passou": tem_luz,
+        "detalhes": if tem_luz { "Pontos de iluminação presentes no desenho." } else { "Falta incluir pontos de iluminação na camada ELE_PONTOS." }
+    }));
+
+    let tem_eletrodutos = d.entidades().iter().any(|e| {
+        let cname = d.camadas().get(e.camada).map(|c| c.nome.to_uppercase()).unwrap_or_default();
+        cname.contains("ELETRODUTO") || cname.contains("ELE")
+    });
+    itens.push(json!({
+        "item": "Traçado de Eletrodutos",
+        "passou": tem_eletrodutos,
+        "detalhes": if tem_eletrodutos { "Eletrodutos e tubulações identificadas." } else { "Falta traçado de eletrodutos interligando os pontos." }
+    }));
+    itens
+}
+
+fn checklist_arquitetura(d: &Documento) -> Vec<Value> {
+    let mut itens = Vec::new();
+    let tem_paredes = d.entidades().iter().any(|e| {
+        let cname = d.camadas().get(e.camada).map(|c| c.nome.to_uppercase()).unwrap_or_default();
+        cname.contains("PAREDE") || cname.contains("ARQ")
+    });
+    itens.push(json!({
+        "item": "Alvenaria e Paredes",
+        "passou": tem_paredes,
+        "detalhes": if tem_paredes { "Camadas de alvenaria/paredes presentes." } else { "Falta alvenaria/paredes na camada ARQ_PAREDES." }
+    }));
+
+    let tem_niveis = d.entidades().iter().any(|e| {
+        if let feathercad_core::documento::Geometria::Texto { conteudo, .. } = &e.geometria {
+            let u = conteudo.to_uppercase();
+            u.contains("N.P.") || u.contains("N.A.") || u.contains("Z:") || u.contains("NÍVEL")
+        } else {
+            false
+        }
+    });
+    itens.push(json!({
+        "item": "Indicação de Níveis (Z) e Cotas",
+        "passou": tem_niveis,
+        "detalhes": if tem_niveis { "Indicação de níveis Z / cotas identificada." } else { "Falta indicação de níveis Z (N.P. / N.A.) em COTAS_TEXTOS." }
+    }));
+
+    let tem_folha = d.folha_campos(0).is_ok() || d.entidades().iter().any(|e| {
+        if let feathercad_core::documento::Geometria::Texto { conteudo, .. } = &e.geometria {
+            let u = conteudo.to_uppercase();
+            u.contains("PRANCHETA") || u.contains("FOLHA") || u.contains("ESCALA")
+        } else {
+            false
+        }
+    });
+    itens.push(json!({
+        "item": "Prancheta / Folha de Projeto",
+        "passou": tem_folha,
+        "detalhes": if tem_folha { "Folha/Prancheta de projeto identificada." } else { "Falta inserir ao menos uma Folha/Prancheta (cad_folha)." }
+    }));
+    itens
+}
+
+fn checklist_hidraulica(d: &Documento) -> Vec<Value> {
+    let mut itens = Vec::new();
+    let tem_caixa = d.entidades().iter().any(|e| {
+        if let feathercad_core::documento::Geometria::Texto { conteudo, .. } = &e.geometria {
+            let u = conteudo.to_uppercase();
+            u.contains("RESERVATÓRIO") || u.contains("CAIXA") || u.contains("AF-1")
+        } else {
+            false
+        }
+    });
+    itens.push(json!({
+        "item": "Reservatório / Caixa d'Água",
+        "passou": tem_caixa,
+        "detalhes": if tem_caixa { "Reservatório/caixa d'água identificado." } else { "Falta incluir o reservatório de água fria." }
+    }));
+
+    let tem_esgoto = d.entidades().iter().any(|e| {
+        let cname = d.camadas().get(e.camada).map(|c| c.nome.to_uppercase()).unwrap_or_default();
+        cname.contains("ESGOTO") || cname.contains("HID")
+    });
+    itens.push(json!({
+        "item": "Instalações de Esgoto e Caixas (CG/CI/CS)",
+        "passou": tem_esgoto,
+        "detalhes": if tem_esgoto { "Caixas e rede de esgoto presentes." } else { "Falta rede de esgoto e caixas sifonadas/gordura." }
+    }));
+    itens
+}
+
+/// Validação de checklist de requisitos mínimos por domínio (eletrica, arquitetura, hidraulica).
+pub fn checklist_do_dominio(d: &Documento, dom: &str) -> Value {
+    let dom_str = dom.to_lowercase();
+    let itens = match dom_str.as_str() {
+        "eletrica" | "elétrica" => checklist_eletrica(d),
+        "arquitetura" => checklist_arquitetura(d),
+        "hidraulica" | "hidráulica" => checklist_hidraulica(d),
+        _ => {
+            let tem_entidades = !d.entidades().is_empty();
+            vec![json!({
+                "item": "Entidades de Desenho",
+                "passou": tem_entidades,
+                "detalhes": if tem_entidades { "Desenho possui entidades." } else { "O desenho está em branco." }
+            })]
+        }
+    };
+
+    let tudo_ok = itens.iter().all(|i| i["passou"].as_bool().unwrap_or(false));
+    json!({ "dominio": dom, "aprovado": tudo_ok, "checklist": itens })
+}
+
+/// Erros de desenho comuns: comprimento zero, duplicadas, extremidades que **quase** se tocam e checklist de domínio.
 pub fn verificar(d: &Documento, args: &Value) -> Value {
     let diag = d.caixa().map_or(1.0, |(a, b)| a.distancia(b).max(1e-9));
     let tol = numero_opcional(args, "tolerancia").unwrap_or(diag * 0.002);
@@ -230,7 +362,11 @@ pub fn verificar(d: &Documento, args: &Value) -> Value {
     if d.entidades().len() <= 3000 {
         folgas(d, tol, &mut problemas);
     }
-    json!({ "ok": problemas.is_empty(), "tolerancia_usada": arred(tol), "problemas": problemas, "nota": "folga = extremidade que fica perto de outra forma sem tocar; dentro da tolerância, provavelmente era para fechar" })
+    let mut res = json!({ "ok": problemas.is_empty(), "tolerancia_usada": arred(tol), "problemas": problemas, "nota": "folga = extremidade que fica perto de outra forma sem tocar; dentro da tolerância, provavelmente era para fechar" });
+    if let Some(dom) = texto_opcional(args, "dominio") {
+        res["checklist_dominio"] = checklist_do_dominio(d, dom);
+    }
+    res
 }
 
 fn zeros_e_duplicadas(d: &Documento, fora: &mut Vec<Value>) {

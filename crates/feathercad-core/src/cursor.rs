@@ -65,7 +65,7 @@ fn orto_e_grade(base: Option<Ponto>, bruto: Ponto, aj: &Ajudas) -> (Ponto, Vec<G
         };
         let (seno, cosseno) = travada.sin_cos();
         let comprimento = dx * cosseno + dy * seno;
-        p = Ponto::novo(b.x + comprimento * cosseno, b.y + comprimento * seno);
+        p = Ponto::novo3d(b.x + comprimento * cosseno, b.y + comprimento * seno, b.z);
         // Nos eixos, o valor exato (sem resto de ponto flutuante); fora deles, nenhum eixo fica livre para a grade.
         let no_eixo_x = seno.abs() < 1e-9;
         let no_eixo_y = cosseno.abs() < 1e-9;

@@ -40,13 +40,15 @@ impl Escopo {
         }
     }
 
-    /// Muda a variável onde ela já existe; se não existe, cria na camada de cima.
+    /// Muda a variável onde ela já existe; se não existe, cria na camada externa apropriada (para acumulação em laços).
     pub fn atribuir(&mut self, nome: &str, valor: Value) {
-        match self.camadas.iter_mut().rev().find(|c| c.contains_key(nome)) {
-            Some(c) => {
-                c.insert(nome.to_string(), valor);
-            }
-            None => self.declarar(nome, valor),
+        if let Some(c) = self.camadas.iter_mut().rev().find(|c| c.contains_key(nome)) {
+            c.insert(nome.to_string(), valor);
+        } else if self.camadas.len() > 1 {
+            let idx = self.camadas.len() - 2;
+            self.camadas[idx].insert(nome.to_string(), valor);
+        } else {
+            self.declarar(nome, valor);
         }
     }
 
@@ -339,9 +341,23 @@ fn analisar(fonte: &str) -> Res<Ex> {
 
 // ---------------------------------------------------------------- conta
 
-/// Aritmética com número ou lista de números (elemento a elemento; número com lista espalha).
+fn eh_lista_de_listas(a: &[Value]) -> bool {
+    !a.is_empty() && a.iter().all(|v| matches!(v, Value::Array(_)))
+}
+
+fn eh_lista_de_numeros(a: &[Value]) -> bool {
+    !a.is_empty() && a.iter().all(Value::is_number)
+}
+
+/// Aritmética com número ou lista de números (elemento a elemento; número com lista espalha; vetor desloca lista de pontos).
 fn aritmetica(a: &Value, b: &Value, f: fn(f64, f64) -> Res<f64>) -> Res<Value> {
     match (a, b) {
+        (Value::Array(x), Value::Array(y)) if eh_lista_de_listas(x) && eh_lista_de_numeros(y) => {
+            x.iter().map(|p| aritmetica(p, b, f)).collect::<Res<Vec<_>>>().map(Value::Array)
+        }
+        (Value::Array(x), Value::Array(y)) if eh_lista_de_numeros(x) && eh_lista_de_listas(y) => {
+            y.iter().map(|q| aritmetica(a, q, f)).collect::<Res<Vec<_>>>().map(Value::Array)
+        }
         (Value::Array(x), Value::Array(y)) if x.len() == y.len() => x.iter().zip(y).map(|(p, q)| aritmetica(p, q, f)).collect::<Res<Vec<_>>>().map(Value::Array),
         (Value::Array(x), Value::Array(y)) => Err(format!("listas de tamanhos diferentes ({} e {})", x.len(), y.len())),
         (Value::Array(x), n) => x.iter().map(|p| aritmetica(p, n, f)).collect::<Res<Vec<_>>>().map(Value::Array),

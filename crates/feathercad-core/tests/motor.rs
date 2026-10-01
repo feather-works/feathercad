@@ -357,9 +357,9 @@ use feathercad_core::geom::Transf;
 
 /// Um bloco "cruz" de 2×2 com a base no centro, mais um bloco "par" que insere duas cruzes.
 fn doc_com_blocos() -> Documento {
-    let linha = |a: Ponto, b: Ponto| NovaEntidade { camada: 0, cor: None, geometria: Geo::Linha { a, b }, props: Default::default() };
+    let linha = |a: Ponto, b: Ponto| NovaEntidade { camada: 0, cor: None, geometria: Geo::Linha { a, b }, props: Default::default(), espaco: feathercad_core::documento::Espaco::Modelo };
     let cruz = Bloco { nome: "Cruz".into(), base: p(0.0, 0.0), entidades: vec![linha(p(-1.0, 0.0), p(1.0, 0.0)), linha(p(0.0, -1.0), p(0.0, 1.0))] };
-    let insere = |bloco, x, y, sx, rot| NovaEntidade { camada: 0, cor: None, geometria: Geo::Insercao { bloco, ponto: p(x, y), escala_x: sx, escala_y: sx, rotacao: rot }, props: Default::default() };
+    let insere = |bloco, x, y, sx, rot| NovaEntidade { camada: 0, cor: None, geometria: Geo::Insercao { bloco, ponto: p(x, y), escala_x: sx, escala_y: sx, rotacao: rot }, props: Default::default(), espaco: feathercad_core::documento::Espaco::Modelo };
     let par = Bloco { nome: "Par".into(), base: p(0.0, 0.0), entidades: vec![insere(0, 10.0, 0.0, 1.0, 0.0), insere(0, -10.0, 0.0, 1.0, 0.0)] };
     Documento::de_partes_com_blocos(vec![Camada { ligada: true, ..Camada::nova("0", 0xFF_00_00) }], 0, vec![cruz, par], Vec::new())
 }
@@ -401,9 +401,9 @@ fn insercao_com_bloco_dentro_de_si_mesmo_para_no_limite_e_bloco_inexistente_nao_
             nome: "Louco".into(),
             base: p(0.0, 0.0),
             entidades: vec![
-                NovaEntidade { camada: 0, cor: None, geometria: Geo::Linha { a: p(0.0, 0.0), b: p(1.0, 0.0) }, props: Default::default() },
-                NovaEntidade { camada: 0, cor: None, geometria: Geo::Insercao { bloco: 0, ponto: p(1.0, 0.0), escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default() },
-                NovaEntidade { camada: 0, cor: None, geometria: Geo::Insercao { bloco: 99, ponto: p(0.0, 0.0), escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default() },
+                NovaEntidade { camada: 0, cor: None, geometria: Geo::Linha { a: p(0.0, 0.0), b: p(1.0, 0.0) }, props: Default::default(), espaco: feathercad_core::documento::Espaco::Modelo },
+                NovaEntidade { camada: 0, cor: None, geometria: Geo::Insercao { bloco: 0, ponto: p(1.0, 0.0), escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default(), espaco: feathercad_core::documento::Espaco::Modelo },
+                NovaEntidade { camada: 0, cor: None, geometria: Geo::Insercao { bloco: 99, ponto: p(0.0, 0.0), escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default(), espaco: feathercad_core::documento::Espaco::Modelo },
             ],
         }],
         Vec::new(),
@@ -464,3 +464,71 @@ fn orto_com_passo_de_angulo_trava_nos_multiplos() {
     let p = com(0.0, 10.0, 1.0);
     assert!(p.y == 0.0);
 }
+
+#[test]
+fn vista_3d_mantem_centro_na_tela() {
+    let mut v = Vista::inicial(800.0, 600.0);
+    v.centro = p(500.0, 300.0);
+    // Em 2D: o centro fica no meio da tela
+    let (cx2d, cy2d) = v.para_tela(v.centro);
+    assert!((cx2d - 400.0).abs() < 1e-9 && (cy2d - 300.0).abs() < 1e-9);
+
+    // Ao ir para 3D (ex: Isométrica 60°, 45°):
+    v.rotacao_x = 60.0;
+    v.rotacao_z = 45.0;
+    let (cx3d, cy3d) = v.para_tela(v.centro);
+    assert!((cx3d - 400.0).abs() < 1e-9, "centro X deve permanecer em 400, deu {cx3d}");
+    assert!((cy3d - 300.0).abs() < 1e-9, "centro Y deve permanecer em 300, deu {cy3d}");
+}
+
+#[test]
+fn vista_3d_pan_e_zoom_mantem_consistencia() {
+    let mut v = Vista::inicial(800.0, 600.0);
+    v.centro = p(120.0, 80.0);
+    v.rotacao_x = 45.0;
+    v.rotacao_z = 30.0;
+    v.escala = 2.5;
+
+    // Pan
+    let (x1, y1) = v.para_tela(p(120.0, 80.0));
+    let deslocada = v.deslocar(40.0, -25.0);
+    let (x2, y2) = deslocada.para_tela(p(120.0, 80.0));
+    assert!((x2 - (x1 + 40.0)).abs() < 1e-6, "pan X na tela");
+    assert!((y2 - (y1 - 25.0)).abs() < 1e-6, "pan Y na tela");
+
+    // Zoom mantém ponto sob cursor
+    let ponto_antes = v.para_mundo(300.0, 250.0);
+    let com_zoom = v.zoom(300.0, 250.0, 2.0);
+    let ponto_depois = com_zoom.para_mundo(300.0, 250.0);
+    assert!(ponto_antes.distancia_3d(ponto_depois) < 1e-6, "zoom 3D mantém ponto sob o mouse");
+}
+
+#[test]
+fn vista_3d_movimento_em_planos_laterais() {
+    let mut v = Vista::inicial(800.0, 600.0);
+    v.centro = p(100.0, 200.0);
+    // Visão lateral: rx = 90°, rz = 90° (profundidade é o eixo X, tela mostra o plano ZY)
+    v.rotacao_x = 90.0;
+    v.rotacao_z = 90.0;
+
+    let p_meio = v.para_mundo(400.0, 300.0);
+    assert!((p_meio.x - 100.0).abs() < 1e-6, "X é profundidade fixa");
+    assert!((p_meio.y - 200.0).abs() < 1e-6, "Y no centro");
+    assert!((p_meio.z - 0.0).abs() < 1e-6, "Z no centro");
+
+    // Mover mouse para cima na tela: Z deve subir livremente!
+    let p_cima = v.para_mundo(400.0, 200.0);
+    assert!(p_cima.z > p_meio.z + 50.0, "mover mouse para cima deve aumentar Z");
+    assert!((p_cima.x - 100.0).abs() < 1e-6, "X continua no plano de profundidade");
+
+    // Mover mouse para a direita na tela: Y deve se mover livremente!
+    let p_dir = v.para_mundo(500.0, 300.0);
+    assert!(p_dir.y > p_meio.y + 50.0, "mover mouse para direita deve mudar Y");
+    assert!((p_dir.x - 100.0).abs() < 1e-6, "X continua no plano de profundidade");
+
+    // Testar com referência (base)
+    let base = Ponto::novo3d(50.0, 150.0, 30.0);
+    let p_com_base = v.para_mundo_em_z_com_ref(400.0, 300.0, base.z, Some(base));
+    assert!((p_com_base.x - 50.0).abs() < 1e-6, "plano segue a base em X");
+}
+

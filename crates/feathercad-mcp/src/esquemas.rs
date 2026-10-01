@@ -30,8 +30,8 @@ fn filtros() -> Value {
 fn de_arquivo() -> Vec<Value> {
     vec![
         def("cad_novo", "Começa um desenho em branco (descarta o atual). Sempre pergunte/escolha a unidade: as coordenadas são números puros e a unidade diz o que eles significam. Convenção: X para a direita, Y para cima, ângulos em graus anti-horário a partir do eixo X.", &json!({ "unidade": { "type": "string", "enum": ["mm", "cm", "m"] } }), &["unidade"]),
-        def("cad_abrir", "Abre um arquivo `.dxf`, `.fcdz` ou `.fct` (formato compacto) do disco no lugar do desenho atual. Devolve avisos do que não foi possível ler.", &json!({ "caminho": { "type": "string" } }), &["caminho"]),
-        def("cad_salvar", "Grava o desenho em `.dxf`, `.fcdz` ou `.fct` (pela extensão). Sem `caminho`, grava onde foi aberto. Não sobrescreve arquivo existente sem `sobrescrever: true`.", &json!({ "caminho": { "type": "string" }, "sobrescrever": { "type": "boolean" } }), &[]),
+        def("cad_abrir", "Abre um arquivo `.dxf`, `.fcdz`, `.fct` (formato compacto) ou nuvem de pontos (`.xyz`, `.pts`, `.csv`, `.txt`) do disco no lugar do desenho atual. Nuvens de pontos são automaticamente convertidas em levantamento topográfico completo com curvas de nível e TIN. Devolve avisos do que não foi possível ler.", &json!({ "caminho": { "type": "string" } }), &["caminho"]),
+        def("cad_salvar", "Grava o desenho em `.dxf`, `.fcdz` ou `.fct` (pela extensão). Sem `caminho`, grava onde foi aberto. Não sobrescreve arquivo existente sem `sobrescrever: true`. Com `verificar_checklist: true` ou `dominio: \"eletrica\"|\"arquitetura\"|\"hidraulica\"`, valida os requisitos mínimos do domínio antes de salvar e BLOQUEIA se houverem pendências.", &json!({ "caminho": { "type": "string" }, "sobrescrever": { "type": "boolean" }, "verificar_checklist": { "type": "boolean" }, "dominio": { "type": "string", "enum": ["eletrica", "arquitetura", "hidraulica", "geral"] } }), &[]),
         def("cad_converter", "Converte um arquivo em outro **sem** passar pelo desenho aberto nem gastar tokens: DXF/FCDZ → `.fct` (texto compacto, muito menor) e o contrário. Devolve os tamanhos antes e depois.", &json!({ "origem": { "type": "string" }, "destino": { "type": "string" }, "sobrescrever": { "type": "boolean" } }), &["origem", "destino"]),
         def("cad_pdf", "Grava o desenho em PDF VETORIAL (zoom sem perder nitidez; linha fina em fio de cabelo), uma página por folha (blocos `FOLHA-n` de cad_folha e retângulos fechados da camada FOLHA; sem folha, o desenho inteiro). `papel` A4, A3 (padrão), A2, A1, A0, 2A0, 4A0, 8A0, 16A0 ou FOLHA (tamanho da folha, 1 unidade = 1 mm); `orientacao` automatica|horizontal|vertical; `cores` true mantém as cores da tela (senão preto sobre branco); `folhas` [índices] escolhe páginas; não sobrescreve sem `sobrescrever: true`.", &json!({ "caminho": { "type": "string" }, "papel": { "type": "string" }, "orientacao": { "type": "string", "enum": ["automatica", "horizontal", "vertical"] }, "cores": { "type": "boolean" }, "folhas": { "type": "array", "items": { "type": "integer" } }, "sobrescrever": { "type": "boolean" } }), &["caminho"]),
         def("cad_resumo", "Visão geral barata (comece por aqui): unidade, extensão (caixa do desenho), quantas entidades por tipo e por camada, camadas, arquivo, se há alterações não salvas.", &json!({}), &[]),
@@ -46,7 +46,10 @@ fn de_consulta() -> Vec<Value> {
         "largura": { "type": "integer", "description": "largura da imagem em pixels (300 a 2400; padrão 1000)" },
         "rotulos": { "type": "boolean", "description": "escreve o #id de cada entidade ao lado dela (padrão sim)" },
         "grade": { "type": "boolean", "description": "grade com números nas bordas (padrão sim)" },
-        "destacar": { "type": "array", "items": { "type": "integer" }, "description": "ids a realçar em azul" }
+        "destacar": { "type": "array", "items": { "type": "integer" }, "description": "ids a realçar em azul" },
+        "isometria": { "type": "boolean", "description": "renderiza em perspectiva isométrica 3D (rotacao_x=55, rotacao_z=45 por padrão)" },
+        "rotacao_x": { "type": "number", "description": "inclinação vertical da câmera 3D em graus (0 = topo 2D, 55 = isométrica, 90 = perfil lateral)" },
+        "rotacao_z": { "type": "number", "description": "órbita horizontal da câmera 3D em graus (0 = norte para cima, 45 = sudoeste-nordeste)" }
     });
     let perto = json!({ "type": "object", "properties": { "ponto": pt(), "raio": { "type": "number" } }, "required": ["ponto", "raio"], "description": "só o que está a até `raio` do ponto (traz `distancia` e `direcao_do_ponto`)" });
     let mut ent = filtros();
@@ -61,7 +64,8 @@ fn de_consulta() -> Vec<Value> {
         def("cad_importar", "Cria formas a partir de texto compacto (o mesmo de `cad_exportar`). Uma chamada = um passo de desfazer. Com `substituir: true`, apaga o desenho antes. Erros dizem a linha.", &json!({ "texto": { "type": "string" }, "substituir": { "type": "boolean" } }), &["texto"]),
         def("cad_medir", "Medições exatas. `{de, para}` (cada um ponto [x,y] ou {id}) → distância, dx, dy, ângulo; entre entidades, a distância mínima. `{pontos:[…]}` → área e perímetro do polígono. `{vertice, a, b}` → ângulo entre as duas direções.", &json!({ "de": {}, "para": {}, "pontos": { "type": "array", "items": pt() }, "vertice": pt(), "a": pt(), "b": pt() }), &[]),
         def("cad_regioes", "As áreas FECHADAS que os traços formam (salas, peças), com área, perímetro, centro e os textos que caem dentro; `area_util` já desconta vãos. Com `ponto`, só a que contém o ponto (o que uma hachura preencheria). Se uma região esperada não aparece, há abertura no contorno: use cad_verificar.", &json!({ "ponto": pt(), "limite": { "type": "integer" } }), &[]),
-        def("cad_verificar", "Procura defeitos: entidades de comprimento zero, duplicadas e FOLGAS (extremidade que quase toca outra forma sem tocar). Rode depois de desenhar contornos que deveriam fechar.", &json!({ "tolerancia": { "type": "number", "description": "distância máxima que conta como folga (padrão 0,2% da diagonal do desenho)" } }), &[]),
+        def("cad_verificar", "Procura defeitos: entidades de comprimento zero, duplicadas e FOLGAS (extremidade que quase toca outra forma sem tocar). Com `dominio: \"eletrica\"|\"arquitetura\"|\"hidraulica\"`, roda também o CHECKLIST de requisitos mínimos de construção.", &json!({ "tolerancia": { "type": "number", "description": "distância máxima que conta como folga (padrão 0,2% da diagonal do desenho)" }, "dominio": { "type": "string", "enum": ["eletrica", "arquitetura", "hidraulica", "geral"] } }), &[]),
+        def("cad_exemplos", "MODELOS E EXEMPLOS DE PROJETOS — devolve modelos de referência para dar contexto sobre como estruturar projetos (arquitetura, elétrica, hidráulica, estrutural, ferrovia, mecânica). Sem `nome`, lista os modelos disponíveis; com `nome` (ex.: 'arquitetura', 'eletrica', 'ferrovia'), devolve a especificação técnica de camadas ACI, folhas e o código em `cad_lote`.", &json!({ "nome": { "type": "string" } }), &[]),
     ]
 }
 
@@ -146,6 +150,29 @@ fn de_lote() -> Vec<Value> {
     vec![def("cad_lote", "Executa MUITAS ferramentas numa chamada só, com DADOS e LAÇOS feitos pelo servidor (você manda os dados uma vez e o molde uma vez; não repita chamadas). Tudo ou nada: se um passo falha, nada é aplicado e o erro diz o passo e a volta (`passo [2].faca(volta 4)[0]: …`); se dá certo, é UM passo de desfazer. Passos: {ferramenta:\"cad_simbolo\", argumentos:{…}, guardar:\"nome\"} chama qualquer ferramenta (menos cad_ver/cad_novo/cad_abrir/cad_desfazer/cad_lote); {definir:\"x\", valor:\"=expr\"}; {para_cada:\"lista\" (nome de variável ou =expr), como:\"l\", indice:\"i\", faca:[…]}; {repetir:\"=n\", como:\"i\", faca:[…]}; {se:\"=cond\", entao:[…], senao:[…]}; {exigir:\"=cond\", mensagem:\"…\"} valida dados. Em qualquer valor de argumento: texto que começa com `=` é EXPRESSÃO e vira o valor (número, ponto, lista…); `${expr}` dentro de um texto é trocado pelo valor; `==` no começo escreve um `=` literal. Expressões: + - * / %, comparações, && || !, c ? a : b, índice l[0] (negativo = do fim), campo c.nome, lista [x, y]; contas com listas de números valem elemento a elemento ([1,2]+[10,20], [3,4]*2), então pontos se somam; + com texto junta. Funções: abs min max soma media arredondar(x,casas) piso teto raiz potencia sen cos tan atan2 (graus) dist(a,b) angulo(a,b) ponto_polar(o,ang,d) ponto_medio comprimento(caminho) deslocar(caminho,d) (paralela à esquerda; d<0 direita) intervalo(n) tamanho texto numero virgula(x,casas) se(c,a,b) juntar contem inverter soma_campo(lista,\"campo\") onde(lista,\"campo\",valor). Exemplo: {dados:{X:300,luzes:[[250,200,\"a\"]]}, passos:[{para_cada:\"luzes\", como:\"l\", faca:[{ferramenta:\"cad_simbolo\", argumentos:{nome:\"ponto_luz_teto\", ponto:\"=[X + l[0], l[1]]\", comando:\"=l[2]\", circuito:1}}]}]}. Devolve chamadas, voltas, entidades_novas e as variáveis pedidas em `retornar`. Limites: 50 mil chamadas, 200 mil voltas, 16 níveis. Gravar arquivo (cad_salvar) não é desfeito se um passo posterior falhar: deixe por último.", &props, &["passos"])]
 }
 
+/// Topografia: nuvem de pontos, triangulação Delaunay (TIN), curvas de nível e levantamento topográfico.
+fn de_topografia() -> Vec<Value> {
+    let topo = json!({
+        "caminho": { "type": "string", "description": "caminho do arquivo de pontos (.xyz, .pts, .csv, .txt)" },
+        "texto": { "type": "string", "description": "conteúdo de texto com os pontos (E,N,Z ou X,Y,Z delimitado por vírgula, ponto-e-vírgula, tab ou espaço)" },
+        "equidistancia": { "type": "number", "description": "intervalo de cota entre curvas de nível em metros (ex.: 1.0 ou 0.5; calcula automático se omitido)" },
+        "passo_mestra": { "type": "integer", "description": "a cada quantas curvas uma é mestra com espessura maior e cota inteira (padrão 5)" },
+        "max_aresta": { "type": "number", "description": "comprimento máximo da aresta da malha TIN em metros (remove triângulos espúrios nas bordas côncavas)" },
+        "incluir_tin": { "type": "boolean", "description": "gera a malha triangular TIN na camada TOPOGRAFIA_TIN (padrão true)" },
+        "incluir_pontos": { "type": "boolean", "description": "insere marcadores em forma de cruz para cada ponto na camada TOPOGRAFIA_PONTOS (padrão true)" },
+        "rotular_pontos": { "type": "boolean", "description": "insere textos com a cota Z de cada ponto na camada TOPOGRAFIA_ROTULOS (padrão true)" },
+        "incluir_quadro": { "type": "boolean", "description": "insere quadro com dados estatísticos e resumo do levantamento na camada TOPOGRAFIA_QUADRO (padrão true)" }
+    });
+    vec![
+        def(
+            "cad_topografia",
+            "TOPOGRAFIA — processa nuvem de pontos (.xyz, .pts, .csv, .txt) e gera automaticamente o levantamento topográfico completo: malha triangular TIN (Delaunay 2D), curvas de nível mestras e secundárias interpoladas e suavizadas, borda externa do terreno, pontos cotados com elevação Z e quadro de resumo estatístico. Cria camadas padronizadas (TOPOGRAFIA_CURVAS_MESTRAS, TOPOGRAFIA_CURVAS_SECUNDARIAS, TOPOGRAFIA_TIN, TOPOGRAFIA_PONTOS, TOPOGRAFIA_ROTULOS, TOPOGRAFIA_BORDA, TOPOGRAFIA_QUADRO) em um único passo que pode ser desfeito com Ctrl+Z.",
+            &topo,
+            &[]
+        ),
+    ]
+}
+
 /// Todas as ferramentas, na ordem em que aparecem para a IA.
 pub fn todas() -> Value {
     let mut v = de_arquivo();
@@ -153,5 +180,6 @@ pub fn todas() -> Value {
     v.extend(de_edicao());
     v.extend(de_lote());
     v.extend(de_eletrica());
+    v.extend(de_topografia());
     Value::Array(v)
 }

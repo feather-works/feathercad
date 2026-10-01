@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use feathercad_core::documento::{AlinhaH, AlinhaV, Bloco, Camada, Documento, Geometria, LinhaDePadrao, NovaEntidade, Propriedades, TipoLinha, Unidade};
+use feathercad_core::documento::{AlinhaH, AlinhaV, Bloco, Camada, Documento, Espaco, Geometria, LinhaDePadrao, NovaEntidade, Propriedades, TipoLinha, Unidade};
 use feathercad_core::geom::{normalizar_graus, Ponto, Vertice};
 use feathercad_core::sessao::Mensagem;
 
@@ -60,8 +60,12 @@ fn objetos(texto: &str) -> Result<Vec<Objeto<'_>>, String> {
     Ok(lista)
 }
 
+fn ponto_3d(o: &Objeto<'_>, x: i32, y: i32, z: i32) -> Option<Ponto> {
+    Some(Ponto::novo3d(o.numero(x)?, o.numero(y)?, o.numero(z).unwrap_or(0.0)))
+}
+
 fn ponto(o: &Objeto<'_>, x: i32, y: i32) -> Option<Ponto> {
-    Some(Ponto::novo(o.numero(x)?, o.numero(y)?))
+    ponto_3d(o, x, y, x + 20)
 }
 
 /// A cor da entidade: `None` = `PorCamada`/`PorBloco`. A cor verdadeira (420) ganha do ACI.
@@ -109,6 +113,8 @@ impl Camadas {
         // Cor negativa = camada desligada.
         let i = self.indice(&decodificar_u(nome), cor, aci >= 0);
         let c = &mut self.lista[i];
+        c.cor = cor;
+        c.ligada = aci >= 0;
         c.congelada = congelada;
         c.bloqueada = (o.numero(70).unwrap_or(0.0) as i32) & 4 != 0;
         c.plotar = o.numero(290) != Some(0.0);
@@ -122,11 +128,19 @@ impl Camadas {
     }
 }
 
+fn espaco_do(o: &Objeto<'_>) -> Espaco {
+    if o.numero(67).is_some_and(|v| v as i32 == 1) {
+        Espaco::Layout("Layout 1".to_string())
+    } else {
+        Espaco::Modelo
+    }
+}
+
 /// Uma LINE do modelo, se estiver completa.
 fn linha(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
     let (a, b) = (ponto(o, 10, 20)?, ponto(o, 11, 21)?);
     let camada = camadas.indice(&decodificar_u(o.primeiro(8).unwrap_or("0")), 0xFF_FF_FF, true);
-    Some(NovaEntidade { camada, cor: cor_da_entidade(o), geometria: Geometria::Linha { a, b }, props: props_da(o) })
+    Some(NovaEntidade { camada, cor: cor_da_entidade(o), geometria: Geometria::Linha { a, b }, props: props_da(o), espaco: espaco_do(o) })
 }
 
 /// Cria a camada da entidade (ou acha a que já existe).
@@ -150,7 +164,7 @@ fn lwpolilinha(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
             _ => {}
         }
     }
-    (vertices.len() >= 2).then(|| NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Polilinha { vertices, fechada: fechada(o) }, props: props_da(o) })
+    (vertices.len() >= 2).then(|| NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Polilinha { vertices, fechada: fechada(o) }, props: props_da(o), espaco: espaco_do(o) })
 }
 
 /// Uma `POLYLINE` 2D (R12 e depois): os `VERTEX` que a seguem, até o `SEQEND`.
@@ -171,7 +185,7 @@ fn polilinha_pesada(objs: &[Objeto<'_>], i: usize, camadas: &mut Camadas) -> (Op
     if objs.get(i + 1 + consumidos).is_some_and(|f| f.tipo == "SEQEND") {
         consumidos += 1;
     }
-    let entidade = (vertices.len() >= 2).then(|| NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Polilinha { vertices, fechada: fechada(o) }, props: props_da(o) });
+    let entidade = (vertices.len() >= 2).then(|| NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Polilinha { vertices, fechada: fechada(o) }, props: props_da(o), espaco: espaco_do(o) });
     (entidade, consumidos)
 }
 
@@ -188,7 +202,7 @@ fn circulo(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
     if espelhado(o) {
         centro.x = -centro.x;
     }
-    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Circulo { centro, raio }, props: props_da(o) })
+    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Circulo { centro, raio }, props: props_da(o), espaco: espaco_do(o) })
 }
 
 /// Um `ARC` (ângulos em graus, anti-horário do `50` ao `51`).
@@ -201,7 +215,7 @@ fn arco(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
         (inicio, fim) = (180.0 - fim, 180.0 - inicio);
     }
     let (inicio, fim) = (normalizar_graus(inicio), normalizar_graus(fim));
-    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Arco { centro, raio, inicio, fim }, props: props_da(o) })
+    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Arco { centro, raio, inicio, fim }, props: props_da(o), espaco: espaco_do(o) })
 }
 
 /// Os alinhamentos do `TEXT` (`72` horizontal, `73` vertical).
@@ -232,12 +246,12 @@ fn texto(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
     Some(NovaEntidade {
         camada: camada_da(o, camadas),
         cor: cor_da_entidade(o),
-        geometria: Geometria::Texto { ponto, altura, rotacao: o.numero(50).unwrap_or(0.0), conteudo, h, v }, props: props_da(o) })
+        geometria: Geometria::Texto { ponto, altura, rotacao: o.numero(50).unwrap_or(0.0), conteudo, h, v }, props: props_da(o), espaco: espaco_do(o) })
 }
 
 /// Um `POINT`.
 fn ponto_solto(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
-    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Ponto { p: ponto(o, 10, 20)? }, props: props_da(o) })
+    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Ponto { p: ponto(o, 10, 20)? }, props: props_da(o), espaco: espaco_do(o) })
 }
 
 /// Os cantos `10/20`…`13/23` de um `SOLID`/`3DFACE` (o 4º pode faltar ou repetir o 3º).
@@ -259,16 +273,26 @@ fn solido(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
         c.swap(2, 3);
     }
     let laco = c.into_iter().map(|p| Vertice { p, bulge: 0.0 }).collect();
-    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Hachura { contornos: vec![laco], padrao: Vec::new(), nome: "SOLID".into() }, props: props_da(o) })
+    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Hachura { contornos: vec![laco], padrao: Vec::new(), nome: "SOLID".into() }, props: props_da(o), espaco: espaco_do(o) })
 }
 
-/// Um `3DFACE`: só o contorno, projetado no plano (Z some).
+/// Um `3DFACE`: polígono plano no espaço 3D.
 fn face3d(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
     let c = cantos(o);
-    (c.len() >= 3).then(|| NovaEntidade {
+    if c.len() < 3 {
+        return None;
+    }
+    let p1 = c[0];
+    let p2 = c[1];
+    let p3 = c[2];
+    let p4 = if c.len() >= 4 { c[3] } else { c[2] };
+    Some(NovaEntidade {
         camada: camada_da(o, camadas),
         cor: cor_da_entidade(o),
-        geometria: Geometria::Polilinha { vertices: c.into_iter().map(|p| Vertice { p, bulge: 0.0 }).collect(), fechada: true }, props: props_da(o) })
+        geometria: Geometria::Face3D { p1, p2, p3, p4 },
+        props: props_da(o),
+        espaco: espaco_do(o),
+    })
 }
 
 /// Uma `ELLIPSE`: centro, eixo maior (vetor), razão e parâmetros inicial/final em radianos; vira polilinha.
@@ -290,7 +314,7 @@ fn elipse(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
             Vertice { p: Ponto::novo(centro.x + eixo.x * c - razao * eixo.y * s, centro.y + eixo.y * c + razao * eixo.x * s), bulge: 0.0 }
         })
         .collect();
-    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Polilinha { vertices, fechada: completa }, props: props_da(o) })
+    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Polilinha { vertices, fechada: completa }, props: props_da(o), espaco: espaco_do(o) })
 }
 
 /// O ponto da B-spline (racional) em `u`, pelo algoritmo de de Boor. `pesos` = 1 se não racional.
@@ -350,7 +374,7 @@ fn spline(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
     Some(NovaEntidade {
         camada: camada_da(o, camadas),
         cor: cor_da_entidade(o),
-        geometria: Geometria::Polilinha { vertices: vertices.into_iter().map(|p| Vertice { p, bulge: 0.0 }).collect(), fechada }, props: props_da(o) })
+        geometria: Geometria::Polilinha { vertices: vertices.into_iter().map(|p| Vertice { p, bulge: 0.0 }).collect(), fechada }, props: props_da(o), espaco: espaco_do(o) })
 }
 
 /// Uma chamada de um `MULTILEADER`: linhas até o ponto de pouso e o pedaço horizontal (dogleg).
@@ -433,7 +457,7 @@ fn multileader(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<Vec<NovaEntidade
                 }
             }
             if traco.len() >= 2 {
-                feitas.push(NovaEntidade { camada, cor, geometria: Geometria::Polilinha { vertices: traco.into_iter().map(|p| Vertice { p, bulge: 0.0 }).collect(), fechada: false }, props: props_da(o) });
+                feitas.push(NovaEntidade { camada, cor, geometria: Geometria::Polilinha { vertices: traco.into_iter().map(|p| Vertice { p, bulge: 0.0 }).collect(), fechada: false }, props: props_da(o), espaco: espaco_do(o) });
             }
         }
     }
@@ -443,7 +467,7 @@ fn multileader(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<Vec<NovaEntidade
             feitas.push(NovaEntidade {
                 camada,
                 cor,
-                geometria: Geometria::Texto { ponto: Ponto::novo(x, y - i as f64 * passo), altura, rotacao: 0.0, conteudo, h: AlinhaH::Esquerda, v: AlinhaV::Meio }, props: props_da(o) });
+                geometria: Geometria::Texto { ponto: Ponto::novo(x, y - i as f64 * passo), altura, rotacao: 0.0, conteudo, h: AlinhaH::Esquerda, v: AlinhaV::Meio }, props: props_da(o), espaco: espaco_do(o) });
         }
     }
     (!feitas.is_empty()).then_some(feitas)
@@ -591,7 +615,7 @@ fn hachura(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
             padrao.push(LinhaDePadrao { angulo, base, dx, dy, tracos });
         }
     }
-    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Hachura { contornos, padrao, nome }, props: props_da(o) })
+    Some(NovaEntidade { camada: camada_da(o, camadas), cor: cor_da_entidade(o), geometria: Geometria::Hachura { contornos, padrao, nome }, props: props_da(o), espaco: espaco_do(o) })
 }
 
 /// Uma matriz de INSERT (`MINSERT`) tem no máximo tantas cópias (proteção contra arquivo absurdo).
@@ -683,7 +707,7 @@ fn mtext(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<Vec<NovaEntidade>> {
                 _ => i as f64,
             } * passo;
             let ponto = Ponto::novo(p.x + seno * abaixo, p.y - cosseno * abaixo);
-            NovaEntidade { camada, cor, geometria: Geometria::Texto { ponto, altura, rotacao, conteudo, h, v }, props: props_da(o) }
+            NovaEntidade { camada, cor, geometria: Geometria::Texto { ponto, altura, rotacao, conteudo, h, v }, props: props_da(o), espaco: espaco_do(o) }
         })
         .collect();
     Some(feitas)
@@ -744,7 +768,7 @@ fn tabela(o: &Objeto<'_>, l: &mut Leitura, nome: &str) -> Option<NovaEntidade> {
     let bloco = *l.blocos.get(&decodificar_u(nome).to_lowercase())?;
     let camada = camada_da(o, &mut l.camadas);
     let ponto = ponto(o, 10, 20).unwrap_or(Ponto::novo(0.0, 0.0));
-    Some(NovaEntidade { camada, cor: cor_da_entidade(o), geometria: Geometria::Insercao { bloco, ponto, escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: props_da(o) })
+    Some(NovaEntidade { camada, cor: cor_da_entidade(o), geometria: Geometria::Insercao { bloco, ponto, escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: props_da(o), espaco: espaco_do(o) })
 }
 
 /// O `INSERT` — ou, num `MINSERT` (`70` colunas × `71` linhas, espaços `44`/`45`), a matriz toda.
@@ -753,7 +777,7 @@ fn insercoes(o: &Objeto<'_>, l: &mut Leitura, nome: &str, cota: bool) -> Option<
     let camada = camada_da(o, &mut l.camadas);
     let cor = cor_da_entidade(o);
     if cota {
-        return Some(vec![NovaEntidade { camada, cor, geometria: Geometria::Insercao { bloco, ponto: Ponto::novo(0.0, 0.0), escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: props_da(o) }]);
+        return Some(vec![NovaEntidade { camada, cor, geometria: Geometria::Insercao { bloco, ponto: Ponto::novo(0.0, 0.0), escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: props_da(o), espaco: espaco_do(o) }]);
     }
     let base = ponto(o, 10, 20).unwrap_or(Ponto::novo(0.0, 0.0));
     let (escala_x, escala_y, rotacao) = (o.numero(41).unwrap_or(1.0), o.numero(42).unwrap_or(1.0), o.numero(50).unwrap_or(0.0));
@@ -769,7 +793,7 @@ fn insercoes(o: &Objeto<'_>, l: &mut Leitura, nome: &str, cota: bool) -> Option<
             // O deslocamento acompanha o giro do próprio INSERT.
             let (dx, dy) = (c as f64 * espaco_c, r as f64 * espaco_l);
             let ponto = Ponto::novo(base.x + dx * cosseno - dy * seno, base.y + dx * seno + dy * cosseno);
-            v.push(NovaEntidade { camada, cor, geometria: Geometria::Insercao { bloco, ponto, escala_x, escala_y, rotacao }, props: props_da(o) });
+            v.push(NovaEntidade { camada, cor, geometria: Geometria::Insercao { bloco, ponto, escala_x, escala_y, rotacao }, props: props_da(o), espaco: espaco_do(o) });
         }
     }
     Some(v)
@@ -827,10 +851,6 @@ fn ignorar(ig: &mut Ignorados, tipo: &str) {
 /// como ignorada. Devolve quantos objetos **seguintes** ela consumiu (os `VERTEX` de uma `POLYLINE`).
 fn entidade(objs: &[Objeto<'_>], i: usize, l: &mut Leitura, saida: &mut Vec<NovaEntidade>, dentro: bool) -> usize {
     let o = &objs[i];
-    if !dentro && o.numero(67).is_some_and(|v| v as i32 == 1) {
-        l.ignorados.papel += 1;
-        return if o.tipo == "POLYLINE" { polilinha_pesada(objs, i, &mut l.camadas).1 } else { 0 };
-    }
     let camadas = &mut l.camadas;
     let (feita, consumidos) = match o.tipo {
         "LINE" => (linha(o, camadas), 0),

@@ -3,6 +3,7 @@
 export interface Ponto {
   x: number;
   y: number;
+  z?: number;
 }
 
 /** A janela por onde se olha o desenho. Toda conta sobre ela é do Rust. */
@@ -25,6 +26,9 @@ export interface Vista {
   escala: number;
   largura: number;
   altura: number;
+  rotacao_x?: number;
+  rotacao_z?: number;
+  perspectiva?: boolean;
 }
 
 /** Texto para a interface traduzir: `chave` no arquivo de língua + `{variáveis}`. */
@@ -65,6 +69,28 @@ export interface RespostaDeMenu {
   itens: ItemDeMenu[];
 }
 
+export interface ViewportDados {
+  id: number;
+  centro_papel: Ponto;
+  largura_papel: number;
+  altura_papel: number;
+  centro_modelo: Ponto;
+  escala_modelo: number;
+  ativa: boolean;
+  bloqueada: boolean;
+}
+
+export interface InfoLayout {
+  nome: string;
+  papel: string;
+  largura_mm: number;
+  altura_mm: number;
+  viewports: ViewportDados[];
+  viewport_ativa: number | null;
+}
+
+export type EspacoAtivo = 'modelo' | { layout: string };
+
 export interface Estado {
   versao: number;
   /** Nada = arquivo aberto sem essa informação. */
@@ -100,6 +126,8 @@ export interface Estado {
   /** Enquanto o Inserir espera o nome: os blocos do desenho para escolher. */
   blocos: string[];
   historico: Entrada[];
+  layouts: InfoLayout[];
+  espaco_ativo: EspacoAtivo;
 }
 
 export interface Segmento {
@@ -113,8 +141,10 @@ export interface Segmento {
 export interface RespostaCursor {
   x: number;
   y: number;
+  z: number;
   texto_x: string;
   texto_y: string;
+  texto_z: string;
   texto_distancia: string | null;
   texto_angulo: string | null;
   guias: Segmento[];
@@ -195,6 +225,29 @@ export interface RespostaDeCamada {
   estado: Estado;
 }
 
+export type NomeCampoDePropriedade =
+  | 'camada'
+  | 'cor'
+  | 'tipo_linha'
+  | 'espessura'
+  | 'posicao_x'
+  | 'posicao_y'
+  | 'posicao_z'
+  | 'comprimento'
+  | 'raio'
+  | 'diametro'
+  | 'area'
+  | 'tamanho_geral'
+  | 'rotacao'
+  | 'rotacao_x'
+  | 'rotacao_y'
+  | 'rotacao_z'
+  | 'altura_extrusao'
+  | 'dimensao_z'
+  | 'volume'
+  | 'area_superficie'
+  | 'conteudo';
+
 /** Um campo da paleta de propriedades: sem objetos, igual em todos ou variado. */
 export type CampoDePropriedade = { estado: 'vazio' } | { estado: 'variado' } | { estado: 'igual'; valor: string };
 
@@ -210,6 +263,23 @@ export interface ResumoDePropriedades {
   espessura: CampoDePropriedade;
   /** As cores básicas (`#rrggbb`): vermelho, amarelo, verde, ciano, azul, magenta, branco. */
   cores_basicas: string[];
+  posicao_x?: CampoDePropriedade;
+  posicao_y?: CampoDePropriedade;
+  posicao_z?: CampoDePropriedade;
+  comprimento?: CampoDePropriedade;
+  raio?: CampoDePropriedade;
+  diametro?: CampoDePropriedade;
+  area?: CampoDePropriedade;
+  tamanho_geral?: CampoDePropriedade;
+  rotacao?: CampoDePropriedade;
+  rotacao_x?: CampoDePropriedade;
+  rotacao_y?: CampoDePropriedade;
+  rotacao_z?: CampoDePropriedade;
+  altura_extrusao?: CampoDePropriedade;
+  dimensao_z?: CampoDePropriedade;
+  volume?: CampoDePropriedade;
+  area_superficie?: CampoDePropriedade;
+  conteudo?: CampoDePropriedade;
 }
 
 /** O que o Rust entende por regional (do arquivo de língua). */
@@ -279,8 +349,10 @@ export interface CamposFolha {
   disciplina: string;
   titulo: string;
   subtitulo: string;
+  responsavel?: string;
   numero: string;
   revisao: string;
+  revisao_descricao?: string;
   /** O número da folha no carimbo; vazio = a ordem em que foi criada. */
   folha: string;
   /** A linha no meio da folha (duas vistas). */
@@ -292,6 +364,9 @@ export interface PedidoFolhaNova {
   /** Nada = a menor escala em que o desenho cabe. */
   escala?: number;
   campos: CamposFolha;
+  /** Se true, enquadra e centra a folha apenas nos objetos selecionados. */
+  cobrir_selecao?: boolean;
+  ids?: number[];
 }
 
 export interface RespostaFolha {

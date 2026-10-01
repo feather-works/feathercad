@@ -51,6 +51,12 @@ pub fn transformar(geo: &Geometria, t: &Transf) -> Geometria {
                 .collect(),
             nome: nome.clone(),
         },
+        Geometria::Face3D { p1, p2, p3, p4 } => Geometria::Face3D {
+            p1: t.aplicar(*p1),
+            p2: t.aplicar(*p2),
+            p3: t.aplicar(*p3),
+            p4: t.aplicar(*p4),
+        },
     }
 }
 
@@ -62,7 +68,7 @@ fn dentro(p: Ponto, (min, max): (Ponto, Ponto)) -> bool {
 /// arco, texto, ponto e inserção andam inteiros se o ponto de referência (centro, posição) está na janela.
 /// `None` se a janela não pegou nada da forma.
 pub fn esticar(geo: &Geometria, janela: (Ponto, Ponto), dx: f64, dy: f64) -> Option<Geometria> {
-    let mover = |p: Ponto| if dentro(p, janela) { Ponto::novo(p.x + dx, p.y + dy) } else { p };
+    let mover = |p: Ponto| if dentro(p, janela) { Ponto::novo3d(p.x + dx, p.y + dy, p.z) } else { p };
     let inteira = |ref_: Ponto| dentro(ref_, janela).then(|| transformar(geo, &Transf::mover(dx, dy)));
     match geo {
         Geometria::Linha { a, b } => (dentro(*a, janela) || dentro(*b, janela)).then(|| Geometria::Linha { a: mover(*a), b: mover(*b) }),
@@ -77,6 +83,12 @@ pub fn esticar(geo: &Geometria, janela: (Ponto, Ponto), dx: f64, dy: f64) -> Opt
             .then(|| Geometria::Hachura { contornos: contornos.iter().map(|c| c.iter().map(|v| Vertice { p: mover(v.p), bulge: v.bulge }).collect()).collect(), padrao: padrao.clone(), nome: nome.clone() }),
         Geometria::Circulo { centro, .. } | Geometria::Arco { centro, .. } => inteira(*centro),
         Geometria::Texto { ponto, .. } | Geometria::Insercao { ponto, .. } | Geometria::Ponto { p: ponto } => inteira(*ponto),
+        Geometria::Face3D { p1, p2, p3, p4 } => (dentro(*p1, janela) || dentro(*p2, janela) || dentro(*p3, janela) || dentro(*p4, janela)).then(|| Geometria::Face3D {
+            p1: mover(*p1),
+            p2: mover(*p2),
+            p3: mover(*p3),
+            p4: mover(*p4),
+        }),
     }
 }
 
@@ -172,6 +184,12 @@ fn distancia_no_nivel(doc: &Documento, geo: &Geometria, p: Ponto, nivel: u8) -> 
                 return 0.0;
             }
             lacos.iter().flat_map(|l| (0..l.len()).map(move |i| (l[i], l[(i + 1) % l.len()]))).map(|(a, b)| distancia_ao_segmento(p, a, b)).fold(f64::MAX, f64::min)
+        }
+        Geometria::Face3D { p1, p2, p3, p4 } => {
+            distancia_ao_segmento(p, *p1, *p2)
+                .min(distancia_ao_segmento(p, *p2, *p3))
+                .min(distancia_ao_segmento(p, *p3, *p4))
+                .min(distancia_ao_segmento(p, *p4, *p1))
         }
     }
 }

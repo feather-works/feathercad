@@ -51,10 +51,10 @@ pub struct ModosSnap {
 }
 
 impl Default for ModosSnap {
-    /// De fábrica (como o AutoCAD): extremidade, interseção, meio, centro, quadrante e nó.
+    /// De fábrica (como o AutoCAD): extremidade, interseção, meio, centro, quadrante, nó e perpendicular.
     fn default() -> Self {
         let mut m = Self { ligados: [false; 9] };
-        for t in [TipoSnap::Extremidade, TipoSnap::Intersecao, TipoSnap::Meio, TipoSnap::Centro, TipoSnap::Quadrante, TipoSnap::No] {
+        for t in [TipoSnap::Extremidade, TipoSnap::Intersecao, TipoSnap::Meio, TipoSnap::Centro, TipoSnap::Quadrante, TipoSnap::No, TipoSnap::Perpendicular] {
             m.definir(t, true);
         }
         m
@@ -223,7 +223,15 @@ fn achados_da_prim(prim: &Prim, modos: &ModosSnap, base: Option<Ponto>, saida: &
             dar(b, TipoSnap::Extremidade);
             dar(Ponto::novo((a.x + b.x) / 2.0, (a.y + b.y) / 2.0), TipoSnap::Meio);
             if let Some(o) = base {
-                dar(mais_proximo(prim, o), TipoSnap::Perpendicular);
+                let (dx, dy) = (b.x - a.x, b.y - a.y);
+                let len_sq = dx * dx + dy * dy;
+                if len_sq > 1e-12 {
+                    let t = ((o.x - a.x) * dx + (o.y - a.y) * dy) / len_sq;
+                    if (-1e-6..=1.0 + 1e-6).contains(&t) {
+                        let p_perp = Ponto::novo(a.x + t.clamp(0.0, 1.0) * dx, a.y + t.clamp(0.0, 1.0) * dy);
+                        dar(p_perp, TipoSnap::Perpendicular);
+                    }
+                }
             }
         }
         Prim::Arco { centro, raio, inicio, varredura } => {
@@ -291,7 +299,7 @@ const MAX_PARA_INTERSECAO: usize = 48;
 
 /// O melhor ponto de snap perto de `cursor` (dentro de `tolerancia`), ou `None`.
 pub fn achar(doc: &Documento, base: Option<Ponto>, cursor: Ponto, tolerancia: f64, modos: &ModosSnap) -> Option<Achado> {
-    let mut candidatos: Vec<Achado> = Vec::new();
+    let mut candidatos: Vec<(Achado, f64)> = Vec::new();
     let mut proximas: Vec<Prim> = Vec::new();
     // Um vetor só, reaproveitado: um por entidade eram 100 mil alocações a cada movimento do mouse.
     let mut prims: Vec<Prim> = Vec::new();
@@ -306,21 +314,36 @@ pub fn achar(doc: &Documento, base: Option<Ponto>, cursor: Ponto, tolerancia: f6
         if modos.ligado(TipoSnap::Centro) {
             for p in &prims {
                 if let Prim::Arco { centro, .. } = p {
-                    if centro.distancia(cursor) <= tolerancia {
-                        candidatos.push(Achado { ponto: *centro, tipo: TipoSnap::Centro });
+                    let dist = centro.distancia(cursor);
+                    if dist <= tolerancia {
+                        candidatos.push((Achado { ponto: *centro, tipo: TipoSnap::Centro }, dist));
                     }
                 }
             }
         }
         for p in &prims {
-            if distancia_da_prim(p, cursor) <= tolerancia {
-                achados_da_prim(p, modos, base, &mut candidatos);
+            let dist_prim = distancia_da_prim(p, cursor);
+            if dist_prim <= tolerancia {
+                let mut achados_temp = Vec::new();
+                achados_da_prim(p, modos, base, &mut achados_temp);
+                for a in achados_temp {
+                    let dist_efetiva = match a.tipo {
+                        TipoSnap::Perpendicular | TipoSnap::Tangente => dist_prim,
+                        _ => a.ponto.distancia(cursor),
+                    };
+                    if dist_efetiva <= tolerancia {
+                        candidatos.push((a, dist_efetiva));
+                    }
+                }
                 proximas.push(*p);
             }
         }
         if let Geometria::Texto { ponto, .. } | Geometria::Insercao { ponto, .. } | Geometria::Ponto { p: ponto } = &e.geometria {
             if modos.ligado(TipoSnap::No) {
-                candidatos.push(Achado { ponto: *ponto, tipo: TipoSnap::No });
+                let dist = ponto.distancia(cursor);
+                if dist <= tolerancia {
+                    candidatos.push((Achado { ponto: *ponto, tipo: TipoSnap::No }, dist));
+                }
             }
         }
     }
@@ -332,14 +355,20 @@ pub fn achar(doc: &Documento, base: Option<Ponto>, cursor: Ponto, tolerancia: f6
         }
         for (i, (_, x)) in perto.iter().enumerate() {
             for (_, y) in &perto[i + 1..] {
-                candidatos.extend(intersecoes(x, y).into_iter().map(|ponto| Achado { ponto, tipo: TipoSnap::Intersecao }));
+                for ponto in intersecoes(x, y) {
+                    let dist = ponto.distancia(cursor);
+                    if dist <= tolerancia {
+                        candidatos.push((Achado { ponto, tipo: TipoSnap::Intersecao }, dist));
+                    }
+                }
             }
         }
     }
     let melhor = candidatos
         .into_iter()
-        .filter(|c| c.ponto.distancia(cursor) <= tolerancia)
-        .min_by(|a, b| a.ponto.distancia(cursor).total_cmp(&b.ponto.distancia(cursor)).then(a.tipo.cmp(&b.tipo)));
+        .min_by(|(a, dist_a), (b, dist_b)| dist_a.total_cmp(dist_b).then(a.tipo.cmp(&b.tipo)))
+        .map(|(a, _)| a);
+
     if melhor.is_some() || !modos.ligado(TipoSnap::Proximo) {
         return melhor;
     }
@@ -401,6 +430,14 @@ mod testes {
         let d = doc_com(vec![linha((0.0, 0.0), (10.0, 0.0))]);
         assert!(achar(&d, None, Ponto::novo(3.2, 0.2), 1.0, &so(TipoSnap::Perpendicular)).is_none());
         let a = achar(&d, Some(Ponto::novo(3.0, 8.0)), Ponto::novo(3.2, 0.2), 1.0, &so(TipoSnap::Perpendicular)).unwrap();
+        assert_eq!(a.ponto, Ponto::novo(3.0, 0.0));
+    }
+
+    #[test]
+    fn perpendicular_em_qualquer_ponto_da_linha() {
+        let d = doc_com(vec![linha((0.0, 0.0), (10.0, 0.0))]);
+        // Cursor pairando em x=8.0 (longe do pé pé=3.0, mas sobre a linha): o snap perpendicular deve achar (3, 0)
+        let a = achar(&d, Some(Ponto::novo(3.0, 8.0)), Ponto::novo(8.0, 0.1), 1.0, &so(TipoSnap::Perpendicular)).unwrap();
         assert_eq!(a.ponto, Ponto::novo(3.0, 0.0));
     }
 

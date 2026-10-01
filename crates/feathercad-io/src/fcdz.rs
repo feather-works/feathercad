@@ -59,6 +59,7 @@ enum GeometriaJson {
     Circulo { centro: Ponto, raio: f64 },
     Arco { centro: Ponto, raio: f64, inicio: f64, fim: f64 },
     Texto { ponto: Ponto, altura: f64, rotacao: f64, conteudo: String, h: AlinhaH, v: AlinhaV },
+    Face3D { p1: Ponto, p2: Ponto, p3: Ponto, p4: Ponto },
 }
 
 impl From<&Geometria> for GeometriaJson {
@@ -72,6 +73,7 @@ impl From<&Geometria> for GeometriaJson {
             Geometria::Circulo { centro, raio } => GeometriaJson::Circulo { centro, raio },
             Geometria::Arco { centro, raio, inicio, fim } => GeometriaJson::Arco { centro, raio, inicio, fim },
             Geometria::Texto { ponto, altura, rotacao, conteudo, h, v } => GeometriaJson::Texto { ponto, altura, rotacao, conteudo, h, v },
+            Geometria::Face3D { p1, p2, p3, p4 } => GeometriaJson::Face3D { p1, p2, p3, p4 },
         }
     }
 }
@@ -87,6 +89,7 @@ impl From<GeometriaJson> for Geometria {
             GeometriaJson::Circulo { centro, raio } => Geometria::Circulo { centro, raio },
             GeometriaJson::Arco { centro, raio, inicio, fim } => Geometria::Arco { centro, raio, inicio, fim },
             GeometriaJson::Texto { ponto, altura, rotacao, conteudo, h, v } => Geometria::Texto { ponto, altura, rotacao, conteudo, h, v },
+            GeometriaJson::Face3D { p1, p2, p3, p4 } => Geometria::Face3D { p1, p2, p3, p4 },
         }
     }
 }
@@ -168,7 +171,7 @@ pub fn ler(bytes: &[u8]) -> Result<Aberto, String> {
     }
     let d: DesenhoJson = serde_json::from_slice(&ler_arquivo(&mut zip, "data/desenho.json")?).map_err(|e| format!("desenho.json ilegível: {e}"))?;
     let camadas = d.camadas.into_iter().map(|c| Camada { ligada: c.ligada, congelada: c.congelada, bloqueada: c.bloqueada, plotar: c.plotar, tipo_linha: c.tipo_linha, espessura: c.espessura, transparencia: c.transparencia.min(90), ..Camada::nova(c.nome, c.cor) }).collect();
-    let nova = |e: EntidadeJson| NovaEntidade { camada: e.camada, cor: e.cor, geometria: e.geometria.into(), props: e.props };
+    let nova = |e: EntidadeJson| NovaEntidade { camada: e.camada, cor: e.cor, geometria: e.geometria.into(), props: e.props, espaco: feathercad_core::documento::Espaco::Modelo };
     let blocos = d.blocos.into_iter().map(|b| Bloco { nome: b.nome, base: b.base, entidades: b.entidades.into_iter().map(nova).collect() }).collect();
     let entidades = d.entidades.into_iter().map(nova).collect();
     Ok(Aberto { doc: Documento::de_partes_com_blocos(camadas, d.camada_atual, blocos, entidades).com_unidade(d.unidade.as_deref().and_then(Unidade::de_nome)), avisos: Vec::new(), versao_dxf: None })

@@ -4,6 +4,7 @@ import type { Estado } from '../ponte/index.ts';
 import type { Textos } from '../idiomas/index.ts';
 import { RIBBON } from './ribbon-dados.ts';
 import type { WidgetDaRibbon } from './ribbon-widgets.ts';
+import { obterIconeSVG } from './icones-svg.ts';
 import { Z } from './z.ts';
 
 export const RIBBON_CSS = `
@@ -80,7 +81,12 @@ export function criarRibbon(t: Textos, aoComando: (comando: string) => void, aoA
         botao.className = b.pequeno ? 'botao pequeno' : 'botao';
         botao.title = textos.dica;
         botao.innerHTML = `<span class="simbolo"></span><span></span>`;
-        botao.children[0]!.textContent = b.simbolo;
+        const svgIcone = obterIconeSVG(b.id, b.simbolo);
+        if (svgIcone.startsWith('<svg')) {
+          botao.children[0]!.innerHTML = svgIcone;
+        } else {
+          botao.children[0]!.textContent = svgIcone;
+        }
         botao.children[1]!.textContent = textos.rotulo;
         if (b.acao) {
           const acao = b.acao;

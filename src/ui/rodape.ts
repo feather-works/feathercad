@@ -3,12 +3,13 @@
 import type { Estado, Fundo, RespostaCursor, TipoDeSnap } from '../ponte/index.ts';
 import { TIPOS_DE_SNAP } from '../ponte/tipos.ts';
 import { Z } from './z.ts';
-import { formatar, type Textos } from '../idiomas/index.ts';
+import type { Textos } from '../idiomas/index.ts';
 import { ANGULOS_DO_ORTO } from './preferencias.ts';
+import { criarAbasLayout, ABAS_LAYOUT_CSS } from './abas-layout.ts';
 
 export const RODAPE_CSS = `
 .rodape { display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; background: var(--fundo-faixa); border-top: 1px solid var(--borda); }
-.rodape .modelo { padding: 2px 10px; border-radius: 4px; background: var(--fundo-painel); border: 1px solid var(--borda); color: var(--texto); font-size: 11px; letter-spacing: 0.06em; }
+${ABAS_LAYOUT_CSS}
 .rodape .zoom { min-width: 48px; text-align: right; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
 .rodape select { background: var(--fundo-painel); color: var(--texto); border: 1px solid var(--borda); border-radius: 4px; padding: 2px 6px; font: inherit; cursor: pointer; }
 .rodape select.angulo-orto { margin-left: -4px; padding: 2px 2px; }
@@ -36,12 +37,23 @@ export interface Rodape {
 }
 
 /** Cria o rodapé; `aoAlternar` recebe o interruptor e o valor que o botão pede. */
-export function criarRodape(t: Textos, aoAlternar: (nome: NomeDeInterruptor, ligado: boolean) => void, aoEscolherFundo: (f: Fundo) => void, aoEscolherAnguloDoOrto: (graus: number) => void, aoEscolherSnap: (modos: Partial<Record<TipoDeSnap, boolean>>) => void): Rodape {
+export function criarRodape(
+  t: Textos,
+  aoAlternar: (nome: NomeDeInterruptor, ligado: boolean) => void,
+  aoEscolherFundo: (f: Fundo) => void,
+  aoEscolherAnguloDoOrto: (graus: number) => void,
+  aoEscolherSnap: (modos: Partial<Record<TipoDeSnap, boolean>>) => void,
+  aoAlternarEspaco?: (espaco: string) => void,
+  aoCriarLayout?: (nome: string, papel: string, w: number, h: number) => void,
+): Rodape {
   const el = document.createElement('footer');
   el.className = 'rodape';
-  const modelo = document.createElement('span');
-  modelo.className = 'modelo';
-  modelo.textContent = t.rodape.modelo;
+
+  const abasLayout = criarAbasLayout(
+    (espaco) => aoAlternarEspaco?.(espaco),
+    (nome, papel, w, h) => aoCriarLayout?.(nome, papel, w, h),
+  );
+
   const coords = document.createElement('span');
   coords.className = 'coordenadas';
   const zoom = document.createElement('span');
@@ -55,7 +67,7 @@ export function criarRodape(t: Textos, aoAlternar: (nome: NomeDeInterruptor, lig
     fundo.append(o);
   }
   fundo.addEventListener('change', () => aoEscolherFundo(fundo.value as Fundo));
-  el.append(modelo, coords, zoom, fundo);
+  el.append(abasLayout.el, coords, zoom, fundo);
 
   // O passo do Orto: 90° = só horizontal e vertical; 45°, 30°, 15°… travam nesses ângulos.
   const angulo = document.createElement('select');
@@ -131,8 +143,7 @@ export function criarRodape(t: Textos, aoAlternar: (nome: NomeDeInterruptor, lig
     el,
     atualizar(e) {
       atual = e;
-      modelo.textContent = e.unidade ? `${t.rodape.modelo} · ${e.unidade}` : t.rodape.modelo;
-      modelo.title = e.unidade ? formatar(t.unidade.dicaRodape, { nome: t.unidade.nomes[e.unidade] }) : t.unidade.semUnidade;
+      abasLayout.atualizar(e);
       for (const [nome, b] of botoes) b.classList.toggle('ligado', e[nome]);
       fundo.value = e.fundo;
       if (angulo.value !== String(e.orto_angulo)) listarAngulos(e.orto_angulo);
@@ -141,7 +152,9 @@ export function criarRodape(t: Textos, aoAlternar: (nome: NomeDeInterruptor, lig
       zoom.textContent = texto;
     },
     coordenadas(r) {
-      coords.textContent = r ? `X ${r.texto_x}   Y ${r.texto_y}` : '';
+      if (!r) { coords.textContent = ''; return; }
+      const temZ = Math.abs(r.z ?? 0) > 1e-4;
+      coords.textContent = temZ ? `X ${r.texto_x}   Y ${r.texto_y}   Z ${r.texto_z}` : `X ${r.texto_x}   Y ${r.texto_y}`;
     },
   };
 }

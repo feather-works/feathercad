@@ -1,67 +1,92 @@
 /**
- * As abas de arquivo, logo abaixo da Ribbon: **Início** (a página inicial), o
+ * As abas de arquivo, logo abaixo da Ribbon: **Início** (a página inicial), cada
  * desenho aberto (com `*` se há alteração não salva e o ✕ para fechar) e o `+`
- * (desenho novo). Por ora o motor guarda um desenho só; com vários abertos, cada
- * um ganha a sua aba aqui.
+ * (desenho novo). Suporta múltiplos desenhos abertos em abas concorrentes.
  */
 
-import type { Estado } from '../ponte/index.ts';
 import type { Textos } from '../idiomas/index.ts';
 
 export const ABAS_ARQUIVO_CSS = `
-.abas-arquivo { display: flex; align-items: flex-end; gap: 2px; padding: 4px 8px 0; background: var(--fundo); border-bottom: 1px solid var(--borda); }
-.abas-arquivo .arquivo { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: var(--fundo-faixa); border: 1px solid var(--borda); border-bottom: 0; border-radius: 3px 3px 0 0; color: var(--texto-suave); cursor: pointer; }
-.abas-arquivo .arquivo.ativa { background: var(--fundo-area); color: var(--texto); }
-.abas-arquivo .fechar { background: none; border: 0; cursor: pointer; color: inherit; padding: 0 2px; opacity: .6; }
-.abas-arquivo .fechar:hover { opacity: 1; }
+.abas-arquivo { display: flex; align-items: flex-end; gap: 2px; padding: 4px 8px 0; background: var(--fundo); border-bottom: 1px solid var(--borda); overflow-x: auto; }
+.abas-arquivo .arquivo { display: flex; align-items: center; gap: 8px; padding: 4px 12px; background: var(--fundo-faixa); border: 1px solid var(--borda); border-bottom: 0; border-radius: 3px 3px 0 0; color: var(--texto-suave); cursor: pointer; user-select: none; max-width: 200px; }
+.abas-arquivo .arquivo .nome-aba { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.abas-arquivo .arquivo.ativa { background: var(--fundo-area); color: var(--texto); font-weight: 500; }
+.abas-arquivo .fechar { background: none; border: 0; cursor: pointer; color: inherit; padding: 0 2px; opacity: .6; font-size: 13px; border-radius: 2px; }
+.abas-arquivo .fechar:hover { opacity: 1; background: var(--borda); }
 .abas-arquivo .mais { background: none; border: 0; cursor: pointer; padding: 4px 10px; font-size: 15px; color: var(--texto-suave); }
+.abas-arquivo .mais:hover { color: var(--texto); }
 `;
 
-export type AbaAtiva = 'inicio' | 'desenho';
+export interface ItemAba {
+  id: string;
+  nome: string;
+  caminho?: string;
+  sujo: boolean;
+}
 
-interface Acoes {
+export interface AcoesAbas {
   aoInicio: () => void;
-  aoDesenho: () => void;
-  aoFechar: () => void;
+  aoSelecionarAba: (id: string) => void;
+  aoFecharAba: (id: string) => void;
   aoNovo: () => void;
 }
 
 export interface AbasArquivo {
   el: HTMLElement;
-  atualizar(e: Estado, ativa: AbaAtiva, temDesenho: boolean): void;
+  atualizar(abas: ItemAba[], ativaId: string): void;
 }
 
-export function criarAbasArquivo(t: Textos, acoes: Acoes): AbasArquivo {
+export function criarAbasArquivo(t: Textos, acoes: AcoesAbas): AbasArquivo {
   const el = document.createElement('div');
   el.className = 'abas-arquivo';
-  const botao = (classe: string, texto: string, dica: string, acao: () => void): HTMLElement => {
-    const b = document.createElement('div');
-    b.className = classe;
-    b.textContent = texto;
-    b.title = dica;
-    b.addEventListener('click', acao);
-    return b;
-  };
+
   return {
     el,
-    atualizar(e, ativa, temDesenho) {
-      const inicio = botao(`arquivo${ativa === 'inicio' ? ' ativa' : ''}`, t.abas.inicio, t.abas.inicio, acoes.aoInicio);
+    atualizar(abas: ItemAba[], ativaId: string) {
+      const inicio = document.createElement('div');
+      inicio.className = `arquivo${ativaId === 'inicio' ? ' ativa' : ''}`;
+      const inicioSpan = document.createElement('span');
+      inicioSpan.className = 'nome-aba';
+      inicioSpan.textContent = t.abas.inicio;
+      inicio.append(inicioSpan);
+      inicio.title = t.abas.inicio;
+      inicio.addEventListener('click', () => acoes.aoInicio());
+
       const partes: HTMLElement[] = [inicio];
-      if (temDesenho) {
-        const nome = `${e.arquivo?.nome ?? t.app.semTitulo}${e.sujo ? '*' : ''}`;
-        const desenho = botao(`arquivo${ativa === 'desenho' ? ' ativa' : ''}`, nome, e.arquivo?.caminho ?? nome, acoes.aoDesenho);
+
+      for (const aba of abas) {
+        const d = document.createElement('div');
+        const eAtiva = aba.id === ativaId;
+        d.className = `arquivo${eAtiva ? ' ativa' : ''}`;
+
+        const nomeSpan = document.createElement('span');
+        nomeSpan.className = 'nome-aba';
+        nomeSpan.textContent = `${aba.nome}${aba.sujo ? '*' : ''}`;
+        d.append(nomeSpan);
+        d.title = aba.caminho ?? aba.nome;
+
+        d.addEventListener('click', () => acoes.aoSelecionarAba(aba.id));
+
         const fechar = document.createElement('button');
         fechar.className = 'fechar';
         fechar.textContent = '✕';
         fechar.title = t.abas.fechar;
         fechar.addEventListener('click', (ev) => {
           ev.stopPropagation();
-          acoes.aoFechar();
+          acoes.aoFecharAba(aba.id);
         });
-        desenho.append(fechar);
-        partes.push(desenho);
+
+        d.append(fechar);
+        partes.push(d);
       }
-      partes.push(botao('mais', '+', t.abas.novo, acoes.aoNovo));
+
+      const mais = document.createElement('div');
+      mais.className = 'mais';
+      mais.textContent = '+';
+      mais.title = t.abas.novo;
+      mais.addEventListener('click', () => acoes.aoNovo());
+      partes.push(mais);
+
       el.replaceChildren(...partes);
     },
   };

@@ -6,6 +6,7 @@
 
 import { formatar, texto } from '../idiomas/index.ts';
 import type { ItemDeMenu } from '../ponte/tipos.ts';
+import { obterIconeSVG } from './icones-svg.ts';
 import { Z } from './z.ts';
 
 export const MENU_CONTEXTO_CSS = `
@@ -15,7 +16,7 @@ export const MENU_CONTEXTO_CSS = `
 .menu-contexto .item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; background: none; border: 0; border-radius: 8px; color: var(--texto); font: inherit; text-align: left; cursor: pointer; }
 .menu-contexto .item:hover:not(:disabled), .menu-contexto .item.foco:not(:disabled) { background: var(--destaque-suave); }
 .menu-contexto .item:disabled { color: var(--texto-suave); opacity: .55; cursor: default; }
-.menu-contexto .icone { flex: none; width: 18px; text-align: center; color: var(--destaque); font-size: 14px; }
+.menu-contexto .icone { flex: none; width: 18px; text-align: center; color: var(--destaque); font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
 .menu-contexto .rotulo { flex: 1; white-space: nowrap; }
 .menu-contexto .atalho { color: var(--texto-suave); font-size: 11.5px; }
 .menu-contexto .visto { flex: none; width: 18px; text-align: center; color: var(--destaque); font-weight: 700; }
@@ -25,8 +26,8 @@ export const MENU_CONTEXTO_CSS = `
 /** Enfeite por item (o que o item faz é do motor). */
 const ICONES: Record<string, string> = {
   enter: '↵', cancelar: '✕', fechar: '◯', mover: '✥', copiar: '⧉', girar: '↻', escala: '⤢', espelhar: '⇋', deslocar: '⫽', esticar: '↔',
-  matriz: '▦', recortar: '✂', copiar_area: '⎘', colar: '📋', criar_bloco: '▣', agrupar: '⬚', apagar: '🗑',
-  desfazer: '↶', refazer: '↷', propriedades: '☰', zoom_ajustar: '⛶', configuracoes: '⚙',
+  matriz: '▦', recortar: '✂', copiar_area: '⎘', colar: '', criar_bloco: '▣', agrupar: '⬚', apagar: '',
+  desfazer: '↶', refazer: '↷', propriedades: '☰', zoom_ajustar: '⛶', configuracoes: '',
   linha: '╱', polilinha: '⌇', circulo: '○', arco: '◠', retangulo: '▭', elipse: '⬭', hachura: '▨', texto: 'A', cota: '⟷', cota_alinhada: '⤢', cota_raio: 'R', cota_diametro: 'Ø',
 };
 
@@ -104,10 +105,19 @@ export function criarMenuContexto(aoEscolher: (i: ItemDeMenu) => void): MenuCont
         b.className = 'item';
         b.disabled = !item.ativo;
         b.setAttribute('role', item.marcado === undefined || item.marcado === null ? 'menuitem' : 'menuitemcheckbox');
-        if (item.marcado !== null && item.marcado !== undefined) b.setAttribute('aria-checked', String(item.marcado));
         const icone = document.createElement('span');
         icone.className = item.marcado !== null && item.marcado !== undefined ? 'visto' : 'icone';
-        icone.textContent = item.marcado !== null && item.marcado !== undefined ? (item.marcado ? '✓' : '') : (ICONES[item.id.split(':').pop()!] ?? '');
+        const idLimpo = item.id.split(':').pop()!;
+        if (item.marcado !== null && item.marcado !== undefined) {
+          icone.textContent = item.marcado ? '✓' : '';
+        } else {
+          const svgStr = obterIconeSVG(idLimpo, ICONES[idLimpo] ?? '');
+          if (svgStr.startsWith('<svg')) {
+            icone.innerHTML = svgStr;
+          } else {
+            icone.textContent = svgStr;
+          }
+        }
         const rotulo = document.createElement('span');
         rotulo.className = 'rotulo';
         rotulo.textContent = rotuloDe(item);

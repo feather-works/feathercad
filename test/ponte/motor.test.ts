@@ -173,7 +173,7 @@ test('motor: zoom para dentro/fora em volta do centro, enquadrar o desenho e o t
   assert.deepEqual(m.vistaAjustar(v), v, 'sem desenho, enquadrar volta ao início');
   m.linhaCriar({ x: 1000, y: 1000 }, { x: 1100, y: 1050 });
   const a = m.vistaAjustar(v);
-  assert.deepEqual(a.centro, { x: 1050, y: 1025 });
+  assert.deepEqual(a.centro, { x: 1050, y: 1025, z: 0 });
   assert.ok(a.escala > 1 && a.escala < 10);
   const en = motorNovo('en-US');
   assert.equal(en.vistaTexto(en.vistaZoomCentro(en.vistaInicial(800, 600), 1.5)), '150%');
@@ -247,15 +247,14 @@ test('motor: Ctrl+N/O/S/Shift+S pedem ação de janela (o motor escolhe qual, a 
 
 test('motor: os avisos do último abrir/salvar ficam no estado (para irem ao console) e o novo limpa', () => {
   const m = motorNovo();
-  const dxf = '0\nSECTION\n2\nENTITIES\n0\nXLINE\n8\n0\n0\nMESH\n8\n0\n0\nMESH\n8\n0\n0\nLINE\n67\n1\n8\n0\n10\n0\n20\n0\n11\n1\n21\n1\n0\nENDSEC\n0\nEOF\n';
+  const dxf = '0\nSECTION\n2\nENTITIES\n0\nXLINE\n8\n0\n0\nMESH\n8\n0\n0\nMESH\n8\n0\n0\nENDSEC\n0\nEOF\n';
   const e = m.documentoAbrir(new TextEncoder().encode(dxf));
-  assert.deepEqual(e.avisos_do_arquivo.map((a) => a.chave), ['aviso.entidadesIgnoradas', 'aviso.espacoPapelIgnorado']);
+  assert.deepEqual(e.avisos_do_arquivo.map((a) => a.chave), ['aviso.entidadesIgnoradas']);
   assert.equal(e.avisos_do_arquivo[0]!.vars['tipos'], '2 MESH, 1 XLINE');
   const linhas: string[] = [];
   registrarAvisos(e, 'planta.dxf', (msg) => linhas.push(msg));
-  assert.equal(linhas.length, 2);
+  assert.equal(linhas.length, 1);
   assert.match(linhas[0]!, /^\[arquivo\] planta\.dxf: 3 objeto\(s\) ficaram de fora.*2 MESH, 1 XLINE/);
-  assert.match(linhas[1]!, /1 objeto\(s\) do espaço do papel/);
   assert.deepEqual(m.documentoNovo().avisos_do_arquivo, []);
   m.linhaCriar({ x: 0, y: 0 }, { x: 1, y: 1 });
   assert.deepEqual(m.estado().avisos_do_arquivo, [], 'um comando comum não repete o aviso antigo como novo');

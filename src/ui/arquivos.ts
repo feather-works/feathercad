@@ -15,7 +15,7 @@ function escolherArquivoNoNavegador(): Promise<File | null> {
   return new Promise((resolve) => {
     const entrada = document.createElement('input');
     entrada.type = 'file';
-    entrada.accept = '.dxf,.fcdz';
+    entrada.accept = '.dxf,.fcdz,.xyz,.pts,.csv,.txt';
     entrada.addEventListener('change', () => resolve(entrada.files?.[0] ?? null));
     entrada.addEventListener('cancel', () => resolve(null));
     entrada.click();
@@ -28,9 +28,11 @@ export async function abrirDesenho(motor: Motor, caminho?: string): Promise<Esta
   const arquivo = await escolherArquivoNoNavegador();
   if (!arquivo) return null;
   motor.documentoAbrir(new Uint8Array(await arquivo.arrayBuffer()));
-  const formato = arquivo.name.toLowerCase().endsWith('.fcdz') ? 'fcdz' : 'dxf';
-  // No navegador não há caminho de verdade: o nome do arquivo faz as vezes.
-  return motor.documentoArquivoDefinir(arquivo.name, formato, false);
+  const ext = arquivo.name.toLowerCase().split('.').pop() ?? '';
+  const ehNuvem = ['xyz', 'pts', 'csv', 'txt'].includes(ext);
+  const formato = ext === 'fcdz' ? 'fcdz' : 'dxf';
+  const nome = ehNuvem ? `${arquivo.name.replace(/\.[^.]+$/, '')}.dxf` : arquivo.name;
+  return motor.documentoArquivoDefinir(nome, formato, false);
 }
 
 /** Baixa os bytes como arquivo (navegador). */

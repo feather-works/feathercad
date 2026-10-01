@@ -224,7 +224,7 @@ fn tipo_de_linha_vira_traco_e_vao_no_quadro_e_a_espessura_vai_no_segmento() {
     use feathercad_core::vista::Vista;
     let mut d = Documento::default();
     let id = d.adicionar_linha(p(0.0, 0.0), p(100.0, 0.0));
-    let v = Vista { centro: p(50.0, 0.0), escala: 1.0, largura: 200.0, altura: 100.0 };
+    let v = Vista { centro: p(50.0, 0.0), escala: 1.0, largura: 200.0, altura: 100.0, rotacao_x: 0.0, rotacao_z: 0.0 };
     let n_continua = u32::from_le_bytes(montar(&d, &v, None, None, false)[12..16].try_into().unwrap());
     assert_eq!(n_continua, 1);
     d.aplicar_mudancas(vec![Mudanca::Alterar { id, camada: None, cor: None, props: Some(Propriedades { espessura: Some(1.0), tipo_linha: Some(TipoLinha::Tracejada), grupo: None }) }]);

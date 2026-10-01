@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 /// Os comandos que o motor conhece (o nome interno, em minúsculas).
-pub const CONHECIDOS: [&str; 39] = [
+pub const CONHECIDOS: [&str; 58] = [
     "linha",
     "polilinha",
     "circulo",
@@ -50,6 +50,25 @@ pub const CONHECIDOS: [&str; 39] = [
     "igualar_camada",
     "criar_bloco",
     "agrupar",
+    "3dface",
+    "caixa3d",
+    "elevacao",
+    "cilindro3d",
+    "esfera3d",
+    "cone3d",
+    "toro3d",
+    "cunha3d",
+    "extrusao",
+    "revolucao",
+    "varredura",
+    "loft",
+    "presspull",
+    "uniao3d",
+    "subtracao3d",
+    "intersecao3d",
+    "mover3d",
+    "rotacionar3d",
+    "escalar3d",
 ];
 
 /// As opções de ferramenta que o motor conhece.

@@ -9,7 +9,7 @@ import { etapa } from './perfil.ts';
 import { lerQuadro } from './quadro-binario.ts';
 import { noApp, ponteBinaria } from './nativo.ts';
 import { chamarJson, type Canal } from './canal.ts';
-import type { CamposFolha, OpcoesDeHachura, ConsultaDeCamadas, FolhasDoMotor, OpcoesPdf, PedidoFolhaNova, RespostaFolha, TipoDeSnap, Estado, Fundo, RespostaDeMenu, Unidade, PedidoDeCamada, RespostaDeCamada, ResumoDePropriedades, TabelaDeCamadas, Ponto, Quadro, Regional, RespostaCursor, Vista } from './tipos.ts';
+import type { CamposFolha, OpcoesDeHachura, ConsultaDeCamadas, FolhasDoMotor, OpcoesPdf, PedidoFolhaNova, RespostaFolha, TipoDeSnap, Estado, Fundo, RespostaDeMenu, Unidade, PedidoDeCamada, RespostaDeCamada, ResumoDePropriedades, TabelaDeCamadas, Ponto, Quadro, Regional, RespostaCursor, Vista, NomeCampoDePropriedade } from './tipos.ts';
 
 export type { Canal } from './canal.ts';
 export type * from './tipos.ts';
@@ -73,6 +73,9 @@ export const COMANDOS_DA_PONTE_ESPERADOS: readonly string[] = [
   'documento_arquivo',
   'quadro',
   'quadro_arrasto',
+  'layout_criar',
+  'layout_alternar',
+  'viewport_inserir',
 ];
 
 /** O motor de um documento. */
@@ -172,7 +175,7 @@ export class Motor {
   }
 
   /** Põe `valor` no `campo` de todos os objetos selecionados. */
-  propriedadesDefinir(campo: 'camada' | 'cor' | 'tipo_linha' | 'espessura', valor: string): Estado {
+  propriedadesDefinir(campo: NomeCampoDePropriedade, valor: string): Estado {
     return this.json('propriedades_definir', { campo, valor });
   }
 
@@ -325,6 +328,21 @@ export class Motor {
   /** Diz ao motor onde o desenho está no disco; `salvo` = acabou de gravar. */
   documentoArquivoDefinir(caminho: string, formato: 'dxf' | 'fcdz', salvo: boolean): Estado {
     return this.json('documento_arquivo_definir', { caminho, formato, salvo });
+  }
+
+  /** Cria um novo layout (Paper Space). */
+  layoutCriar(nome: string, papel: string, largura_mm: number, altura_mm: number): Estado {
+    return this.json('layout_criar', { nome, papel, largura_mm, altura_mm });
+  }
+
+  /** Alterna o espaço ativo ('modelo' ou nome do layout). */
+  layoutAlternar(nome: string): Estado {
+    return this.json('layout_alternar', { nome });
+  }
+
+  /** Insere uma nova Viewport (MVIEW) no layout especificado. */
+  viewportInserir(layout: string, largura_papel: number, altura_papel: number): Estado {
+    return this.json('viewport_inserir', { layout, largura_papel, altura_papel });
   }
 
   /** Durante o "grab": só os objetos arrastados, desenhados onde o cursor os põe. */

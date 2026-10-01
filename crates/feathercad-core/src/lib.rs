@@ -25,4 +25,5 @@ pub mod regiao;
 pub mod propriedades;
 pub mod sessao;
 pub mod snap;
+pub mod topografia;
 pub mod vista;

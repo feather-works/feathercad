@@ -116,7 +116,7 @@ fn letras_gregas_saem_na_fonte_symbol_e_nao_como_interrogacao() {
 #[test]
 fn no_papel_cinza_claro_vira_preto_e_amarelo_escurece_sem_perder_o_tom() {
     let mut doc = Documento::default().com_unidade(Some(Unidade::Centimetro));
-    let linha = |y: f64, cor: u32| Mudanca::Novo(NovaEntidade { camada: 0, cor: Some(cor), geometria: Geometria::Linha { a: Ponto::novo(0.0, y), b: Ponto::novo(100.0, y) }, props: Propriedades::default() });
+    let linha = |y: f64, cor: u32| Mudanca::Novo(NovaEntidade { camada: 0, cor: Some(cor), geometria: Geometria::Linha { a: Ponto::novo(0.0, y), b: Ponto::novo(100.0, y) }, props: Propriedades::default(), espaco: feathercad_core::documento::Espaco::Modelo });
     doc.aplicar_mudancas(vec![linha(0.0, 0xC8C8C8), linha(10.0, 0xFFD84A)]);
     let papel = String::from_utf8_lossy(&exportar_folhas(&doc, &Opcoes::default()).unwrap()).into_owned();
     assert!(papel.contains("0 0 0 RG"), "cinza claro impresso em preto");
@@ -174,4 +174,33 @@ fn folha_inserida_pelo_motor_vira_uma_pagina_do_papel_certo() {
     let texto = String::from_utf8_lossy(&pdf);
     assert_eq!(texto.matches("/Type /Page ").count(), 2, "uma página por folha inserida");
     assert!(contem(&pdf, b"MediaBox [0 0 2383.937 1683.78]"), "A1 deitada");
+}
+
+#[test]
+fn folhas_inseridas_saem_na_ordem_do_numero_do_carimbo_e_nao_da_posicao() {
+    use feathercad_core::folha::Campos;
+    let mut doc = Documento::default().com_unidade(Some(Unidade::Metro));
+    doc.adicionar_linha(Ponto::novo(0.0, 0.0), Ponto::novo(300.0, 100.0));
+    // A primeira criada (à esquerda) é a folha 02; a segunda (à direita) é a 01.
+    doc.folha_inserir("A1", Some(1000.0), &Campos { folha: "02/02".into(), ..Campos::default() }).unwrap();
+    doc.folha_inserir("A1", Some(1000.0), &Campos { folha: "01/02".into(), ..Campos::default() }).unwrap();
+    let info = doc.folhas_inseridas();
+    assert!(info[0].min.x < info[1].min.x, "a segunda vai à direita");
+    let f = folhas(&doc);
+    assert_eq!(f.len(), 2);
+    assert_eq!(f[0].0.x, info[1].min.x, "a 01 sai primeiro, mesmo estando à direita");
+    assert_eq!(f[1].0.x, info[0].min.x);
+}
+
+#[test]
+fn folhas_inseridas_sem_numero_saem_na_ordem_de_criacao() {
+    use feathercad_core::folha::Campos;
+    let mut doc = Documento::default().com_unidade(Some(Unidade::Metro));
+    doc.adicionar_linha(Ponto::novo(0.0, 0.0), Ponto::novo(300.0, 100.0));
+    for _ in 0..3 {
+        doc.folha_inserir("A3", Some(1000.0), &Campos::default()).unwrap();
+    }
+    let info = doc.folhas_inseridas();
+    let f = folhas(&doc);
+    assert_eq!(f.iter().map(|c| c.0.x).collect::<Vec<_>>(), info.iter().map(|i| i.min.x).collect::<Vec<_>>());
 }

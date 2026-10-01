@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::documento::{AlinhaH, AlinhaV, Bloco, Camada, Captura, Documento, Geometria, Id, NovaEntidade, Passo, Propriedades, Unidade};
+use crate::documento::{AlinhaH, AlinhaV, Bloco, Camada, Captura, Documento, Espaco, Geometria, Id, NovaEntidade, Passo, Propriedades, Unidade};
 use crate::edicao::caixa_da_entidade;
 use crate::geom::{Ponto, Vertice};
 
@@ -61,8 +61,10 @@ pub struct Campos {
     pub disciplina: String,
     pub titulo: String,
     pub subtitulo: String,
+    pub responsavel: String,
     pub numero: String,
     pub revisao: String,
+    pub revisao_descricao: String,
     /// O número da folha no carimbo; vazio = a ordem de criação (01, 02…).
     pub folha: String,
     /// A linha horizontal no meio da folha (divide a área em duas vistas, como na prancheta do escritório).
@@ -88,12 +90,14 @@ pub struct InfoFolha {
 
 /// Onde cada campo do carimbo mora (mm de papel, base A1) e o texto-guia de quando está vazio.
 const X_CARIMBO: f64 = 656.4;
-const CAMPOS_DO_CARIMBO: [(&str, f64, f64, f64, &str); 8] = [
+const CAMPOS_DO_CARIMBO: [(&str, f64, f64, f64, &str); 10] = [
     ("cliente", X_CARIMBO + 1.5, 67.2, 2.8, "NOME DO CLIENTE"),
     ("fase", X_CARIMBO + 1.5, 59.5, 2.8, "FASE DE PROJETO"),
     ("disciplina", X_CARIMBO + 1.5, 51.8, 2.8, "DISCIPLINA"),
     ("titulo", X_CARIMBO + 1.5, 46.0, 2.6, "TÍTULO DO DESENHO"),
     ("subtitulo", X_CARIMBO + 1.5, 42.6, 1.9, ""),
+    ("responsavel", 507.7, 32.0, 2.0, "RESPONSÁVEL TÉCNICO / EMPRESA"),
+    ("revisao_descricao", 603.7, 58.0, 1.7, ""),
     ("numero", X_CARIMBO + 30.0, 20.0, 3.4, "—"),
     ("folha", X_CARIMBO + 96.5, 20.0, 3.4, ""),
     ("revisao", X_CARIMBO + 165.0, 20.0, 3.4, "00"),
@@ -106,9 +110,12 @@ fn valor_do_campo<'a>(campos: &'a Campos, nome: &str) -> &'a str {
         "disciplina" => &campos.disciplina,
         "titulo" => &campos.titulo,
         "subtitulo" => &campos.subtitulo,
+        "responsavel" => &campos.responsavel,
         "numero" => &campos.numero,
+        "revisao" => &campos.revisao,
+        "revisao_descricao" => &campos.revisao_descricao,
         "folha" => &campos.folha,
-        _ => &campos.revisao,
+        _ => "",
     }
 }
 
@@ -119,9 +126,12 @@ fn guardar_o_campo(campos: &mut Campos, nome: &str, valor: String) {
         "disciplina" => campos.disciplina = valor,
         "titulo" => campos.titulo = valor,
         "subtitulo" => campos.subtitulo = valor,
+        "responsavel" => campos.responsavel = valor,
         "numero" => campos.numero = valor,
+        "revisao" => campos.revisao = valor,
+        "revisao_descricao" => campos.revisao_descricao = valor,
         "folha" => campos.folha = valor,
-        _ => campos.revisao = valor,
+        _ => {}
     }
 }
 
@@ -140,7 +150,7 @@ struct Pena {
 
 impl Pena {
     fn nova(&mut self, camada: usize, geometria: Geometria) {
-        self.fora.push(NovaEntidade { camada, cor: None, geometria, props: Propriedades::default() });
+        self.fora.push(NovaEntidade { camada, cor: None, geometria, props: Propriedades::default(), espaco: Espaco::Modelo });
     }
     fn linha(&mut self, x1: f64, y1: f64, x2: f64, y2: f64) {
         let f = self.f;
@@ -301,14 +311,35 @@ impl Documento {
         caixa
     }
 
-    /// A menor escala oferecida em que o modelo cabe na área útil da folha.
-    fn escala_que_cabe(&self, largura_mm: f64) -> f64 {
-        let Some((min, max)) = self.caixa_do_modelo() else { return 100.0 };
+    /// A caixa delimitadora de uma lista de IDs de entidades.
+    pub fn caixa_dos_ids(&self, ids: &[Id]) -> Option<(Ponto, Ponto)> {
+        let mut caixa: Option<(Ponto, Ponto)> = None;
+        for id in ids {
+            if let Some(e) = self.entidade(*id) {
+                if let Some((a, b)) = caixa_da_entidade(self, &e.geometria) {
+                    caixa = Some(match caixa {
+                        None => (a, b),
+                        Some((min, max)) => (Ponto::novo(min.x.min(a.x), min.y.min(a.y)), Ponto::novo(max.x.max(b.x), max.y.max(b.y))),
+                    });
+                }
+            }
+        }
+        caixa
+    }
+
+    /// A menor escala oferecida em que uma determinada caixa cabe na área útil da folha.
+    pub fn escala_que_cabe_na_caixa(&self, (min, max): (Ponto, Ponto), largura_mm: f64) -> f64 {
         let f = largura_mm / BASE_W;
         let (aw, ah) = ((AREA.2 - AREA.0) * f, (AREA.3 - AREA.1) * f);
         let em_mm = self.milimetros_da_unidade();
         let precisa = ((max.x - min.x) * em_mm / aw).max((max.y - min.y) * em_mm / ah);
         ESCALAS.iter().copied().find(|e| *e >= precisa).unwrap_or_else(|| precisa.ceil())
+    }
+
+    /// A menor escala oferecida em que o modelo cabe na área útil da folha.
+    fn escala_que_cabe(&self, largura_mm: f64) -> f64 {
+        let Some(c) = self.caixa_do_modelo() else { return 100.0 };
+        self.escala_que_cabe_na_caixa(c, largura_mm)
     }
 
     /// Onde a inserção deve ficar para o centro da área útil coincidir com `centro`.
@@ -317,14 +348,17 @@ impl Documento {
         Ponto::novo(centro.x - k * (AREA.0 + AREA.2) / 2.0 * f, centro.y - k * (AREA.1 + AREA.3) / 2.0 * f)
     }
 
-    /// Insere uma folha nova. `escala` `None` = a menor que faz o desenho caber. A primeira folha se centra no desenho;
-    /// as seguintes vão à direita da última. Um passo de desfazer. Devolve a folha criada.
-    pub fn folha_inserir(&mut self, papel: &str, escala: Option<f64>, campos: &Campos) -> Result<InfoFolha, String> {
+    /// Insere uma folha nova permitindo especificar opcionalmente IDs de objetos alvo para cobrir apenas a seleção/objeto.
+    pub fn folha_inserir_ids(&mut self, papel: &str, escala: Option<f64>, campos: &Campos, ids_alvo: Option<&[Id]>) -> Result<InfoFolha, String> {
         let (largura, _) = papel_mm(papel).ok_or_else(|| format!("papel `{papel}` não existe ({})", PAPEIS.map(|(n, _, _)| n).join(", ")))?;
+        let caixa_alvo = ids_alvo.and_then(|ids| self.caixa_dos_ids(ids)).or_else(|| self.caixa_do_modelo());
         let escala = match escala {
             Some(e) if e.is_finite() && e > 0.0 && e <= 1.0e6 => e,
             Some(e) => return Err(format!("escala inválida: {e}")),
-            None => self.escala_que_cabe(largura),
+            None => match caixa_alvo {
+                Some(c) => self.escala_que_cabe_na_caixa(c, largura),
+                None => 100.0,
+            },
         };
         let existentes = self.folhas_inseridas();
         let captura = self.captura();
@@ -335,11 +369,14 @@ impl Documento {
         }
         let entidades = desenhar(largura, escala, campos, existentes.len() + 1, camada_folha, camada_carimbo);
         let k = escala / self.milimetros_da_unidade();
-        let ponto = match (existentes.iter().max_by(|a, b| a.max.x.total_cmp(&b.max.x)), self.caixa_do_modelo()) {
-            (Some(ultima), _) => Ponto::novo(ultima.max.x + 0.05 * (ultima.max.x - ultima.min.x), ultima.min.y),
-            (None, Some((a, b))) => self.ponto_para_centrar(Ponto::novo((a.x + b.x) / 2.0, (a.y + b.y) / 2.0), largura, escala),
-            (None, None) => Ponto::novo(0.0, 0.0),
+
+        let ponto = match (ids_alvo.is_some(), caixa_alvo, existentes.iter().max_by(|a, b| a.max.x.total_cmp(&b.max.x))) {
+            (true, Some((a, b)), _) => self.ponto_para_centrar(Ponto::novo((a.x + b.x) / 2.0, (a.y + b.y) / 2.0), largura, escala),
+            (false, _, Some(ultima)) => Ponto::novo(ultima.max.x + 0.05 * (ultima.max.x - ultima.min.x), ultima.min.y),
+            (false, Some((a, b)), None) => self.ponto_para_centrar(Ponto::novo((a.x + b.x) / 2.0, (a.y + b.y) / 2.0), largura, escala),
+            (_, None, _) => Ponto::novo(0.0, 0.0),
         };
+
         self.desfazer.push(Passo::Tudo(Box::new(captura)));
         self.refazer.clear();
         self.blocos.push(Bloco { nome: format!("{PREFIXO}{n}"), base: Ponto::novo(0.0, 0.0), entidades });
@@ -347,9 +384,15 @@ impl Documento {
         self.caixas_dos_blocos.push(self.caixa_do_bloco(indice, 0));
         let id = self.proximo_id;
         self.proximo_id += 1;
-        self.entidades.push(crate::documento::Entidade { id, camada: camada_folha, cor: None, geometria: Geometria::Insercao { bloco: indice, ponto, escala_x: k, escala_y: k, rotacao: 0.0 }, props: Propriedades::default() });
+        self.entidades.push(crate::documento::Entidade { id, camada: camada_folha, cor: None, geometria: Geometria::Insercao { bloco: indice, ponto, escala_x: k, escala_y: k, rotacao: 0.0 }, props: Propriedades::default(), espaco: Espaco::Modelo });
         self.mudou();
         self.folhas_inseridas().into_iter().find(|f| f.id == id).ok_or_else(|| "a folha não apareceu".to_string())
+    }
+
+    /// Insere uma folha nova. `escala` `None` = a menor que faz o desenho caber. A primeira folha se centra no desenho;
+    /// as seguintes vão à direita da última. Um passo de desfazer. Devolve a folha criada.
+    pub fn folha_inserir(&mut self, papel: &str, escala: Option<f64>, campos: &Campos) -> Result<InfoFolha, String> {
+        self.folha_inserir_ids(papel, escala, campos, None)
     }
 
     /// Os campos do carimbo como estão (o texto-guia volta como vazio).
@@ -401,6 +444,7 @@ impl Documento {
                     cor: None,
                     geometria: Geometria::Texto { ponto: Ponto::novo(x * f, y * f), altura: altura * f, rotacao: 0.0, conteudo: novo.to_string(), h: AlinhaH::Esquerda, v: AlinhaV::Base },
                     props: Propriedades::default(),
+                    espaco: Espaco::Modelo,
                 }),
                 (None, true) => {}
             }
@@ -547,5 +591,15 @@ mod testes {
     fn texto_da_escala_e_ampliacao() {
         assert_eq!(texto_da_escala(100.0), "1:100");
         assert_eq!(texto_da_escala(0.5), "2:1");
+    }
+
+    #[test]
+    fn folha_inserir_enquadra_apenas_objetos_selecionados() {
+        let mut d = com_linha(Unidade::Metro, 10.0);
+        let id2 = d.adicionar_linha(Ponto::novo(200.0, 0.0), Ponto::novo(210.0, 0.0));
+
+        let f = d.folha_inserir_ids("A4", None, &Campos::default(), Some(&[id2])).unwrap();
+        let centro_folha_x = (f.min.x + f.max.x) / 2.0;
+        assert!((centro_folha_x - 205.0).abs() < 20.0, "a folha centra perto de X=205 (objeto selecionado)");
     }
 }

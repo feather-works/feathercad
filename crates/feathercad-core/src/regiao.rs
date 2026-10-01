@@ -131,7 +131,7 @@ fn grafo(segs: &[Segmento], mut cortes: Vec<Vec<f64>>, celula: f64) -> (Vec<Pont
     for (i, (a, b)) in segs.iter().enumerate() {
         let mut ts = std::mem::take(&mut cortes[i]);
         ts.sort_by(f64::total_cmp);
-        let pontos: Vec<usize> = ts.iter().map(|t| no_de(Ponto::novo(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y)))).collect();
+        let pontos: Vec<usize> = ts.iter().map(|t| no_de(Ponto::novo3d(a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z)))).collect();
         for w in pontos.windows(2) {
             if w[0] != w[1] {
                 arestas.insert((w[0].min(w[1]), w[0].max(w[1])));

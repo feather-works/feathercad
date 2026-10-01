@@ -69,7 +69,7 @@ export class Nucleo {
     if (q.tipo === 'igual') return { resumo: RESUMO_IGUAL, bitmapFundo: null, bitmapTextos: null };
     this.q = q;
     this.ctxFundo.clearRect(0, 0, vista.largura, vista.altura);
-    pintarGrade(this.ctxFundo, q.fundoX, q.fundoY, vista.largura, vista.altura, modo, cores);
+    pintarGrade(this.ctxFundo, q.fundoX, q.fundoY, vista.largura, vista.altura, modo, cores, vista);
     pintarTracos(this.ctxFundo, q);
     const t2 = performance.now();
     if (comTextos) this.desenharTextos(vista);

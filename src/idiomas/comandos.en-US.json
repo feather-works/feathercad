@@ -149,7 +149,37 @@
     "agrupar": [
       "GROUP",
       "G"
-    ]
+    ],
+    "3dface": [
+      "3DFACE",
+      "FACE3D",
+      "FACE"
+    ],
+    "caixa3d": [
+      "BOX",
+      "CAIXA3D",
+      "3DBOX"
+    ],
+    "elevacao": [
+      "ELEVATION",
+      "ELEV"
+    ],
+    "cilindro3d": ["CYLINDER", "CYL"],
+    "esfera3d": ["SPHERE", "SPH"],
+    "cone3d": ["CONE"],
+    "toro3d": ["TORUS", "TOR"],
+    "cunha3d": ["WEDGE", "WE"],
+    "extrusao": ["EXTRUDE", "EXT"],
+    "revolucao": ["REVOLVE", "REV"],
+    "varredura": ["SWEEP"],
+    "loft": ["LOFT"],
+    "presspull": ["PRESSPULL"],
+    "uniao3d": ["UNION", "UNI"],
+    "subtracao3d": ["SUBTRACT", "SUB"],
+    "intersecao3d": ["INTERSECT", "IN"],
+    "mover3d": ["3DMOVE"],
+    "rotacionar3d": ["3DROTATE"],
+    "escalar3d": ["3DSCALE"]
   },
   "opcoes": {
     "fechar": [

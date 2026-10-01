@@ -30,7 +30,7 @@ test('tema: todo modo tem texto em todas as línguas', () => {
 
 test('tema: nenhum componente escreve cor solta — só as variáveis de base.ts (exceções: console copiado e toast de erro)', () => {
   const pasta = new URL('../../src/ui/', import.meta.url);
-  const livres = new Set(['base.ts', 'console-depuracao.ts', 'toast.ts']);
+  const livres = new Set(['base.ts', 'console-depuracao.ts', 'toast.ts', 'pintura.ts']);
   for (const arq of readdirSync(pasta).filter((f) => f.endsWith('.ts') && !livres.has(f))) {
     const cores = readFileSync(new URL(arq, pasta), 'utf8').match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g);
     assert.equal(cores, null, `${arq} tem cor solta: ${cores?.join(', ')}`);

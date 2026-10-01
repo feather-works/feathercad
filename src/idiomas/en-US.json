@@ -25,6 +25,7 @@
       "inserir": "Insert",
       "anotar": "Annotate",
       "parametrico": "Parametric",
+      "modelo3d": "3D Modeling",
       "exibir": "View",
       "gerenciar": "Manage",
       "saida": "Output",
@@ -40,7 +41,27 @@
       "grupos": "Groups",
       "utilitarios": "Utilities",
       "area_transferencia": "Clipboard",
-      "folha": "Sheet"
+      "folha": "Sheet",
+      "texto": "Text",
+      "cotas": "Dimensions",
+      "chamada": "Leaders",
+      "tabela": "Table",
+      "marcacao": "Measurement",
+      "geometria": "Geometry",
+      "dimensional": "Dimensional",
+      "primitivas3d": "3D Primitives",
+      "operacoes3d": "3D Operations",
+      "booleanas3d": "3D Booleans",
+      "gizmos3d": "3D Gizmos",
+      "vistas": "Views",
+      "interface": "Interface",
+      "tema": "Theme",
+      "personalizacao": "Customization",
+      "desenho_geren": "Drawing",
+      "exportar": "Export",
+      "impressao": "Print & Plot",
+      "nuvem": "Cloud & AI",
+      "compartilhar": "Share"
     },
     "botoes": {
       "linha": {
@@ -74,6 +95,86 @@
       "hachura": {
         "rotulo": "Hatch",
         "dica": "Hatches a closed boundary: click inside it (H)"
+      },
+      "3dface": {
+        "rotulo": "3D Face",
+        "dica": "Creates a 3 or 4-point planar face in 3D space (3DFACE)"
+      },
+      "caixa3d": {
+        "rotulo": "3D Box",
+        "dica": "Creates a 3D box/cuboid (BOX)"
+      },
+      "m3d_caixa3d": {
+        "rotulo": "3D Box",
+        "dica": "Creates a 3D box/cuboid (BOX)"
+      },
+      "m3d_cilindro3d": {
+        "rotulo": "3D Cylinder",
+        "dica": "Creates a 3D solid cylinder (CYLINDER)"
+      },
+      "m3d_esfera3d": {
+        "rotulo": "3D Sphere",
+        "dica": "Creates a 3D solid sphere (SPHERE)"
+      },
+      "m3d_cone3d": {
+        "rotulo": "3D Cone",
+        "dica": "Creates a 3D solid cone (CONE)"
+      },
+      "m3d_toro3d": {
+        "rotulo": "3D Torus",
+        "dica": "Creates a 3D solid torus (TORUS)"
+      },
+      "m3d_cunha3d": {
+        "rotulo": "3D Wedge",
+        "dica": "Creates a 3D solid wedge (WEDGE)"
+      },
+      "m3d_extrusao": {
+        "rotulo": "3D Extrude",
+        "dica": "Extrudes a 2D profile into 3D space (EXTRUDE)"
+      },
+      "m3d_revolucao": {
+        "rotulo": "3D Revolve",
+        "dica": "Revolves a 2D profile around an axis (REVOLVE)"
+      },
+      "m3d_varredura": {
+        "rotulo": "3D Sweep",
+        "dica": "Sweeps a profile along a 3D path (SWEEP)"
+      },
+      "m3d_loft": {
+        "rotulo": "3D Loft",
+        "dica": "Lofts a 3D solid across cross-sections (LOFT)"
+      },
+      "m3d_presspull": {
+        "rotulo": "3D Presspull",
+        "dica": "Presses or pulls bounded 3D faces (PRESSPULL)"
+      },
+      "m3d_uniao3d": {
+        "rotulo": "3D Union",
+        "dica": "Unions 3D solids into a single body (UNION)"
+      },
+      "m3d_subtracao3d": {
+        "rotulo": "3D Subtract",
+        "dica": "Subtracts one 3D solid from another (SUBTRACT)"
+      },
+      "m3d_intersecao3d": {
+        "rotulo": "3D Intersect",
+        "dica": "Creates a 3D solid from intersection (INTERSECT)"
+      },
+      "m3d_mover3d": {
+        "rotulo": "3D Move",
+        "dica": "Moves objects along 3D axes X, Y, Z (3DMOVE)"
+      },
+      "m3d_rotacionar3d": {
+        "rotulo": "3D Rotate",
+        "dica": "Rotates objects around 3D axes (3DROTATE)"
+      },
+      "m3d_escalar3d": {
+        "rotulo": "3D Scale",
+        "dica": "Scales objects in 3D (3DSCALE)"
+      },
+      "elevacao": {
+        "rotulo": "Z Elevation",
+        "dica": "Sets the active work plane Z elevation (ELEV)"
       },
       "mover": {
         "rotulo": "Move",
@@ -231,6 +332,162 @@
       "contar": {
         "rotulo": "Count",
         "dica": "Click an object: selects every object equal to it and tells how many there are (CNT)"
+      },
+      "anot_texto": {
+        "rotulo": "Text",
+        "dica": "Creates a single-line text (TX)"
+      },
+      "anot_cota": {
+        "rotulo": "Dimension",
+        "dica": "Linear dimension: two points and line position (COT)"
+      },
+      "anot_cota_alinhada": {
+        "rotulo": "Aligned dimension",
+        "dica": "Measures real distance between two points (CAL)"
+      },
+      "anot_cota_raio": {
+        "rotulo": "Radius",
+        "dica": "Dimensions radius of a circle or arc (CRA)"
+      },
+      "anot_cota_diametro": {
+        "rotulo": "Diameter",
+        "dica": "Dimensions diameter of a circle or arc (CDI)"
+      },
+      "anot_chamada": {
+        "rotulo": "Leader",
+        "dica": "Leader line with arrow and text (CH)"
+      },
+      "anot_tabela": {
+        "rotulo": "Table",
+        "dica": "Table: grid of rows and columns (TAB)"
+      },
+      "anot_medir": {
+        "rotulo": "Measure",
+        "dica": "Measures distance (2 clicks) or area (A) (MD)"
+      },
+      "anot_contar": {
+        "rotulo": "Count",
+        "dica": "Click an object: selects all identical objects (CNT)"
+      },
+      "param_coincidente": {
+        "rotulo": "Coincident",
+        "dica": "Coincident constraint: joins two points"
+      },
+      "param_colinear": {
+        "rotulo": "Collinear",
+        "dica": "Collinear constraint: aligns lines"
+      },
+      "param_concentrico": {
+        "rotulo": "Concentric",
+        "dica": "Concentric constraint: same center"
+      },
+      "param_paralelo": {
+        "rotulo": "Parallel",
+        "dica": "Parallel constraint"
+      },
+      "param_perpendicular": {
+        "rotulo": "Perpendicular",
+        "dica": "Perpendicular constraint: 90°"
+      },
+      "param_tangente": {
+        "rotulo": "Tangent",
+        "dica": "Tangent constraint"
+      },
+      "param_horizontal": {
+        "rotulo": "Horizontal",
+        "dica": "Horizontal constraint"
+      },
+      "param_vertical": {
+        "rotulo": "Vertical",
+        "dica": "Vertical constraint"
+      },
+      "param_linear": {
+        "rotulo": "Linear",
+        "dica": "Linear dimensional constraint"
+      },
+      "param_raio": {
+        "rotulo": "Radius",
+        "dica": "Radius dimensional constraint"
+      },
+      "param_angulo": {
+        "rotulo": "Angle",
+        "dica": "Angle dimensional constraint"
+      },
+      "exib_enquadrar": {
+        "rotulo": "Fit All",
+        "dica": "Fits whole drawing on screen"
+      },
+      "exib_zoom_mais": {
+        "rotulo": "Zoom In",
+        "dica": "Zooms in"
+      },
+      "exib_zoom_menos": {
+        "rotulo": "Zoom Out",
+        "dica": "Zooms out"
+      },
+      "exib_propriedades": {
+        "rotulo": "Properties",
+        "dica": "Opens properties palette (Ctrl+1)"
+      },
+      "exib_camadas": {
+        "rotulo": "Layers",
+        "dica": "Opens layer manager"
+      },
+      "exib_monitor": {
+        "rotulo": "Monitor",
+        "dica": "Opens performance monitor (F12)"
+      },
+      "exib_tema": {
+        "rotulo": "Theme",
+        "dica": "Toggles light / dark / auto theme"
+      },
+      "geren_configuracoes": {
+        "rotulo": "Settings",
+        "dica": "Opens settings modal (Ctrl+,)"
+      },
+      "geren_mcp": {
+        "rotulo": "Connect MCP",
+        "dica": "MCP Server (AI / Antigravity)"
+      },
+      "geren_unidades": {
+        "rotulo": "Units",
+        "dica": "Configures drawing units (mm, cm, m)"
+      },
+      "geren_limpar": {
+        "rotulo": "Purge",
+        "dica": "Purges unused objects and blocks"
+      },
+      "saida_pdf": {
+        "rotulo": "PDF",
+        "dica": "Exports drawing sheets to PDF"
+      },
+      "saida_dxf": {
+        "rotulo": "Save DXF",
+        "dica": "Saves drawing in DXF format"
+      },
+      "saida_fcdz": {
+        "rotulo": "Save FCDZ",
+        "dica": "Saves in FeatherCAD binary format (.fcdz)"
+      },
+      "saida_folhas": {
+        "rotulo": "Sheets",
+        "dica": "Inserts or adjusts print sheets"
+      },
+      "colab_mcp": {
+        "rotulo": "MCP Agent",
+        "dica": "Communication via MCP protocol"
+      },
+      "colab_ia": {
+        "rotulo": "AI Assistant",
+        "dica": "Automations and drawing assistant"
+      },
+      "colab_exportar": {
+        "rotulo": "Export",
+        "dica": "Exports project"
+      },
+      "colab_sobre": {
+        "rotulo": "About",
+        "dica": "About FeatherCAD"
       }
     },
     "embreve": "This tab will be filled in later."
@@ -278,6 +535,20 @@
   "linha": {
     "primeiroPonto": "LINE Specify first point:",
     "proximoPonto": "LINE Specify next point or [Enter to finish]:"
+  },
+  "elevacao": {
+    "digite": "Current Z elevation: {z}. Type new Z elevation value:",
+    "definida": "Z elevation plane set to {z}."
+  },
+  "face3d": {
+    "primeiroPonto": "3DFACE Specify first point:",
+    "segundoPonto": "3DFACE Specify second point:",
+    "terceiroPonto": "3DFACE Specify third point:",
+    "quartoPonto": "3DFACE Specify fourth point (or Enter to close):"
+  },
+  "caixa3d": {
+    "primeiroCanto": "BOX Specify first corner:",
+    "segundoCantoOuAltura": "BOX Specify opposite corner or Z height:"
   },
   "desfazer": {
     "feito": "Undone.",
@@ -371,7 +642,7 @@
       }
     },
     "overlay": {
-      "titulo": "⚙ Debug console",
+      "titulo": "Debug Console",
       "filtrar": "Filter text...",
       "todos": "All",
       "erros": "Errors",
@@ -412,7 +683,11 @@
     },
     "tipos": {
       "dxf": "DXF",
-      "fcdz": "FeatherCAD drawing"
+      "fcdz": "FeatherCAD drawing",
+      "xyz": "Point Cloud (XYZ)",
+      "pts": "Point Cloud (PTS)",
+      "csv": "Point Cloud (CSV)",
+      "txt": "Point Cloud (TXT)"
     },
     "visao": {
       "lista": "List",
@@ -442,7 +717,9 @@
     "hachuraNaoGravada": "{n} hatch(es) were not saved to the DXF (area with an island, or too much detail). Save as .fcdz to keep them.",
     "espacoPapelIgnorado": "{n} paper space object(s) were ignored.",
     "corAproximada": "{n} color(s) were approximated to the DXF color table (ACI).",
-    "hachuraDecomposta": "{n} hatch(es) were saved as lines and triangles: the DXF written today (R12) has no hatch. Save as .fcdz to keep true hatches."
+    "espessuraNaoGravada": "{n} lineweight(s) (layer or object) were not saved: the DXF written today (R12) has no lineweight. Save as .fcdz to keep them.",
+    "hachuraDecomposta": "{n} hatch(es) were saved as lines and triangles: the DXF written today (R12) has no hatch. Save as .fcdz to keep true hatches.",
+    "nuvemCarregada": "Point cloud loaded: {pontos} points processed, {curvas} contour lines generated."
   },
   "navegacao": {
     "maisZoom": "Zoom in",
@@ -625,10 +902,21 @@
     "nenhum": "No selection",
     "objetos": "{n} object(s) selected",
     "geral": "General",
+    "geometria": "Geometry",
+    "texto": "Text",
     "camada": "Layer",
     "cor": "Color",
     "tipoLinha": "Linetype",
     "espessura": "Lineweight",
+    "posicaoX": "Position X",
+    "posicaoY": "Position Y",
+    "comprimento": "Length",
+    "raio": "Radius",
+    "diametro": "Diameter",
+    "area": "Area",
+    "tamanhoGeral": "General size",
+    "rotacao": "Rotation",
+    "conteudo": "Content",
     "porCamada": "ByLayer",
     "variado": "*VARIES*",
     "fechar": "Close",
@@ -636,6 +924,7 @@
     "corInvalida": "Invalid color: use #rrggbb or ByLayer.",
     "tipoInvalido": "Invalid linetype.",
     "espessuraInvalida": "Invalid lineweight (0 to 2.11 mm).",
+    "numeroInvalido": "Invalid number.",
     "dica": "Properties of the selected objects (Ctrl+1)",
     "cores": {
       "vermelho": "Red",
@@ -955,7 +1244,26 @@
       "tornar_atual": "Make layer current",
       "igualar_propriedades": "Match properties",
       "igualar_camada": "Match layer",
-      "contar": "Count equals"
+      "contar": "Count equals",
+      "3dface": "3D Face",
+      "caixa3d": "3D Box",
+      "cilindro3d": "3D Cylinder",
+      "esfera3d": "3D Sphere",
+      "cone3d": "3D Cone",
+      "toro3d": "3D Torus",
+      "cunha3d": "3D Wedge",
+      "extrusao": "3D Extrude",
+      "revolucao": "3D Revolve",
+      "varredura": "3D Sweep",
+      "loft": "3D Loft",
+      "presspull": "3D Presspull",
+      "uniao3d": "3D Union",
+      "subtracao3d": "3D Subtract",
+      "intersecao3d": "3D Intersect",
+      "mover3d": "3D Move",
+      "rotacionar3d": "3D Rotate",
+      "escalar3d": "3D Scale",
+      "elevacao": "Z Elevation"
     }
   },
   "folha": {
@@ -970,10 +1278,12 @@
       "cliente": "Client",
       "fase": "Project phase",
       "disciplina": "Discipline",
+      "responsavel": "Technical Lead / Company",
       "tituloDesenho": "Drawing title",
       "subtitulo": "Subtitle",
       "numero": "Drawing no.",
       "revisao": "Revision",
+      "revisaoDescricao": "Revision description",
       "inserir": "Insert",
       "cancelar": "Cancel",
       "divisoria": "Dividing line across the middle (two views)",

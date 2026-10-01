@@ -330,7 +330,7 @@ fn folha_pdf_contar_e_hachura_com_padrao_funcionam_pelo_mcp() {
     // folha: sem escala pedida escolhe a que cabe; origem põe o canto em (0,0)
     let f = s.json("cad_folha", json!({ "acao": "inserir", "papel": "A1", "origem": true, "campos": { "titulo": "TÚNEL" } }));
     assert_eq!(f["folha"]["papel"], "A1");
-    assert_eq!(f["folha"]["min"], json!({ "x": 0.0, "y": 0.0 }));
+    assert_eq!(f["folha"]["min"], json!({ "x": 0.0, "y": 0.0, "z": 0.0 }));
     let escala = f["folha"]["escala"].as_f64().unwrap();
     assert!(escala >= 500.0, "500 m em A1 pedem 1:750 ou mais: {escala}");
     let c = s.json("cad_folha", json!({ "acao": "campos", "indice": 0 }));
@@ -357,3 +357,62 @@ fn folha_pdf_contar_e_hachura_com_padrao_funcionam_pelo_mcp() {
     assert!(erro, "não sobrescreve sem pedir");
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[test]
+fn checklist_e_validacao_de_dominio_no_mcp() {
+    let mut s = Servidor::novo();
+    s.json("cad_novo", json!({ "unidade": "m" }));
+    
+    // Testar cad_verificar com dominio eletrica no desenho vazio -> deve falhar no checklist
+    let ver = s.json("cad_verificar", json!({ "dominio": "eletrica" }));
+    assert_eq!(ver["checklist_dominio"]["aprovado"], false);
+
+    // Salvar com verificar_checklist: true e dominio: eletrica -> deve dar erro e BLOQUEAR o salvamento
+    let tmp = std::env::temp_dir().join(format!("teste_chk_{}.dxf", std::process::id()));
+    let (_, erro) = s.ferramenta("cad_salvar", json!({ "caminho": tmp.to_str().unwrap(), "verificar_checklist": true, "dominio": "eletrica" }));
+    assert!(erro, "cad_salvar deve bloquear o salvamento quando o checklist do domínio falha");
+
+    // Adiciona o QDC, pontos de luz e eletroduto
+    s.json("cad_criar", json!({ "camada": "ELE_PONTOS", "formas": [
+        { "tipo": "texto", "ponto": [1, 1], "altura": 0.2, "conteudo": "QDC GERAL" },
+        { "tipo": "circulo", "centro": [5, 5], "raio": 0.2 }
+    ] }));
+    s.json("cad_criar", json!({ "camada": "ELE_ELETRODUTOS", "formas": [
+        { "tipo": "polilinha", "pontos": [[1, 1], [5, 5]] }
+    ] }));
+
+    // Agora o checklist do domínio elétrica passa!
+    let ver_ok = s.json("cad_verificar", json!({ "dominio": "eletrica" }));
+    assert_eq!(ver_ok["checklist_dominio"]["aprovado"], true);
+
+    // Salvar com verificar_checklist: true -> deve salvar com sucesso!
+    let salvou = s.json("cad_salvar", json!({ "caminho": tmp.to_str().unwrap(), "verificar_checklist": true, "dominio": "eletrica" }));
+    assert_eq!(salvou["ok"], true);
+
+    std::fs::remove_file(&tmp).ok();
+}
+
+#[test]
+fn topografia_mcp_gera_levantamento_e_abre_arquivo() {
+    let mut s = Servidor::novo();
+    s.json("cad_novo", json!({ "unidade": "m" }));
+
+    let csv = "E,N,Z\n0,0,10\n10,0,12\n10,10,15\n0,10,11\n5,5,18\n";
+    let res = s.json("cad_topografia", json!({ "texto": csv, "equidistancia": 1.0 }));
+    assert_eq!(res["total_pontos"], 5);
+    assert!(res["total_curvas"].as_u64().unwrap() > 0);
+    assert!(res["entidades_criadas"].as_u64().unwrap() > 10);
+
+    let desfeito = s.json("cad_desfazer", json!({}));
+    assert_eq!(desfeito["feito"], true);
+
+    let tmp = std::env::temp_dir().join(format!("teste_topo_{}.csv", std::process::id()));
+    std::fs::write(&tmp, csv).unwrap();
+    let abrir = s.json("cad_abrir", json!({ "caminho": tmp.to_str().unwrap() }));
+    assert!(abrir["avisos"].as_array().unwrap().iter().any(|a| a.as_str().unwrap().contains("aviso.nuvemCarregada")));
+
+    let resumo = s.json("cad_resumo", json!({}));
+    assert!(resumo["camadas"].as_array().unwrap().iter().any(|c| c["nome"] == "TOPOGRAFIA_CURVAS_MESTRAS"));
+    std::fs::remove_file(&tmp).ok();
+}
+

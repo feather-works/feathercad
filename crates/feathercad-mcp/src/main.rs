@@ -15,10 +15,12 @@ mod json;
 mod lote;
 mod medidas;
 mod eletroduto;
+mod exemplos;
 mod guias;
 mod mutacoes;
 mod rpc;
 mod simbolos;
+mod topografia;
 
 use std::io::{BufRead, Write};
 

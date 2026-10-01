@@ -21,6 +21,24 @@ pub struct Opcoes {
     pub rotulos: bool,
     pub grade: bool,
     pub destacar: BTreeSet<Id>,
+    pub rotacao_x: f64,
+    pub rotacao_z: f64,
+    pub isometria: bool,
+}
+
+impl Default for Opcoes {
+    fn default() -> Self {
+        Self {
+            janela: None,
+            largura_px: 1000,
+            rotulos: true,
+            grade: true,
+            destacar: BTreeSet::new(),
+            rotacao_x: 0.0,
+            rotacao_z: 0.0,
+            isometria: false,
+        }
+    }
 }
 
 pub struct Imagem {
@@ -132,25 +150,76 @@ pub fn numero(v: f64) -> String {
 
 /// A janela do desenho: a pedida ou a de todo o desenho, com folga; nunca degenerada.
 fn escolher_janela(doc: &Documento, o: &Opcoes) -> (Ponto, Ponto) {
-    let (mut min, mut max) = o.janela.or_else(|| doc.caixa()).unwrap_or((Ponto::novo(-10.0, -10.0), Ponto::novo(10.0, 10.0)));
+    let (mut min, mut max) = o.janela.or_else(|| doc.caixa()).unwrap_or((Ponto::novo3d(-10.0, -10.0, 0.0), Ponto::novo3d(10.0, 10.0, 0.0)));
     let (mut w, mut h) = (max.x - min.x, max.y - min.y);
     if w < 1e-9 && h < 1e-9 {
         (w, h) = (2.0, 2.0);
-        (min, max) = (Ponto::novo(min.x - 1.0, min.y - 1.0), Ponto::novo(max.x + 1.0, max.y + 1.0));
+        (min, max) = (Ponto::novo3d(min.x - 1.0, min.y - 1.0, min.z), Ponto::novo3d(max.x + 1.0, max.y + 1.0, max.z));
     }
     if o.janela.is_none() {
         let folga = w.max(h) * 0.06;
-        return (Ponto::novo(min.x - folga, min.y - folga), Ponto::novo(max.x + folga, max.y + folga));
+        return (Ponto::novo3d(min.x - folga, min.y - folga, min.z), Ponto::novo3d(max.x + folga, max.y + folga, max.z));
     }
     (min, max)
 }
 
-/// A vista que enquadra a janela em `largura` pixels (a altura segue a proporção).
-fn montar_vista(janela: (Ponto, Ponto), largura: u32) -> Vista {
+/// A vista que enquadra a janela em `largura` pixels (a altura segue a proporção 2D ou projeção 3D).
+fn montar_vista(janela: (Ponto, Ponto), largura: u32, rx: f64, rz: f64) -> Vista {
     let (w, h) = (janela.1.x - janela.0.x, janela.1.y - janela.0.y);
-    let (lw, lh) = (f64::from(largura), (f64::from(largura) * h / w.max(1e-12)).clamp(200.0, 2400.0));
-    let escala = (lw / w.max(1e-12)).min(lh / h.max(1e-12));
-    Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala, largura: lw, altura: lh }
+    let lw = f64::from(largura);
+    if rx.abs() > 1e-4 || rz.abs() > 1e-4 {
+        let temp_vista = Vista {
+            centro: Ponto::novo(0.0, 0.0),
+            escala: 1.0,
+            largura: lw,
+            altura: lw,
+            rotacao_x: rx,
+            rotacao_z: rz,
+        };
+        let cantos = [
+            Ponto::novo3d(janela.0.x, janela.0.y, janela.0.z),
+            Ponto::novo3d(janela.1.x, janela.0.y, janela.0.z),
+            Ponto::novo3d(janela.0.x, janela.1.y, janela.0.z),
+            Ponto::novo3d(janela.1.x, janela.1.y, janela.0.z),
+            Ponto::novo3d(janela.0.x, janela.0.y, janela.1.z),
+            Ponto::novo3d(janela.1.x, janela.0.y, janela.1.z),
+            Ponto::novo3d(janela.0.x, janela.1.y, janela.1.z),
+            Ponto::novo3d(janela.1.x, janela.1.y, janela.1.z),
+        ];
+        let mut p_min = (f64::INFINITY, f64::INFINITY);
+        let mut p_max = (f64::NEG_INFINITY, f64::NEG_INFINITY);
+        for c in cantos {
+            let (px, py) = temp_vista.projetar(c);
+            p_min.0 = p_min.0.min(px);
+            p_min.1 = p_min.1.min(py);
+            p_max.0 = p_max.0.max(px);
+            p_max.1 = p_max.1.max(py);
+        }
+        let proj_w = (p_max.0 - p_min.0).max(1e-6);
+        let proj_h = (p_max.1 - p_min.1).max(1e-6);
+        let lh = (lw * proj_h / proj_w).clamp(300.0, 2400.0);
+        let mut v = Vista {
+            centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0),
+            escala: 1.0,
+            largura: lw,
+            altura: lh,
+            rotacao_x: rx,
+            rotacao_z: rz,
+        };
+        v = v.ajustar(Some(janela));
+        v
+    } else {
+        let lh = (lw * h / w.max(1e-12)).clamp(200.0, 2400.0);
+        let escala = (lw / w.max(1e-12)).min(lh / h.max(1e-12));
+        Vista {
+            centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0),
+            escala,
+            largura: lw,
+            altura: lh,
+            rotacao_x: 0.0,
+            rotacao_z: 0.0,
+        }
+    }
 }
 
 fn linha(pix: &mut Pixmap, a: (f64, f64), b: (f64, f64), cor: [u8; 3], largura: f32) {
@@ -250,21 +319,77 @@ fn desenhar_escala(pix: &mut Pixmap, v: &Vista, fonte: &Fonte) {
     escrever(pix, fonte, &numero(comprimento), ((x0 + x1) / 2.0) as f32, y as f32 - 8.0, 12.0, 0.0, [20, 20, 20], Ancora { h: 1, v: 0 }, true);
 }
 
+fn desenhar_indicador_3d(pix: &mut Pixmap, v: &Vista, fonte: &Fonte) {
+    let h = v.altura as f32;
+    escrever(
+        pix,
+        fonte,
+        &format!("3D [rx={:.0}° rz={:.0}°]", v.rotacao_x, v.rotacao_z),
+        14.0,
+        22.0,
+        13.0,
+        0.0,
+        [80, 80, 80],
+        ESQUERDA_BASE,
+        true,
+    );
+
+    let ox = 50.0;
+    let oy = f64::from(h) - 45.0;
+    let comps = [
+        (Ponto::novo3d(1.0, 0.0, 0.0), [220, 50, 50], "X"),
+        (Ponto::novo3d(0.0, 1.0, 0.0), [40, 160, 40], "Y"),
+        (Ponto::novo3d(0.0, 0.0, 1.0), [50, 100, 220], "Z"),
+    ];
+
+    for (dir, cor, nome) in comps {
+        let (dx, dy) = v.projetar(dir);
+        let len = (dx * dx + dy * dy).sqrt().max(1e-6);
+        let ex = (dx / len) * 28.0;
+        let ey = (dy / len) * 28.0;
+        let tx = ox + ex;
+        let ty = oy - ey;
+        linha(pix, (ox, oy), (tx, ty), cor, 2.0);
+        escrever(
+            pix,
+            fonte,
+            nome,
+            (tx + (dx / len) * 6.0) as f32,
+            (ty - (dy / len) * 4.0) as f32 + 4.0,
+            11.0,
+            0.0,
+            cor,
+            Ancora { h: 1, v: 2 },
+            true,
+        );
+    }
+}
+
 /// Desenha o documento e devolve o PNG e o que ele mostra.
 pub fn desenhar(doc: &Documento, o: &Opcoes, fonte: &Fonte) -> Res<Imagem> {
     let janela = escolher_janela(doc, o);
-    let vista = montar_vista(janela, o.largura_px.clamp(300, 2400));
+    let (rx, rz) = if o.isometria && o.rotacao_x.abs() < 1e-4 && o.rotacao_z.abs() < 1e-4 {
+        (55.0, 45.0)
+    } else {
+        (o.rotacao_x, o.rotacao_z)
+    };
+    let eh_3d = rx.abs() > 1e-4 || rz.abs() > 1e-4;
+    let vista = montar_vista(janela, o.largura_px.clamp(300, 2400), rx, rz);
     let mut pix = Pixmap::new(vista.largura as u32, vista.altura as u32).ok_or("imagem grande demais")?;
     pix.fill(Color::WHITE);
-    if o.grade {
+    if o.grade && !eh_3d {
         desenhar_grade(&mut pix, &vista, fonte);
     }
     let bytes = montar_com_selecao(doc, &vista, None, None, true, &o.destacar, 0);
     desenhar_objetos(&mut pix, &ler_quadro(&bytes)?, fonte);
-    if o.rotulos {
+    if o.rotulos && !eh_3d {
         desenhar_rotulos(&mut pix, doc, &vista, fonte);
     }
-    desenhar_escala(&mut pix, &vista, fonte);
+    if !eh_3d {
+        desenhar_escala(&mut pix, &vista, fonte);
+    } else {
+        desenhar_indicador_3d(&mut pix, &vista, fonte);
+    }
     let png = pix.encode_png().map_err(|e| format!("não consegui gerar o PNG: {e}"))?;
     let (min, max) = vista.area_visivel();
     Ok(Imagem { png, largura: pix.width(), altura: pix.height(), janela: (Ponto::novo(min.x, min.y), Ponto::novo(max.x, max.y)), unidades_por_pixel: 1.0 / vista.escala })
@@ -291,10 +416,37 @@ mod testes {
         let mut d = Documento::default();
         d.adicionar_linha(Ponto::novo(0.0, 0.0), Ponto::novo(100.0, 50.0));
         d.adicionar_circulo(Ponto::novo(50.0, 25.0), 10.0);
-        let o = Opcoes { janela: None, largura_px: 600, rotulos: true, grade: true, destacar: BTreeSet::new() };
+        let o = Opcoes {
+            janela: None,
+            largura_px: 600,
+            rotulos: true,
+            grade: true,
+            destacar: BTreeSet::new(),
+            rotacao_x: 0.0,
+            rotacao_z: 0.0,
+            isometria: false,
+        };
         let img = desenhar(&d, &o, &crate::fonte::Fonte::Basica).unwrap();
         assert_eq!(&img.png[1..4], b"PNG");
         assert!(img.janela.0.x < 0.0 && img.janela.1.x > 100.0, "a janela tem folga em volta do desenho");
         assert!((img.largura as f64 * img.unidades_por_pixel) >= 100.0);
+    }
+
+    #[test]
+    fn desenha_png_isometria_3d() {
+        let mut d = Documento::default();
+        d.adicionar_linha(Ponto::novo3d(0.0, 0.0, 0.0), Ponto::novo3d(100.0, 50.0, 25.0));
+        let o = Opcoes {
+            janela: None,
+            largura_px: 600,
+            rotulos: false,
+            grade: false,
+            destacar: BTreeSet::new(),
+            rotacao_x: 55.0,
+            rotacao_z: 45.0,
+            isometria: true,
+        };
+        let img = desenhar(&d, &o, &crate::fonte::Fonte::Basica).unwrap();
+        assert_eq!(&img.png[1..4], b"PNG");
     }
 }
