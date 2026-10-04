@@ -11,6 +11,7 @@ pub mod contagem;
 pub mod cursor;
 pub mod deslocar;
 pub mod documento;
+pub mod geodesia;
 pub mod edicao_sessao;
 pub mod edicao;
 pub mod estender;

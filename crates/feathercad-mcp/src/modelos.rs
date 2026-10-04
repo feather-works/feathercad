@@ -285,7 +285,55 @@ pub fn modelo(ag: &mut Agente, fonte: &Fonte, args: &Value) -> Res<Value> {
     r
 }
 
-fn ferrovia(ag: &mut Agente, fonte: &Fonte, d: &Value, caminho: &str) -> Res<Value> {
+/// Tudo o que o cálculo do projeto produz e as folhas leem.
+struct Calculo {
+    a: feathercad_core::viario::alinhamento::Alinhamento,
+    tabela: Vec<ResultadoCurva>,
+    regras: feathercad_core::viario::superelevacao::Regras,
+    greide: feathercad_core::viario::greide::Greide,
+    obs: Vec<feathercad_core::viario::criticidade::Observacao>,
+    analise: feathercad_core::viario::criticidade::Analise,
+    existente: crate::nuvem_ferramentas::Feicoes,
+    /// Respostas das ferramentas, para o resumo final.
+    secoes: Value,
+    feic: Value,
+    qual: Value,
+    ajuste: Value,
+    sup: Value,
+    g: Value,
+    regras_args: Value,
+}
+
+/// Os pontos do levantamento projetados no traçado: progressiva, cota e ripagem (suspeitos de fora).
+fn observacoes(a: &feathercad_core::viario::alinhamento::Alinhamento, f: &crate::nuvem_ferramentas::Feicoes) -> Vec<feathercad_core::viario::criticidade::Observacao> {
+    let t = feathercad_core::trajeto::Trajeto::novo(&a.amostrar(0.5));
+    let mut v: Vec<_> = f
+        .pares
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !f.suspeitos.contains(i))
+        .filter_map(|(_, p)| t.as_ref().map(|t| { let (d, s) = t.projetar(p.meio); feathercad_core::viario::criticidade::Observacao { s: s + a.progressiva_inicial, z: p.z, ripagem: d } }))
+        .collect();
+    v.sort_by(|x, y| x.s.total_cmp(&y.s));
+    v
+}
+
+/// Os limiares da análise: os padrões de `Criterios` com o que vier em `dados.criterios` por cima.
+fn criterios_de(d: &Value) -> feathercad_core::viario::criticidade::Criterios {
+    let mut c = feathercad_core::viario::criticidade::Criterios::default();
+    let Some(o) = d.get("criterios").and_then(Value::as_object) else { return c };
+    let n = |k: &str| o.get(k).and_then(Value::as_f64);
+    let campos: [(&str, &mut f64); 14] = [("fracao_h", &mut c.fracao_h), ("fracao_i", &mut c.fracao_i), ("folga_r", &mut c.folga_r), ("folga_v", &mut c.folga_v), ("folga_ls", &mut c.folga_ls), ("ripagem_atencao", &mut c.ripagem_atencao), ("ripagem_critica", &mut c.ripagem_critica), ("movimento_minimo", &mut c.movimento_minimo), ("movimento_atencao", &mut c.movimento_atencao), ("movimento_critico", &mut c.movimento_critico), ("rampa_atencao_pct", &mut c.rampa_atencao_pct), ("rampa_critica_pct", &mut c.rampa_critica_pct), ("tangente_minima", &mut c.tangente_minima), ("largura_plataforma", &mut c.largura_plataforma)];
+    for (nome, campo) in campos {
+        if let Some(v) = n(nome) {
+            *campo = v;
+        }
+    }
+    c
+}
+
+/// Nuvem → feições → traçado ajustado → superelevação → greide → análise de criticidade.
+fn calcular_projeto(ag: &mut Agente, fonte: &Fonte, d: &Value, caminho: &str) -> Res<Calculo> {
     let regras_args = json!({ "regras": d.get("regras").cloned().unwrap_or(Value::Null), "V": d.get("V").cloned().unwrap_or(json!(65)) });
     passo(ag, fonte, "cad_novo", &json!({ "unidade": "m" }))?;
     let mut sec = json!({ "caminho": caminho });
@@ -297,58 +345,100 @@ fn ferrovia(ag: &mut Agente, fonte: &Fonte, d: &Value, caminho: &str) -> Res<Val
     let secoes = passo(ag, fonte, "cad_nuvem_secoes", &sec)?;
     let feic = passo(ag, fonte, "cad_nuvem_feicoes", &json!({ "bitola": d.get("bitola").cloned().unwrap_or(json!(1.0)) }))?;
     let qual = passo(ag, fonte, "cad_nuvem_qualidade", &json!({ "marcar": true }))?;
-    let mut aj = json!({ "voltas": d.get("voltas").cloned().unwrap_or(json!(3)), "regras": regras_args["regras"], "V": regras_args["V"] });
+    let mut aj = json!({ "voltas": d.get("voltas").cloned().unwrap_or(json!(6)), "regras": regras_args["regras"], "V": regras_args["V"] });
     if aj["regras"].is_null() {
         aj.as_object_mut().map(|o| o.remove("regras"));
     }
     let ajuste = passo(ag, fonte, "cad_alinhamento_ajustar", &aj)?;
     let sup = passo(ag, fonte, "cad_superelevacao", &regras_args)?;
-    let g = passo(ag, fonte, "cad_greide", &json!({}))?;
+    // greide `compensado` (padrão: mínimos quadrados, corta e aterra ao redor do existente) ou `so_levante` (a via só sobe)
+    let regra = if texto_opcional(d, "greide") == Some("so_levante") { json!({}) } else { json!({ "regra": "minimos_quadrados" }) };
+    let g = passo(ag, fonte, "cad_greide", &regra)?;
     let a = ag.alinhamentos.values().next().ok_or("sem alinhamento")?.0.clone();
     let regras = crate::regras::carregar(&regras_args)?;
     let tabela = calcular(&a, &regras);
-    // o que se vê na planta: eixo existente e eixo de projeto
-    let f_existente = ag.feicoes.values().next().ok_or("sem feições")?.clone();
-    let pontos: Vec<Value> = f_existente.pares.iter().enumerate().filter(|(i, _)| !f_existente.suspeitos.contains(i)).map(|(_, p)| json!([p.meio.x, p.meio.y])).collect();
+    let existente = ag.feicoes.values().next().ok_or("sem feições")?.clone();
+    let greide = ag.greides.values().next().ok_or("sem greide")?.clone();
+    let obs = observacoes(&a, &existente);
+    let analise = feathercad_core::viario::criticidade::analisar(&a, &tabela, &regras, &greide, &obs, &criterios_de(d));
+    Ok(Calculo { a, tabela, regras, greide, obs, analise, existente, secoes, feic, qual, ajuste, sup, g, regras_args })
+}
+
+/// O eixo existente (azul) e o de projeto no desenho, que a planta geral e os detalhes copiam.
+fn desenhar_eixos(ag: &mut Agente, fonte: &Fonte, c: &Calculo) -> Res<Value> {
+    let f = &c.existente;
+    let pontos: Vec<Value> = f.pares.iter().enumerate().filter(|(i, _)| !f.suspeitos.contains(i)).map(|(_, p)| json!([p.meio.x, p.meio.y])).collect();
     passo(ag, fonte, "cad_criar", &json!({ "formas": [{ "tipo": "polilinha", "pontos": pontos }], "camada": "EXISTENTE", "cor": "#00B0FF" }))?;
-    let aj_eixo = json!({ "pis": ajuste["pis"], "curvas": ajuste["raios"].as_array().map(|r| r.iter().zip(a.curvas.iter()).map(|(r, c)| json!({ "R": r, "Ls": c.ls })).collect::<Vec<_>>()), "desenhar": { "eixo": true }, "camada_base": "PROJETO", "nome": "A1" });
-    passo(ag, fonte, "cad_alinhamento", &aj_eixo)?;
+    let curvas = c.ajuste["raios"].as_array().map(|r| r.iter().zip(c.a.curvas.iter()).map(|(r, cv)| json!({ "R": r, "Ls": cv.ls })).collect::<Vec<_>>());
+    let eixo = json!({ "pis": c.ajuste["pis"], "curvas": curvas, "desenhar": { "eixo": true }, "camada_base": "PROJETO", "nome": "A1" });
+    passo(ag, fonte, "cad_alinhamento", &eixo)?;
+    Ok(json!({ "pis": c.ajuste["pis"], "curvas": curvas }))
+}
+
+/// Quantas folhas de cada tipo o projeto terá (o carimbo mostra `n/total`).
+struct Contagem {
+    perfis: usize,
+    plantas: usize,
+    estacas: usize,
+}
+
+impl Contagem {
+    fn de(a: &feathercad_core::viario::alinhamento::Alinhamento, trechos: usize) -> Self {
+        Self { perfis: crate::perfil::numero_de_folhas(a.comprimento), plantas: trechos, estacas: ((a.comprimento / 20.0).floor() as usize + 1).div_ceil(LINHAS_POR_FOLHA_DE_ESTACAS) }
+    }
+    fn total(&self) -> usize {
+        4 + self.perfis + self.plantas + self.estacas
+    }
+}
+
+fn montar_folhas(ag: &mut Agente, fonte: &Fonte, d: &Value, c: &Calculo, eixo: &Value) -> Res<f64> {
+    let trechos = crate::planta_a1::dividir(&c.a);
+    let n = Contagem::de(&c.a, trechos.len());
     let carimbo = d.get("carimbo").cloned().unwrap_or(json!({}));
-    let trechos = crate::planta_a1::dividir(&a);
-    let n_estacas = ((a.comprimento / 20.0).floor() as usize + 1).div_ceil(LINHAS_POR_FOLHA_DE_ESTACAS);
-    let total = 4 + trechos.len() + n_estacas;
-    let mut ctx = Contexto { papel: texto_opcional(d, "papel").unwrap_or("A0").to_string(), escala: numero_opcional(d, "escala").unwrap_or(0.0), carimbo, total };
-    let f1 = prancha_planta(ag, fonte, &mut ctx, 1, &tabela)?;
+    let mut ctx = Contexto { papel: texto_opcional(d, "papel").unwrap_or("A0").to_string(), escala: numero_opcional(d, "escala").unwrap_or(0.0), carimbo, total: n.total() };
+    let f1 = prancha_planta(ag, fonte, &mut ctx, 1, &c.tabela)?;
     // textos da planta já na escala certa
-    let rot = json!({ "pis": ajuste["pis"], "curvas": aj_eixo["curvas"], "desenhar": { "estacas": true, "km": true, "notaveis": true, "rotulos": false }, "camada_base": "PROJETO", "escala": f1.escala, "nome": "A1", "altura_texto": 3.0, "rotular_estacas_a_cada": ((35.0 * f1.escala / 1000.0 / 20.0 / 5.0).ceil() * 5.0).max(5.0) });
+    let rot = json!({ "pis": eixo["pis"], "curvas": eixo["curvas"], "desenhar": { "estacas": true, "km": true, "notaveis": true, "rotulos": false }, "camada_base": "PROJETO", "escala": f1.escala, "nome": "A1", "altura_texto": 3.0, "rotular_estacas_a_cada": ((35.0 * f1.escala / 1000.0 / 20.0 / 5.0).ceil() * 5.0).max(5.0) });
     passo(ag, fonte, "cad_alinhamento", &rot)?;
-    prancha_graficos(ag, fonte, &ctx, 2, &tabela)?;
-    crate::pranchas::prancha_secao_e_3d(ag, fonte, &ctx, 3, &a, &tabela)?;
+    prancha_graficos(ag, fonte, &ctx, 2, &c.tabela)?;
+    crate::pranchas::prancha_secao_e_3d(ag, fonte, &ctx, 3, &c.a, &c.tabela)?;
     let num = |v: &Value| v.as_f64().unwrap_or(0.0);
-    let resumo = crate::pranchas::Resumo { comprimento: a.comprimento, pontos: secoes["pontos"].as_u64().unwrap_or(0) as usize, pares: feic["pares"].as_u64().unwrap_or(0) as usize, suspeitos: qual["cota_fora_da_mediana"]["total"].as_u64().unwrap_or(0) as usize,
-        rip_rms: num(&ajuste["ripagem"]["rms"]), rip_max: num(&ajuste["ripagem"]["maxima"]), lev_medio: num(&g["levante"]["medio"]), lev_max: num(&g["levante"]["maximo"]), pivs: g["pivs"].as_array().map_or(0, Vec::len) };
-    crate::pranchas::prancha_memorial(ag, fonte, &ctx, 4, (&a, &tabela, &regras, &resumo), sup["memorial"].as_str().unwrap_or(""))?;
-    let existente = eixo_existente(&f_existente);
-    crate::planta_a1::plantas(ag, fonte, &ctx, (&a, &tabela, &existente), 5, &trechos)?;
-    prancha_estacas(ag, fonte, &ctx, 5 + trechos.len(), n_estacas, &a)?;
+    let resumo = crate::pranchas::Resumo { comprimento: c.a.comprimento, pontos: c.secoes["pontos"].as_u64().unwrap_or(0) as usize, pares: c.feic["pares"].as_u64().unwrap_or(0) as usize, suspeitos: c.qual["cota_fora_da_mediana"]["total"].as_u64().unwrap_or(0) as usize,
+        rip_rms: num(&c.ajuste["ripagem"]["rms"]), rip_max: num(&c.ajuste["ripagem"]["maxima"]), lev_medio: num(&c.g["levante"]["medio"]), lev_max: num(&c.g["levante"]["maximo"]), pivs: c.g["pivs"].as_array().map_or(0, Vec::len) };
+    crate::pranchas::prancha_memorial(ag, fonte, &ctx, 4, (&c.a, &c.tabela, &c.regras, &resumo), c.sup["memorial"].as_str().unwrap_or(""))?;
+    let projeto = crate::projeto::Projeto { a: &c.a, tabela: &c.tabela, regras: &c.regras, greide: &c.greide, analise: &c.analise, obs: &c.obs };
+    crate::perfil::perfis(ag, fonte, &ctx, &projeto, 5)?;
+    let existente = eixo_existente(&c.existente);
+    crate::planta_a1::plantas(ag, fonte, &ctx, (&c.a, &c.tabela, &existente), 5 + n.perfis, &trechos)?;
+    prancha_estacas(ag, fonte, &ctx, 5 + n.perfis + n.plantas, n.estacas, &c.a)?;
+    Ok(f1.escala)
+}
+
+fn ferrovia(ag: &mut Agente, fonte: &Fonte, d: &Value, caminho: &str) -> Res<Value> {
+    let c = calcular_projeto(ag, fonte, d, caminho)?;
+    let eixo = desenhar_eixos(ag, fonte, &c)?;
+    let escala = montar_folhas(ag, fonte, d, &c, &eixo)?;
     let leiaute = crate::leiaute::verificar_leiaute(&ag.doc);
     let mut saidas = serde_json::Map::new();
     if let Some(s) = d.get("saida") {
         for (chave, tool) in [("dxf", "cad_salvar"), ("fcdz", "cad_salvar")] {
-            if let Some(c) = texto_opcional(s, chave) {
-                saidas.insert(chave.into(), passo(ag, fonte, tool, &json!({ "caminho": c, "sobrescrever": true }))?);
+            if let Some(cam) = texto_opcional(s, chave) {
+                saidas.insert(chave.into(), passo(ag, fonte, tool, &json!({ "caminho": cam, "sobrescrever": true }))?);
             }
         }
-        if let Some(c) = texto_opcional(s, "pdf") {
-            saidas.insert("pdf".into(), passo(ag, fonte, "cad_pdf", &json!({ "caminho": c, "papel": "auto", "sobrescrever": true }))?);
+        if let Some(cam) = texto_opcional(s, "pdf") {
+            saidas.insert("pdf".into(), passo(ag, fonte, "cad_pdf", &json!({ "caminho": cam, "papel": "auto", "sobrescrever": true }))?);
         }
     }
+    let niveis = |n| c.analise.contagem(n);
     Ok(json!({
-        "modelo": "ferrovia", "folhas": ag.doc.folhas_inseridas().len(), "escala": f1.escala,
-        "nuvem": { "pontos": secoes["pontos"], "pares_de_trilho": feic["pares"], "suspeitos_por_cota": qual["cota_fora_da_mediana"]["total"] },
-        "alinhamento": { "comprimento": ajuste["comprimento"], "curvas": ajuste["curvas_n"], "ripagem": ajuste["ripagem"] },
-        "superelevacao": { "todas_atendem": sup["todas_atendem"] }, "greide": { "levante": g["levante"], "pivs": g["pivs"].as_array().map(Vec::len) },
-        "curvas": a.curvas.iter().zip(&tabela).enumerate().map(|(i, (c, r))| json!({ "curva": i + 1, "R": c.raio, "Ls": c.ls, "Lc": arred(c.lc), "h_mm": r.h_mm, "ok": r.ok })).collect::<Vec<_>>(),
+        "modelo": "ferrovia", "folhas": ag.doc.folhas_inseridas().len(), "escala": escala,
+        "nuvem": { "pontos": c.secoes["pontos"], "pares_de_trilho": c.feic["pares"], "suspeitos_por_cota": c.qual["cota_fora_da_mediana"]["total"] },
+        "alinhamento": { "comprimento": c.ajuste["comprimento"], "curvas": c.ajuste["curvas_n"], "ripagem": c.ajuste["ripagem"] },
+        "superelevacao": { "todas_atendem": c.sup["todas_atendem"] }, "greide": { "levante": c.g["levante"], "pivs": c.g["pivs"].as_array().map(Vec::len) },
+        "criticidade": { "criticos": niveis(feathercad_core::viario::criticidade::Nivel::Critico), "atencao": niveis(feathercad_core::viario::criticidade::Nivel::Atencao), "normais": niveis(feathercad_core::viario::criticidade::Nivel::Normal),
+            "volumes_m3": { "aterro": arred(c.analise.volumes.aterro_m3), "escavacao": arred(c.analise.volumes.escavacao_m3) } },
+        "curvas": c.a.curvas.iter().zip(&c.tabela).enumerate().map(|(i, (cv, r))| json!({ "curva": i + 1, "R": cv.raio, "Ls": cv.ls, "Lc": arred(cv.lc), "h_mm": r.h_mm, "ok": r.ok })).collect::<Vec<_>>(),
         "leiaute": { "problemas": leiaute["contagem"], "textos_conferidos": leiaute["textos_conferidos"] }, "saidas": saidas,
         "proximo_passo": "cad_verificar {leiaute:true} e cad_ver {arquivo:\"x.png\", janela:…} por folha; ajuste com as ferramentas individuais",
     }))
