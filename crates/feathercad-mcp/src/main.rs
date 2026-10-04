@@ -2,6 +2,7 @@
 //! stdout; o que for diagnóstico vai para o stderr. Tudo local: nenhum dado sai da máquina.
 
 mod agente;
+mod ao_longo;
 mod compacto;
 mod componentes;
 mod consulta;
@@ -11,16 +12,31 @@ mod ferramentas;
 mod folhas;
 mod fonte;
 mod imagem;
+mod leiaute;
 mod json;
 mod lote;
 mod medidas;
+mod dados;
+mod detalhe;
 mod eletroduto;
 mod exemplos;
 mod guias;
+mod grafico;
+mod malha_norte;
+mod modelos;
 mod mutacoes;
+mod nuvem_ferramentas;
+mod pecas;
+mod projecao;
+mod tabela;
+mod texto_bloco;
+mod regras;
 mod rpc;
 mod simbolos;
 mod topografia;
+mod via;
+mod viario;
+mod viario_projeto;
 
 use std::io::{BufRead, Write};
 

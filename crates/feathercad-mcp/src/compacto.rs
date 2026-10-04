@@ -11,19 +11,21 @@
 //! P 0 0 100 0 ~0.5 100 50 f  polilinha (~b = arco até o próximo ponto; f = fechada)
 //! C 50 25 10                 círculo: centro, raio
 //! A 50 25 10 0 90            arco: centro, raio, ângulo inicial e final
-//! T 10 10 2.5 0 "Sala"       texto: ponto, altura, giro, conteúdo
+//! T 10 10 2.5 0 "Sala" cm    texto: ponto, altura, giro, conteúdo [alinhamento: e/c/d na horizontal, b/m/t/f
+//!                                           (base, meio, topo, fundo) na vertical; ex. `c`, `dm`; sem sufixo = esquerda/base]
 //! . 5 5                      ponto
 //! H solida 0 0 10 0 10 10 | 2 2 4 2 4 4   hachura (laços separados por |); em vez de `solida`: `padrao` (45°) ou um da
 //!                                           biblioteca — concreto, areia, brita, terra, tijolo, ansi32, ansi37, horizontal,
 //!                                           vertical, grade, pontos — e `terra*2` dobra o espaço do padrão
 //! ```
 //! Uma linha pode começar por `@id` (o id que a IA cita) e terminar por `#RRGGBB` (cor própria).
-//! `camada NOME [#cor] [off] [congelada] [bloqueada]` define a camada e a usa daí em diante.
+//! `camada NOME [#cor] [off] [congelada] [bloqueada] [esp=0.35] [linha=eixo] [transp=30]` define a camada e a usa
+//! daí em diante (linha: continua, tracejada, oculta, eixo, pontilhada, fantasma).
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
-use feathercad_core::documento::{AlinhaH, AlinhaV, Camada, Documento, Geometria, Id};
+use feathercad_core::documento::{AlinhaH, AlinhaV, Camada, Documento, Geometria, Id, TipoLinha};
 use feathercad_core::edicao::transformar;
 use feathercad_core::geom::{Ponto, Transf, Vertice};
 
@@ -41,6 +43,10 @@ pub struct CamadaLida {
     pub ligada: bool,
     pub congelada: bool,
     pub bloqueada: bool,
+    /// Espessura em mm (`esp=`); `None` = a linha não disse.
+    pub espessura: Option<f32>,
+    pub tipo_linha: Option<TipoLinha>,
+    pub transparencia: Option<u8>,
 }
 
 /// O que se leu de um texto compacto.
@@ -94,6 +100,53 @@ fn texto_entre_aspas(t: &str) -> String {
     format!("\"{}\"", t.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n"))
 }
 
+/// ` c`, ` dm`… (vazio quando é esquerda/base, o padrão).
+fn sufixo_de_alinhamento(h: AlinhaH, v: AlinhaV) -> String {
+    let h = match h {
+        AlinhaH::Esquerda => "",
+        AlinhaH::Centro => "c",
+        AlinhaH::Direita => "d",
+    };
+    let v = match v {
+        AlinhaV::Base => "",
+        AlinhaV::Baixo => "f",
+        AlinhaV::Meio => "m",
+        AlinhaV::Topo => "t",
+    };
+    if h.is_empty() && v.is_empty() { String::new() } else { format!(" {h}{v}") }
+}
+
+/// `c`, `dm`, `et`… → alinhamento; `None` se a palavra não é um sufixo de alinhamento.
+fn alinhamento_de(p: &str) -> Option<(AlinhaH, AlinhaV)> {
+    if p.is_empty() || p.len() > 2 {
+        return None;
+    }
+    let (mut h, mut v, mut tem_h, mut tem_v) = (AlinhaH::Esquerda, AlinhaV::Base, false, false);
+    for ch in p.chars() {
+        match ch {
+            'e' | 'c' | 'd' if !tem_h => {
+                h = match ch {
+                    'e' => AlinhaH::Esquerda,
+                    'c' => AlinhaH::Centro,
+                    _ => AlinhaH::Direita,
+                };
+                tem_h = true;
+            }
+            'b' | 'f' | 'm' | 't' if !tem_v => {
+                v = match ch {
+                    'b' => AlinhaV::Base,
+                    'f' => AlinhaV::Baixo,
+                    'm' => AlinhaV::Meio,
+                    _ => AlinhaV::Topo,
+                };
+                tem_v = true;
+            }
+            _ => return None,
+        }
+    }
+    Some((h, v))
+}
+
 fn como_laco(l: &[Vertice]) -> String {
     l.iter().map(|v| pt(v.p)).collect::<Vec<_>>().join(" ")
 }
@@ -105,7 +158,7 @@ fn linha_da_forma(g: &Geometria) -> Option<String> {
         Geometria::Polilinha { vertices, fechada } => como_retangulo(vertices, *fechada).unwrap_or_else(|| como_polilinha(vertices, *fechada)),
         Geometria::Circulo { centro, raio } => format!("C {} {}", pt(*centro), numero(*raio)),
         Geometria::Arco { centro, raio, inicio, fim } => format!("A {} {} {} {}", pt(*centro), numero(*raio), numero(*inicio), numero(*fim)),
-        Geometria::Texto { ponto, altura, rotacao, conteudo, .. } => format!("T {} {} {} {}", pt(*ponto), numero(*altura), numero(*rotacao), texto_entre_aspas(conteudo)),
+        Geometria::Texto { ponto, altura, rotacao, conteudo, h, v } => format!("T {} {} {} {}{}", pt(*ponto), numero(*altura), numero(*rotacao), texto_entre_aspas(conteudo), sufixo_de_alinhamento(*h, *v)),
         Geometria::Ponto { p } => format!(". {}", pt(*p)),
         Geometria::Hachura { contornos, padrao, nome } => format!("H {} {}", if padrao.is_empty() { "solida".to_string() } else if feathercad_core::padroes::reconhecer(nome).is_some() { nome.to_lowercase() } else { "padrao".to_string() }, contornos.iter().map(|c| como_laco(c)).collect::<Vec<_>>().join(" | ")),
         Geometria::Face3D { p1, p2, p3, p4 } => format!("F3D {} {} {} {}", pt(*p1), pt(*p2), pt(*p3), pt(*p4)),
@@ -141,6 +194,16 @@ fn abrir_blocos(doc: &Documento, e: &(usize, Option<u32>, Id, Geometria), t: &Tr
         let c = if n.camada == 0 { *camada } else { n.camada };
         abrir_blocos(doc, &(c, n.cor.or(*cor), 0, n.geometria.clone()), &filha, nivel + 1, fora, est);
     }
+}
+
+/// Todas as formas do desenho (ou só `ids`) com os blocos abertos em formas soltas: camada, cor própria, id e geometria.
+pub fn formas_abertas(doc: &Documento, ids: Option<&BTreeSet<Id>>) -> Vec<(usize, Option<u32>, Id, Geometria)> {
+    let mut est = Estatistica::default();
+    let mut formas: Vec<Saida> = Vec::new();
+    for e in doc.entidades().iter().filter(|e| ids.map_or(true, |s| s.contains(&e.id))) {
+        abrir_blocos(doc, &(e.camada, e.cor, e.id, e.geometria.clone()), &Transf::IDENTIDADE, 0, &mut formas, &mut est);
+    }
+    formas
 }
 
 /// O desenho em texto compacto. `ids`: só esses objetos (ou todos); `com_ids`: escreve `@id` em cada linha.
@@ -187,8 +250,28 @@ fn declaracao(c: &Camada) -> String {
             s.push_str(nome);
         }
     }
+    if let Some(e) = c.espessura {
+        let _ = write!(s, " esp={}", numero(f64::from(e)));
+    }
+    if c.tipo_linha != TipoLinha::Continua {
+        let _ = write!(s, " linha={}", nome_do_tipo(c.tipo_linha));
+    }
+    if c.transparencia > 0 {
+        let _ = write!(s, " transp={}", c.transparencia);
+    }
     s.push('\n');
     s
+}
+
+fn nome_do_tipo(t: TipoLinha) -> &'static str {
+    match t {
+        TipoLinha::Continua => "continua",
+        TipoLinha::Tracejada => "tracejada",
+        TipoLinha::Oculta => "oculta",
+        TipoLinha::Eixo => "eixo",
+        TipoLinha::Pontilhada => "pontilhada",
+        TipoLinha::Fantasma => "fantasma",
+    }
 }
 
 // ------------------------------------------------------------------- ler
@@ -311,7 +394,11 @@ fn forma(letra: &str, p: &[String]) -> Res<Geometria> {
         "T" => {
             precisa(5)?;
             let n = nums(&p[..4])?;
-            Ok(Geometria::Texto { ponto: Ponto::novo(n[0], n[1]), altura: n[2], rotacao: n[3], conteudo: p[4].clone(), h: AlinhaH::Esquerda, v: AlinhaV::Base })
+            let (h, v) = match p.get(5) {
+                Some(w) => alinhamento_de(w).ok_or_else(|| format!("alinhamento `{w}` inválido (e/c/d + b/m/t/f, ex.: `c`, `dm`)"))?,
+                None => (AlinhaH::Esquerda, AlinhaV::Base),
+            };
+            Ok(Geometria::Texto { ponto: Ponto::novo(n[0], n[1]), altura: n[2], rotacao: n[3], conteudo: p[4].clone(), h, v })
         }
         "." => {
             precisa(2)?;
@@ -340,11 +427,20 @@ fn forma(letra: &str, p: &[String]) -> Res<Geometria> {
     }
 }
 
-/// Uma linha de camada: `camada NOME [#cor] [off] [congelada] [bloqueada]`.
+/// Uma linha de camada: `camada NOME [#cor] [off] [congelada] [bloqueada] [esp=] [linha=] [transp=]`.
 fn camada_da_linha(p: &[String]) -> Res<CamadaLida> {
     let nome = p.get(1).ok_or("`camada` sem nome")?.clone();
-    let mut c = CamadaLida { nome, cor: None, ligada: true, congelada: false, bloqueada: false };
+    let mut c = CamadaLida { nome, cor: None, ligada: true, congelada: false, bloqueada: false, espessura: None, tipo_linha: None, transparencia: None };
     for w in &p[2..] {
+        if let Some((chave, valor)) = w.split_once('=') {
+            match chave {
+                "esp" => c.espessura = Some(num(&valor.replace(',', "."))? as f32),
+                "linha" => c.tipo_linha = Some(TipoLinha::TODOS.into_iter().find(|t| nome_do_tipo(*t) == valor).ok_or_else(|| format!("linha `{valor}` não existe (continua, tracejada, oculta, eixo, pontilhada, fantasma)"))?),
+                "transp" => c.transparencia = Some(num(valor)?.clamp(0.0, 90.0) as u8),
+                outra => return Err(format!("`{outra}=` não é propriedade de camada (esp, linha, transp)")),
+            }
+            continue;
+        }
         match w.as_str() {
             "off" => c.ligada = false,
             "congelada" => c.congelada = true,
@@ -355,10 +451,53 @@ fn camada_da_linha(p: &[String]) -> Res<CamadaLida> {
     Ok(c)
 }
 
+/// `camera iso|obliqua` ou `camera az= el= escala= origem=x,y` (o que faltar fica no padrão da isométrica, origem 0,0).
+fn camera_da_linha(p: &[String]) -> Res<(crate::projecao::Camera, Ponto)> {
+    let mut origem = Ponto::novo(0.0, 0.0);
+    let mut obj = serde_json::Map::new();
+    for w in &p[1..] {
+        if let Some((k, v)) = w.split_once('=') {
+            match k {
+                "origem" => {
+                    let (x, y) = v.split_once(',').ok_or("`origem=x,y`")?;
+                    origem = Ponto::novo(num(x)?, num(y)?);
+                }
+                "az" | "azimute" => drop(obj.insert("azimute".into(), num(v)?.into())),
+                "el" | "elevacao" => drop(obj.insert("elevacao".into(), num(v)?.into())),
+                "escala" => drop(obj.insert("escala".into(), num(v)?.into())),
+                o => return Err(format!("`{o}=` não é da câmera (az, el, escala, origem)")),
+            }
+        } else if matches!(w.as_str(), "iso" | "obliqua") {
+            return Ok((crate::projecao::camera(Some(&serde_json::Value::String(w.clone())))?, origem));
+        } else {
+            return Err(format!("câmera `{w}`: iso, obliqua ou az= el= escala= origem="));
+        }
+    }
+    obj.entry("azimute").or_insert(45.0.into());
+    Ok((crate::projecao::camera(Some(&serde_json::Value::Object(obj)))?, origem))
+}
+
+/// `L3 x y z x y z` ou `P3 x y z x y z …` (3+ pontos): projetados para 2D pela câmera vigente.
+fn forma_3d(letra: &str, p: &[String], (cam, origem): &(crate::projecao::Camera, Ponto)) -> Res<Geometria> {
+    let n = nums(p)?;
+    if n.len() % 3 != 0 || n.len() < 6 {
+        return Err(format!("`{letra}` precisa de pontos x y z (no mínimo 2)"));
+    }
+    let pts: Vec<Ponto> = n.chunks(3).map(|c| { let (x, y) = crate::projecao::projetar(*cam, c[0], c[1], c[2]); Ponto::novo(origem.x + x, origem.y + y) }).collect();
+    if letra == "L3" {
+        if pts.len() != 2 {
+            return Err("`L3` leva exatamente 2 pontos (use `P3` para vários)".into());
+        }
+        return Ok(Geometria::Linha { a: pts[0], b: pts[1] });
+    }
+    Ok(Geometria::Polilinha { vertices: pts.into_iter().map(|p| Vertice { p, bulge: 0.0 }).collect(), fechada: false })
+}
+
 /// Lê o texto compacto. Erros dizem a linha. Linhas vazias e as que começam por `//` são ignoradas.
 pub fn importar(texto: &str) -> Res<Lido> {
     let mut lido = Lido::default();
     let mut atual = String::from("0");
+    let mut camera3d = (crate::projecao::camera(None)?, Ponto::novo(0.0, 0.0));
     for (n, bruta) in texto.lines().enumerate() {
         let linha = bruta.trim();
         if linha.is_empty() || linha.starts_with("//") {
@@ -371,6 +510,12 @@ pub fn importar(texto: &str) -> Res<Lido> {
         }
         match p.first().map(String::as_str) {
             Some("unidade") => lido.unidade = p.get(1).cloned(),
+            // câmera das linhas 3D: `camera iso`, `camera obliqua` ou `camera az=20 el=35 escala=2 origem=x,y`
+            Some("camera") => camera3d = camera_da_linha(&p).map_err(ctx)?,
+            Some(l @ ("L3" | "P3")) => {
+                let g = forma_3d(l, &p[1..], &camera3d).map_err(ctx)?;
+                lido.formas.push((atual.clone(), None, g));
+            }
             Some("camada") => {
                 let c = camada_da_linha(&p).map_err(ctx)?;
                 atual.clone_from(&c.nome);
@@ -397,12 +542,42 @@ mod testes {
     }
 
     #[test]
+    fn linhas_3d_sao_projetadas_pela_camera() {
+        let l = importar("camera az=0 el=90 origem=10,20\nL3 1 2 9 3 4 9\nP3 0 0 0 1 0 0 1 1 5").unwrap();
+        assert_eq!(l.formas.len(), 2);
+        assert!(matches!(&l.formas[0].2, Geometria::Linha { a, .. } if (a.x - 11.0).abs() < 1e-9 && (a.y - 22.0).abs() < 1e-9));
+        assert!(importar("L3 1 2 3").is_err());
+        assert!(importar("camera cabeca").is_err());
+    }
+
+    #[test]
     fn camada_declarada_de_novo_sem_cor_mantem_a_cor() {
         let l = importar("camada A #FF0000\nL 0 0 1 1\ncamada B #00FF00\nL 0 0 1 1\ncamada A\nL 0 0 2 2\n").unwrap();
         let mut d = Documento::default();
         crate::mutacoes::aplicar_compacto(&mut d, &l).unwrap();
         let a = d.camadas().iter().find(|c| c.nome == "A").unwrap();
         assert_eq!(a.cor, 0xFF_00_00, "a 2ª declaração sem cor não volta para branco");
+    }
+
+    #[test]
+    fn texto_alinhado_e_camada_com_propriedades_vao_e_voltam() {
+        let l = importar("camada EIXO #FF0000 esp=0.35 linha=eixo transp=30\nT 1 2 2.5 0 \"A\" cm\nT 0 0 1 0 \"B\"\nT 0 0 1 0 \"C\" d\nT 0 0 1 0 \"D\" f\n").unwrap();
+        assert_eq!(l.camadas[0].espessura, Some(0.35));
+        assert_eq!(l.camadas[0].tipo_linha, Some(TipoLinha::Eixo));
+        assert_eq!(l.camadas[0].transparencia, Some(30));
+        let mut d = Documento::default();
+        crate::mutacoes::aplicar_compacto(&mut d, &l).unwrap();
+        let c = d.camadas().iter().find(|c| c.nome == "EIXO").unwrap();
+        assert_eq!((c.espessura, c.tipo_linha, c.transparencia), (Some(0.35), TipoLinha::Eixo, 30));
+        let (texto, _) = exportar(&d, None, false);
+        assert!(texto.contains("esp=0.35 linha=eixo transp=30"), "{texto}");
+        let l2 = importar(&texto).unwrap();
+        for (a, b) in l.formas.iter().zip(&l2.formas) {
+            assert_eq!(a.2, b.2);
+        }
+        assert!(matches!(l.formas[0].2, Geometria::Texto { h: AlinhaH::Centro, v: AlinhaV::Meio, .. }));
+        assert!(matches!(l.formas[3].2, Geometria::Texto { h: AlinhaH::Esquerda, v: AlinhaV::Baixo, .. }));
+        assert!(importar("T 0 0 1 0 \"x\" zz\n").is_err());
     }
 
     #[test]

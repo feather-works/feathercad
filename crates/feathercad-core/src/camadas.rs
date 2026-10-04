@@ -269,6 +269,24 @@ impl Documento {
         Some(id)
     }
 
+    /// Cria o bloco `nome` com `entidades` (camadas do próprio desenho; camada `0` herda a da inserção) e o insere em
+    /// `ponto` com a escala dada, na camada `camada`. Um passo de desfazer. `None` se não há entidades ou o nome já existe.
+    pub fn adicionar_bloco_inserido(&mut self, nome: &str, entidades: Vec<crate::documento::NovaEntidade>, ponto: crate::geom::Ponto, escala: f64, camada: usize) -> Option<crate::documento::Id> {
+        if entidades.is_empty() || self.bloco_por_nome(nome).is_some() {
+            return None;
+        }
+        self.desfazer.push(Passo::Tudo(Box::new(Captura { camadas: self.camadas.clone(), atual: self.camada_atual, entidades: self.entidades.clone(), blocos: self.blocos.clone() })));
+        self.refazer.clear();
+        self.blocos.push(crate::documento::Bloco { nome: nome.to_string(), base: crate::geom::Ponto::novo(0.0, 0.0), entidades });
+        let indice = self.blocos.len() - 1;
+        self.caixas_dos_blocos.push(self.caixa_do_bloco(indice, 0));
+        let id = self.proximo_id;
+        self.proximo_id += 1;
+        self.entidades.push(crate::documento::Entidade { id, camada, cor: None, geometria: crate::documento::Geometria::Insercao { bloco: indice, ponto, escala_x: escala, escala_y: escala, rotacao: 0.0 }, props: Default::default(), espaco: self.espaco_ativo.clone() });
+        self.mudou();
+        Some(id)
+    }
+
     /// A camada `indice` tem objetos (no desenho ou dentro de um bloco)?
     pub fn camada_em_uso(&self, indice: usize) -> bool {
         self.entidades.iter().any(|e| e.camada == indice) || self.blocos.iter().any(|b| b.entidades.iter().any(|n| n.camada == indice))

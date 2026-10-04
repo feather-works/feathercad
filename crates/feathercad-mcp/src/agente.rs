@@ -15,6 +15,16 @@ use crate::mutacoes::aplicar_compacto;
 pub struct Agente {
     pub doc: Documento,
     pub arquivo: Option<PathBuf>,
+    /// Modo projeto (`cad_modo`): troca os padrões de `cad_ver` por versões baratas em contexto.
+    pub projeto: bool,
+    /// Alinhamentos calculados nesta sessão (nome → alinhamento e passo da estaca), para as ferramentas viárias.
+    pub alinhamentos: std::collections::BTreeMap<String, (feathercad_core::viario::alinhamento::Alinhamento, f64)>,
+    pub alinhamento_atual: Option<String>,
+    /// Feições extraídas de nuvens nesta sessão (nome → pares de trilho e o que se achou de suspeito).
+    pub feicoes: std::collections::BTreeMap<String, crate::nuvem_ferramentas::Feicoes>,
+    pub nuvens: std::collections::BTreeMap<String, crate::nuvem_ferramentas::Nuvem>,
+    pub nuvem_atual: Option<String>,
+    pub greides: std::collections::BTreeMap<String, feathercad_core::viario::greide::Greide>,
 }
 
 #[derive(Clone, Copy, PartialEq)]

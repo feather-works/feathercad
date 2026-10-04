@@ -179,6 +179,9 @@ fn prompts_so_para_projeto_eletrico() {
     let g = s.pedir("prompts/get", json!({ "name": "projeto_eletrico" }));
     assert!(g["result"]["messages"][0]["content"]["text"].as_str().unwrap().contains("FOLHA"));
     assert_eq!(s.pedir("prompts/get", json!({ "name": "nao_existe" }))["error"]["code"], -32602);
+    let grande = s.pedir("prompts/get", json!({ "name": "projeto_grande" }));
+    assert!(grande["result"]["messages"][0]["content"]["text"].as_str().unwrap().contains("cad_verificar {leiaute:true}"));
+    assert_eq!(l["result"]["prompts"][1]["name"], "projeto_grande");
 }
 
 #[test]
@@ -416,3 +419,32 @@ fn topografia_mcp_gera_levantamento_e_abre_arquivo() {
     std::fs::remove_file(&tmp).ok();
 }
 
+
+#[test]
+fn importar_do_disco_e_modo_projeto_com_ver_em_arquivo() {
+    let pasta = std::env::temp_dir().join(format!("fcad_modo_{}", std::process::id()));
+    std::fs::create_dir_all(&pasta).unwrap();
+    let fct = pasta.join("b.fct");
+    std::fs::write(&fct, "camada EIXO #FF0000 esp=0.5 linha=eixo\nL 0 0 10 0\nT 1 1 2 0 \"x\" cm\n").unwrap();
+    let mut s = Servidor::novo();
+    s.json("cad_novo", json!({ "unidade": "m" }));
+    s.json("cad_importar", json!({ "texto": "L 0 0 1 1\n" }));
+    let r = s.json("cad_importar", json!({ "caminho": fct.to_str().unwrap() }));
+    assert_eq!(r["criadas"], 2);
+    assert_eq!(s.json("cad_resumo", json!({}))["total_de_entidades"], 3, "acrescenta, não substitui");
+    s.json("cad_desfazer", json!({}));
+    assert_eq!(s.json("cad_resumo", json!({}))["total_de_entidades"], 1, "um Ctrl+Z desfaz só o arquivo");
+    let (_, erro) = s.ferramenta("cad_importar", json!({ "caminho": "/tmp/nao.dxf" }));
+    assert!(erro);
+
+    assert_eq!(s.json("cad_modo", json!({ "projeto": true }))["projeto"], true);
+    let png = pasta.join("v.png");
+    let l = s.json("cad_ver", json!({ "arquivo": png.to_str().unwrap() }));
+    assert_eq!(l["pixels"][0], 800, "modo projeto: 800 px");
+    assert!(std::fs::metadata(&png).unwrap().len() > 100);
+    let (c, _) = s.ferramenta("cad_ver", json!({}));
+    assert_eq!(c[0]["type"], "image", "sem `arquivo` a imagem segue na conversa");
+    s.json("cad_modo", json!({ "projeto": false }));
+    assert_eq!(s.json("cad_ver", json!({ "arquivo": png.to_str().unwrap() }))["pixels"][0], 1000);
+    let _ = std::fs::remove_dir_all(&pasta);
+}

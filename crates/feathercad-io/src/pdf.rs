@@ -45,6 +45,9 @@ impl Papel {
     /// Sem papel fixo: cada página tem o tamanho da folha, 1 unidade do desenho = 1 mm (máximo do PDF: 5 m).
     pub const DA_FOLHA: Papel = Papel { largura_mm: 0.0, altura_mm: 0.0 };
 
+    /// Cada página no papel da própria folha inserida (A0 e A1 no mesmo arquivo); retângulo solto da camada `FOLHA` cai em [`Papel::DA_FOLHA`].
+    pub const AUTO: Papel = Papel { largura_mm: -1.0, altura_mm: -1.0 };
+
     /// `A4`…`A0`, `2A0`, `4A0`, `8A0`, `16A0` ou `FOLHA` (sem diferenciar maiúscula).
     pub fn de_nome(nome: &str) -> Option<Self> {
         match nome.trim().to_ascii_uppercase().as_str() {
@@ -58,6 +61,7 @@ impl Papel {
             "8A0" => Some(Self::A8A0),
             "16A0" => Some(Self::A16A0),
             "FOLHA" => Some(Self::DA_FOLHA),
+            "AUTO" => Some(Self::AUTO),
             _ => None,
         }
     }
@@ -343,6 +347,11 @@ fn largura_do_texto(bytes: &[u8]) -> f64 {
     bytes.iter().map(|&b| if (32..=126).contains(&b) { f64::from(LARGURAS[usize::from(b) - 32]) } else if b == 0xD8 { 778.0 } else { 556.0 }).sum::<f64>() / 1000.0
 }
 
+/// Largura de `conteudo` desenhado com letra de `altura` (a mesma métrica Helvetica do PDF), na unidade da altura.
+pub fn largura_do_conteudo(conteudo: &str, altura: f64) -> f64 {
+    trechos(conteudo).iter().map(largura_do_trecho).sum::<f64>() * altura / ALTURA_DA_MAIUSCULA
+}
+
 /// O byte da letra grega ou seta na fonte Symbol (`None` = não é dela).
 fn simbolo(c: char) -> Option<u8> {
     Some(match c {
@@ -514,7 +523,22 @@ fn pagina(doc: &Documento, janela: Caixa, op: &Opcoes) -> Result<(f64, f64, Vec<
     if largura_u <= 0.0 || altura_u <= 0.0 {
         return Err("folha sem tamanho".into());
     }
-    if op.papel == Papel::DA_FOLHA {
+    // `auto`: o papel da folha inserida que tem essa janela (mm de papel reais); sem folha inserida, vale o tamanho da folha
+    let da_folha = if op.papel == Papel::AUTO {
+        let perto = |a: f64, b: f64| (a - b).abs() <= 1e-6 * (1.0 + a.abs());
+        match doc.folhas_inseridas().iter().find(|f| perto(f.min.x, janela.0.x) && perto(f.min.y, janela.0.y) && perto(f.max.x, janela.1.x) && perto(f.max.y, janela.1.y)) {
+            Some(f) => {
+                let (w, h) = (f.largura_mm * PT_POR_MM, f.altura_mm * PT_POR_MM);
+                let vista = Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala: (w / largura_u).min(h / altura_u), largura: w, altura: h, rotacao_x: 0.0, rotacao_z: 0.0 };
+                let bytes = quadro::montar_fino(doc, &vista, true, TOLERANCIA_DO_ARCO_NO_PAPEL_PX);
+                return Ok((w, h, conteudo(&ler_quadro(&bytes)?, h, op.modo_papel)));
+            }
+            None => true,
+        }
+    } else {
+        op.papel == Papel::DA_FOLHA
+    };
+    if da_folha {
         let f = (14400.0 / PT_POR_MM / largura_u.max(altura_u)).min(1.0);
         let (w, h) = (largura_u * f * PT_POR_MM, altura_u * f * PT_POR_MM);
         let vista = Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala: w / largura_u, largura: w, altura: h, rotacao_x: 0.0, rotacao_z: 0.0 };

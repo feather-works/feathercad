@@ -1,5 +1,18 @@
 # Plano de trabalho — tirar o Python do MCP
 
+> **Estado em 04/10/2026 (NÃO commitado):** feitos 0.1–0.5, 1.1–1.5, **1.7**, 2.1–2.6, **2.7**, 3.1–3.7, 4.1–4.3 (+4.4 pelo nome guardado na sessão), **4.2 `bordos`** e modelos do usuário.
+> **Faltam:** 1.6 (HATCH no DXF, bloqueado: exige R2000+) e 4.2 `meio-fio`. Conferir `bordos` com um levantamento real (testado só com seções sintéticas).
+> **Fechado nesta rodada (04/10):** `cad_pdf papel:"auto"` (cada página no papel da própria folha) e `pdf_indice` em `cad_folha listar`;
+> `.fct` com `camera …` + `L3`/`P3` (projetados ao importar); `cad_via` lê `trilho_*`/`dormente_*` de `biblioteca/ferrovia/*.fct` (`trilho:"TR-57"`, `dormente:"concreto"`);
+> `cad_nuvem_feicoes {tipo:"bordos"}` (crista da plataforma + pé do talude; `desenhar:true`); `cad_modelo` roda `~/.config/feathercad/modelos/*.json`
+> (`{descricao, esquema, dados_padrao?, passos, retornar?}` = um `cad_lote`).
+> **Leiaute do modelo `ferrovia` com o CSV real:** rótulos de km à direita e TS/SC/CS/ST sempre à direita do eixo (estacas à esquerda), letras da rosa dos ventos
+> fora da ponta, perspectiva da prancha 3 na escala certa. `cad_verificar {leiaute}`: 24 → **8** `texto_sobre_texto` (todos entre rótulos de curvas coladas em 1:10000 —
+> inerente à escala, sem linha de chamada) e 0 `texto_sobre_linha`. Folhas 1, 3 e 5 conferidas por imagem; 2 e 4 ainda não.
+> Ajuste automático: RMS 0,237 / máx 0,785 (ref. manual 0,182 / 0,643), 13 curvas (ref. 12).
+> Código novo: core `viario/{alinhamento,superelevacao,greide,ajuste}.rs`, `nuvem.rs`, `trajeto.rs`; mcp `viario*.rs`, `via.rs`, `modelos.rs`, `nuvem_ferramentas.rs`,
+> `tabela/grafico/texto_bloco/detalhe/ao_longo/malha_norte/projecao/leiaute/dados/regras.rs`. Depois de `npm run mcp:build`, reconectar com `/mcp`.
+
 **Origem (01/10/2026).** Projeto ferroviário de teste: nuvem de pontos
 `levantamento_topografico.csv` (1 237 pontos, 6,2 km, bitola métrica, V = 65 km/h) virou 4 pranchas A0.
 O MCP fez ~20 % do trabalho (abrir, ver, folha, DXF/PDF); os outros 80 % foram scripts Python
@@ -37,13 +50,13 @@ Meta com o plano todo: **~1 milhão** (ver "Metas").
 **Quando vale:** só ao **gerar um projeto** (pranchas a partir de dados, modelo, `cad_lote` grande). No
 uso normal — o usuário pede para ver, mexer, perguntar — nada muda: imagem cheia, resposta completa.
 
-☐ **0.1 Modo projeto** — `cad_modo {projeto: true|false}` (padrão `false`); liga sozinho dentro de
+☑ **0.1 Modo projeto** (04/10: `cad_modo` e `Agente.projeto` feitos; só `cad_ver` lê o estado por enquanto; a volta automática do `cad_modelo` fica para quando ele existir) — `cad_modo {projeto: true|false}` (padrão `false`); liga sozinho dentro de
 `cad_modelo` e volta ao estado anterior no fim. É só uma troca de **padrões** das ferramentas abaixo;
 qualquer argumento explícito na chamada continua valendo sobre o padrão.
 - Onde: estado no `Agente` (`agente.rs`), lido por `cad_ver`, `cad_tabela_estacas`, `cad_alinhamento*`,
   `cad_greide`, `cad_nuvem_*`.
 
-☐ **0.2 `cad_ver` leve no modo projeto** — largura padrão 800 px (fora do modo segue 1000);
+☑ **0.2 `cad_ver` leve no modo projeto** (04/10: 800 px, sem grade/rótulos no modo projeto; `arquivo: x.png` grava no disco sem imagem na conversa; falta o "grade desligada só quando a janela é uma folha inteira" — hoje é tudo ou nada) — largura padrão 800 px (fora do modo segue 1000);
 `arquivo: caminho` grava o PNG no disco e devolve só o caminho e a janela (sem imagem na conversa);
 `grade`/`rotulos` desligados por padrão quando a janela é uma folha inteira.
 
@@ -79,18 +92,18 @@ Medir de novo, numa sessão nova, ao fechar o item 3.7.
 
 ## Nível 1 — formato e encanamento (pequeno, destrava o resto)
 
-☐ **1.1 `cad_importar {caminho}`** — acrescenta um `.fct` do disco ao desenho aberto (sem
+☑ **1.1 `cad_importar {caminho}`** (04/10, só `.fct`; teste em `tests/sessao.rs`) — acrescenta um `.fct` do disco ao desenho aberto (sem
 substituir; `substituir: true` opcional). Hoje só aceita texto na conversa, e acrescentar algo grande
 obriga a reabrir tudo.
 - Onde: `crates/feathercad-mcp/src/mutacoes.rs` (ou onde está `cad_importar`), reusa `compacto::importar`.
 - Teste: abrir A, importar B do disco → entidades = A + B; um Ctrl+Z desfaz só B.
 
-☐ **1.2 Alinhamento de texto no `.fct`** — sufixo opcional depois do conteúdo:
+☑ **1.2 Alinhamento de texto no `.fct`** (04/10; v: `b` base, `m` meio, `t` topo, `f` fundo — o motor tem `Baixo`, que o plano não previa) — sufixo opcional depois do conteúdo:
 `T x y h giro "texto" c` (h: `e`/`c`/`d`; v: `b`/`m`/`t`, ex. `cm`). O motor já tem `AlinhaH/AlinhaV`.
 - Onde: `compacto.rs` (`forma` → `"T"`, e o `escrever` correspondente).
 - Teste: ida e volta `.fct` ⇄ desenho mantém o alinhamento; texto antigo sem sufixo continua esquerda/base.
 
-☐ **1.3 Propriedades de camada no `.fct`** — `camada NOME #cor esp=0.35 linha=eixo [off] …`.
+☑ **1.3 Propriedades de camada no `.fct`** (04/10; `esp=`, `linha=`, `transp=`) — `camada NOME #cor esp=0.35 linha=eixo [off] …`.
 - Onde: `compacto.rs::camada_da_linha` + `CamadaLida` (+ escrever).
 - Teste: abrir `.fct` com `esp`/`linha` → `cad_camadas listar` mostra os valores.
 

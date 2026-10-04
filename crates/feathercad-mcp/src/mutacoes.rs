@@ -106,7 +106,7 @@ fn forma_poligono(f: &Value) -> Res<Geometria> {
 }
 
 /// Uma forma pedida pela IA como geometria do motor.
-fn forma(f: &Value) -> Res<Geometria> {
+pub fn forma(f: &Value) -> Res<Geometria> {
     match texto_de(f, "tipo")? {
         "linha" => forma_linha(f),
         "retangulo" => forma_retangulo(f),
@@ -150,7 +150,18 @@ pub fn criar(doc: &mut Documento, args: &Value) -> Res<Value> {
     };
     let ms = geos.iter().map(|g| Mudanca::Novo(NovaEntidade { camada, cor, geometria: g.clone(), props: Propriedades::default(), espaco: Espaco::default() })).collect();
     let ids = doc.aplicar_mudancas(ms);
-    let criadas: Vec<Value> = ids.iter().zip(&geos).map(|(id, g)| json!({ "id": id, "tipo": tipo_de(g) })).collect();
+    let criadas: Vec<Value> = ids
+        .iter()
+        .zip(&geos)
+        .map(|(id, g)| match g {
+            Geometria::Texto { ponto, altura, rotacao, conteudo, h, v } => {
+                let c = crate::leiaute::caixa_do_texto(*ponto, *altura, *rotacao, conteudo, *h, *v);
+                let (min, max) = (c.iter().fold(c[0], |m, p| Ponto::novo(m.x.min(p.x), m.y.min(p.y))), c.iter().fold(c[0], |m, p| Ponto::novo(m.x.max(p.x), m.y.max(p.y))));
+                json!({ "id": id, "tipo": "texto", "caixa": { "min": par(min), "max": par(max) }, "largura": crate::json::arred(feathercad_io::pdf::largura_do_conteudo(conteudo, *altura)) })
+            }
+            _ => json!({ "id": id, "tipo": tipo_de(g) }),
+        })
+        .collect();
     Ok(json!({ "criadas": criadas, "camada": doc.camadas()[camada].nome }))
 }
 
@@ -340,6 +351,10 @@ pub fn aplicar_compacto(doc: &mut Documento, lido: &crate::compacto::Lido) -> Re
         }
         if c.congelada {
             let _ = doc.definir_propriedade_de_camadas(&[i], Propriedade::Congelada(true));
+        }
+        let extras = [c.espessura.map(|e| Propriedade::Espessura(Some(e))), c.tipo_linha.map(Propriedade::TipoLinha), c.transparencia.map(Propriedade::Transparencia)];
+        for p in extras.into_iter().flatten() {
+            doc.definir_propriedade_de_camadas(&[i], p).map_err(|e| format!("camada `{}`: {}", c.nome, e.chave()))?;
         }
     }
     let mut ms = Vec::with_capacity(lido.formas.len());

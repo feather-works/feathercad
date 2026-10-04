@@ -204,3 +204,16 @@ fn folhas_inseridas_sem_numero_saem_na_ordem_de_criacao() {
     let f = folhas(&doc);
     assert_eq!(f.iter().map(|c| c.0.x).collect::<Vec<_>>(), info.iter().map(|i| i.min.x).collect::<Vec<_>>());
 }
+
+#[test]
+fn papel_auto_usa_o_papel_de_cada_folha_inserida() {
+    use feathercad_core::folha::Campos;
+    use feathercad_io::pdf::Papel;
+    let mut doc = Documento::default().com_unidade(Some(Unidade::Metro));
+    doc.adicionar_linha(Ponto::novo(0.0, 0.0), Ponto::novo(300.0, 100.0));
+    doc.folha_inserir("A0", Some(1000.0), &Campos::default()).unwrap();
+    doc.folha_inserir("A1", Some(1000.0), &Campos::default()).unwrap();
+    let pdf = exportar_folhas(&doc, &Opcoes { papel: Papel::AUTO, ..Opcoes::default() }).unwrap();
+    assert!(contem(&pdf, b"MediaBox [0 0 3370.394 2380.516]"), "A0 deitada (o tamanho da própria folha)");
+    assert!(contem(&pdf, b"MediaBox [0 0 2383.937 1683.78]"), "A1 deitada, na mesma PDF");
+}

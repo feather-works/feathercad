@@ -44,13 +44,24 @@ fn levar_para(doc: &mut Documento, id: u64, destino: Ponto) -> Res<()> {
     Ok(())
 }
 
+/// As folhas inseridas, cada uma com `pdf_indice`: a posição no `cad_pdf` (`folhas: [i]`), que segue o número do carimbo.
+fn com_indice_de_pdf(doc: &Documento) -> Value {
+    let ordem = feathercad_io::pdf::folhas(doc);
+    let mut lista = serde_json::to_value(doc.folhas_inseridas()).unwrap_or(Value::Null);
+    for f in lista.as_array_mut().into_iter().flatten() {
+        let (x, y) = (f["min"]["x"].as_f64().unwrap_or(f64::NAN), f["min"]["y"].as_f64().unwrap_or(f64::NAN));
+        f["pdf_indice"] = ordem.iter().position(|(a, _)| (a.x - x).abs() < 1e-6 && (a.y - y).abs() < 1e-6).map_or(Value::Null, |i| json!(i));
+    }
+    lista
+}
+
 /// `cad_folha`: `listar` (padrão), `inserir`, `escala`, `ajustar`, `campos`, `campos_definir`.
 pub fn folha(doc: &mut Documento, args: &Value) -> Res<Value> {
     let acao = texto_opcional(args, "acao").unwrap_or("listar");
     let json_de = |f: &feathercad_core::folha::InfoFolha| serde_json::to_value(f).unwrap_or(Value::Null);
     match acao {
         "listar" => Ok(json!({
-            "folhas": doc.folhas_inseridas(),
+            "folhas": com_indice_de_pdf(doc),
             "papeis": PAPEIS.iter().map(|(n, w, h)| json!({ "nome": n, "largura_mm": w, "altura_mm": h })).collect::<Vec<_>>(),
             "escalas": ESCALAS,
         })),
@@ -85,7 +96,7 @@ pub fn pdf(ag: &Agente, args: &Value) -> Res<Value> {
         return Err(format!("`{caminho}` já existe: use `sobrescrever: true`"));
     }
     let papel_nome = texto_opcional(args, "papel").unwrap_or("A3");
-    let papel = feathercad_io::pdf::Papel::de_nome(papel_nome).ok_or_else(|| format!("papel `{papel_nome}` não existe (A4, A3, A2, A1, A0, 2A0, 4A0, 8A0, 16A0 ou FOLHA)"))?;
+    let papel = feathercad_io::pdf::Papel::de_nome(papel_nome).ok_or_else(|| format!("papel `{papel_nome}` não existe (A4, A3, A2, A1, A0, 2A0, 4A0, 8A0, 16A0, FOLHA ou auto)"))?;
     let orientacao = match texto_opcional(args, "orientacao") {
         Some(o) => feathercad_io::pdf::Orientacao::de_nome(o).ok_or_else(|| format!("orientação `{o}` não existe (automatica, horizontal ou vertical)"))?,
         None => feathercad_io::pdf::Orientacao::Automatica,

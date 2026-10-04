@@ -1,0 +1,7 @@
+// descricao: Dormente de concreto monobloco para bitola métrica (valores típicos: confira com o fabricante)
+// categoria: ferrovia
+// tamanho: 2000x200
+// parametros: comprimento=2.0 largura=0.26 altura=0.20 espaco=0.60
+// origem: (m) comprimento = no sentido transversal à via; largura = ao longo da via (planta); espaco = eixo a eixo.
+camada DORMENTE #A0A0A0
+R 0 0 2000 200

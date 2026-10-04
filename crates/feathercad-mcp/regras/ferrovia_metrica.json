@@ -1,0 +1,16 @@
+{
+  "nome": "ferrovia_metrica",
+  "B": 1.075,
+  "V": 65,
+  "v_lenta": 30,
+  "h_max_mm": 100,
+  "i_max_mm": 50,
+  "dh_dt_mm_s": 30,
+  "rampa": 0.0016666666666666668,
+  "psi": 0.35,
+  "ls_min": 30,
+  "ls_multiplo": 10,
+  "h_passo_mm": 5,
+  "corda": 20,
+  "lc_min": 20
+}

@@ -1,10 +1,11 @@
 //! Os **prompts** do MCP: guias que o cliente oferece ao usuário/IA para uma família de projetos.
-//! Hoje só há o de **projeto elétrico**; ele vale apenas quando o projeto é elétrico (NBR 5444/5410) e
-//! deve ser ignorado em qualquer outro tipo de desenho.
+//! `projeto_eletrico` vale apenas quando o projeto é elétrico (NBR 5444/5410); `projeto_grande` vale ao GERAR um
+//! projeto de várias pranchas a partir de dados (poupa contexto). Cada um deve ser ignorado fora do seu caso.
 
 use serde_json::{json, Value};
 
 pub const ELETRICO: &str = "projeto_eletrico";
+pub const GRANDE: &str = "projeto_grande";
 
 /// A lista de prompts (`prompts/list`).
 pub fn listar() -> Value {
@@ -13,16 +14,42 @@ pub fn listar() -> Value {
         "title": "Projeto elétrico (NBR 5444 / 5410)",
         "description": "Use SOMENTE quando o projeto for elétrico (planta de instalações, quadro de distribuição, diagramas). Simbologia, folhas, eletrodutos, condutores, multifilar e verificações. Ignore em qualquer outro tipo de projeto.",
         "arguments": []
+    }, {
+        "name": GRANDE,
+        "title": "Projeto grande: poupar contexto",
+        "description": "Use SOMENTE ao GERAR um projeto de várias pranchas a partir de dados (nuvem de pontos, modelo, cad_lote grande). No uso normal (ver, mexer, perguntar) ignore.",
+        "arguments": []
     }])
 }
 
 /// O conteúdo de um prompt (`prompts/get`).
 pub fn obter(nome: &str) -> Option<Value> {
-    (nome == ELETRICO).then(|| json!({
-        "description": "Guia de projeto elétrico no FeatherCAD",
-        "messages": [{ "role": "user", "content": { "type": "text", "text": TEXTO_ELETRICO } }]
-    }))
+    let (descricao, texto) = match nome {
+        ELETRICO => ("Guia de projeto elétrico no FeatherCAD", TEXTO_ELETRICO),
+        GRANDE => ("Guia de sessão para projetos grandes no FeatherCAD", TEXTO_GRANDE),
+        _ => return None,
+    };
+    Some(json!({ "description": descricao, "messages": [{ "role": "user", "content": { "type": "text", "text": texto } }] }))
 }
+
+const TEXTO_GRANDE: &str = "\
+GUIA PARA PROJETOS GRANDES (valha só ao gerar projeto de várias pranchas a partir de dados; no uso normal ignore).
+
+1. CONTEXTO É O CUSTO. Cada imagem e cada resultado grande ficam no contexto e são relidos em toda requisição seguinte. Ligue o MODO PROJETO (cad_modo {projeto:true}): \
+cad_ver passa a 800 px sem grade/rótulos e as listas longas vão para arquivo (resumo + caminho). Desligue ao terminar.
+
+2. CONFIRA EM TEXTO ANTES DA IMAGEM. cad_verificar {leiaute:true} diz texto sobre texto/linha, texto fora da folha ou entre folhas e texto de cabeça para baixo, com id e posição. \
+Só peça imagem onde houver problema. Uma imagem por folha, depois só recortes (`janela`); para olhar sem pôr na conversa, cad_ver {arquivo:\"x.png\"}.
+
+3. NÃO COPIE NÚMEROS. Nuvem e projeto se encadeiam pelo nome guardado na sessão: cad_nuvem_secoes → cad_nuvem_feicoes → cad_nuvem_qualidade → cad_alinhamento_ajustar → \
+cad_superelevacao → cad_greide → cad_tabela_estacas / cad_tabela / cad_grafico / cad_texto_bloco / cad_detalhe / cad_via. O que é lista longa já vem em arquivo; passe {\"de_arquivo\": caminho} \
+onde a ferramenta pedir a lista. Para o conjunto inteiro de uma vez, veja cad_modelos / cad_modelo.
+
+4. REGRAS EM TABELA. Limites normativos (velocidade, superelevação máxima, rampas…) vêm de `regras` (tabela de fábrica ou a sua em ~/.config/feathercad/regras/); diga ao usuário \
+quais usou e que os de fábrica não foram conferidos na norma.
+
+5. ETAPAS. Ao fechar cada etapa (nuvem → traçado → pranchas), sugira ao usuário rodar /compact: o contexto cai e o resto da sessão fica barato.
+";
 
 const TEXTO_ELETRICO: &str = "\
 GUIA DE PROJETO ELÉTRICO (valha só se o projeto for elétrico; senão ignore).

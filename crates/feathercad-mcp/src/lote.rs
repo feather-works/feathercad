@@ -23,7 +23,7 @@ use crate::fonte::Fonte;
 use crate::json::Res;
 
 /// Ferramentas que não cabem num lote (imagem, recursão, ou que troca/zera o desenho e o histórico).
-const PROIBIDAS: [&str; 5] = ["cad_lote", "cad_ver", "cad_desfazer", "cad_novo", "cad_abrir"];
+const PROIBIDAS: [&str; 6] = ["cad_lote", "cad_ver", "cad_desfazer", "cad_novo", "cad_abrir", "cad_modo"];
 const PROFUNDIDADE_MAX: usize = 16;
 const ITERACOES_MAX: usize = 200_000;
 const CHAMADAS_MAX: usize = 50_000;

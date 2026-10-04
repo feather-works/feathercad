@@ -148,6 +148,11 @@ fn entre(d: &Documento, de: &Ponta, para: &Ponta) -> Res<Value> {
 
 /// Medições: `{de, para}` (pontos ou `{id}`), `{pontos}` (perímetro e área do polígono) ou `{vertice, a, b}` (ângulo).
 pub fn medir(d: &Documento, args: &Value) -> Res<Value> {
+    if let Some(t) = texto_opcional(args, "texto") {
+        let altura = numero_opcional(args, "altura").filter(|a| *a > 0.0).ok_or("`texto` precisa de `altura` maior que zero")?;
+        let largura = feathercad_io::pdf::largura_do_conteudo(t, altura);
+        return Ok(json!({ "largura": arred(largura), "altura": altura, "nota": "mesma métrica do PDF; para caber numa caixa de largura L use altura <= L / largura * altura" }));
+    }
     if let (Some(de), Some(para)) = (args.get("de"), args.get("para")) {
         return entre(d, &ponta(de, "de")?, &ponta(para, "para")?);
     }
@@ -363,6 +368,9 @@ pub fn verificar(d: &Documento, args: &Value) -> Value {
         folgas(d, tol, &mut problemas);
     }
     let mut res = json!({ "ok": problemas.is_empty(), "tolerancia_usada": arred(tol), "problemas": problemas, "nota": "folga = extremidade que fica perto de outra forma sem tocar; dentro da tolerância, provavelmente era para fechar" });
+    if args.get("leiaute").and_then(Value::as_bool).unwrap_or(false) {
+        res["leiaute"] = crate::leiaute::verificar_leiaute(d);
+    }
     if let Some(dom) = texto_opcional(args, "dominio") {
         res["checklist_dominio"] = checklist_do_dominio(d, dom);
     }

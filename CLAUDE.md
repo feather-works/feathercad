@@ -140,6 +140,10 @@ cd src-tauri && cargo clippy
   `npm run mcp:build` é preciso reconectar o MCP no Claude Code (`/mcp`)**: o processo antigo continua com o binário velho.
   O servidor MCP tem o **desenho dele na memória, separado do app**: o app só vê o que for gravado no arquivo que ele tem
   aberto (recarrega em ~1 s se não há alteração pendente). Ligar o MCP ao motor do app ao vivo ainda não existe.
+- **MCP: plano de 01/10 (04/10/2026, feito, testado, não commitado):** ver o topo de `docs/PLANO-MCP.md`. Em resumo: `cad_modelo ferrovia` (e modelos do
+  usuário em `~/.config/feathercad/modelos/*.json`, que rodam como `cad_lote`), `cad_alinhamento/_ajustar`, `cad_superelevacao`, `cad_greide`, `cad_via`
+  (trilho/dormente vêm de `biblioteca/ferrovia/*.fct`), `cad_nuvem_secoes|feicoes (trilhos, bordos)|qualidade`, `cad_tabela_estacas`, `cad_projetar`,
+  `.fct` com `camera`+`L3`/`P3`, `cad_pdf papel:"auto"`, `cad_verificar {leiaute}`. Falta HATCH no DXF (1.6) e `meio-fio`.
 - **MCP: biblioteca de componentes em arquivos** (29-30/09/2026, `crates/feathercad-mcp/src/componentes.rs`, `build.rs`, pasta `biblioteca/`):
   cada equipamento é um `.fct` em mm reais (origem no canto inferior esquerdo) com cabeçalho `// descricao|categoria|tamanho|parametros: a=1 b=x`
   e `{{a}}` no corpo. `cad_componentes {busca?}` lista, `cad_componente {nome, ponto, valores?, ampliacao?, rotacao?, camada?}` coloca (um

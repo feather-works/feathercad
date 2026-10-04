@@ -75,6 +75,31 @@ fn achar(nome: &str) -> Res<Componente> {
     v.into_iter().find(|c| c.nome.eq_ignore_ascii_case(nome)).ok_or_else(|| format!("componente `{nome}` não existe; veja cad_componentes"))
 }
 
+/// O nome do arquivo para um apelido (`TR-57` → `trilho_tr57`; `dormente_concreto` fica como está).
+fn nome_do_arquivo(apelido: &str, prefixo: &str) -> String {
+    let n: String = apelido.trim().to_lowercase().chars().filter(|c| *c != '-' && *c != ' ').collect();
+    if n.starts_with(prefixo) { n } else { format!("{prefixo}_{n}") }
+}
+
+/// O contorno fechado do componente `prefixo_apelido` (a 1ª polilinha do arquivo), em **metros** (os arquivos são em mm).
+pub fn perfil_em_metros(apelido: &str, prefixo: &str) -> Res<Vec<(f64, f64)>> {
+    let c = achar(&nome_do_arquivo(apelido, prefixo))?;
+    let lido = importar(&c.corpo).map_err(|e| format!("componente `{}`: {e}", c.nome))?;
+    lido.formas
+        .iter()
+        .find_map(|f| match &f.2 {
+            feathercad_core::documento::Geometria::Polilinha { vertices, .. } => Some(vertices.iter().map(|v| (v.p.x / 1000.0, v.p.y / 1000.0)).collect()),
+            _ => None,
+        })
+        .ok_or_else(|| format!("componente `{}` não tem polilinha de contorno", c.nome))
+}
+
+/// Os parâmetros padrão do cabeçalho (`parametros: a=1 b=2`) como números.
+pub fn parametros_numericos(apelido: &str, prefixo: &str) -> Res<Vec<(String, f64)>> {
+    let c = achar(&nome_do_arquivo(apelido, prefixo))?;
+    Ok(c.parametros.iter().filter_map(|(k, v)| v.parse::<f64>().ok().map(|n| (k.clone(), n))).collect())
+}
+
 /// `cad_componentes`: a lista (curta) do que existe, com filtro opcional por texto.
 pub fn listar(args: &Value) -> Value {
     let busca = texto_opcional(args, "busca").map(str::to_lowercase);

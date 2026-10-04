@@ -67,6 +67,8 @@ pub struct OpcoesTopografia {
     pub rotular_pontos: bool,
     /// Se deve gerar o quadro de resumo estatístico.
     pub incluir_quadro: bool,
+    /// Canto superior esquerdo do quadro. `None` = ao lado do levantamento (à direita, no topo).
+    pub ponto_quadro: Option<Ponto>,
     /// Fator de exagero vertical para a geometria 3D (padrão 1.0 = escala real).
     pub exagero_vertical: Option<f64>,
 }
@@ -82,6 +84,7 @@ impl Default for OpcoesTopografia {
             incluir_pontos: true,
             rotular_pontos: true,
             incluir_quadro: true,
+            ponto_quadro: None,
             exagero_vertical: None,
         }
     }
@@ -183,6 +186,15 @@ pub fn deduplicar_pontos(pontos: &[Ponto], tolerancia: f64) -> Vec<Ponto> {
         }
     }
     unicos
+}
+
+/// Lê todos os pontos de uma nuvem em texto, **sem** descartar os repetidos (a via férrea tem trilhos a 1 m: nada é duplicata).
+pub fn ler_nuvem_bruta(conteudo: &str) -> Result<Vec<Ponto>, String> {
+    let pontos: Vec<Ponto> = conteudo.lines().filter_map(extrair_coordenadas).map(|(x, y, z)| Ponto::novo3d(x, y, z)).collect();
+    if pontos.len() < 3 {
+        return Err("A nuvem precisa de ao menos 3 pontos (E,N,Z por linha: CSV, XYZ, PTS ou TXT).".into());
+    }
+    Ok(pontos)
 }
 
 /// Lê uma nuvem de pontos em texto (CSV, XYZ, PTS, TXT) e devolve a lista de pontos 3D únicos.
@@ -778,7 +790,7 @@ pub fn criar_levantamento_topografico(
 
     // 6. Quadro Estatístico
     if opcoes.incluir_quadro {
-        adicionar_quadro_estatistico(&mut mudancas, camadas.quadro, &resumo, opcoes.exagero_vertical, &espaco);
+        adicionar_quadro_estatistico(&mut mudancas, camadas.quadro, &resumo, opcoes.exagero_vertical, opcoes.ponto_quadro, &espaco);
     }
 
     resumo.ids_criados = doc.aplicar_mudancas(mudancas);
@@ -853,6 +865,7 @@ fn adicionar_quadro_estatistico(
     camada: usize,
     resumo: &ResumoTopografico,
     exagero_vertical: Option<f64>,
+    ponto: Option<Ponto>,
     espaco: &Espaco,
 ) {
     let largura_caixa = 260.0;
@@ -879,8 +892,7 @@ fn adicionar_quadro_estatistico(
     let num_linhas = linhas.len();
     let altura_total = (num_linhas as f64 + 1.0) * altura_linha;
 
-    let x0 = resumo.max_x + 25.0;
-    let y0 = resumo.max_y;
+    let (x0, y0) = ponto.map_or((resumo.max_x + 25.0, resumo.max_y), |p| (p.x, p.y));
 
     for (a, b) in [
         (Ponto::novo(x0, y0), Ponto::novo(x0 + largura_caixa, y0)),

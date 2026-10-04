@@ -1,0 +1,6 @@
+// descricao: Perfil de trilho TR-57 (57 kg/m, 168 mm de altura), seção transversal
+// categoria: ferrovia
+// tamanho: 140x168
+// origem: centro do boleto, no topo do trilho (y = 0, para baixo é negativo). Usado por cad_via {desenho: "secao"}.
+camada TRILHO #FFFFFF
+P -34.5 0 34.5 0 34.5 -40.5 8.25 -52.5 8.25 -132.5 70 -144.5 70 -168 -70 -168 -70 -144.5 -8.25 -132.5 -8.25 -52.5 -34.5 -40.5 f

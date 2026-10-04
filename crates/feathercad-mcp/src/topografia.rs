@@ -26,10 +26,21 @@ pub fn topografia(ag: &mut Agente, args: &Value) -> Res<Value> {
         incluir_pontos: args.get("incluir_pontos").and_then(Value::as_bool).unwrap_or(true),
         rotular_pontos: args.get("rotular_pontos").and_then(Value::as_bool).unwrap_or(true),
         incluir_quadro: args.get("incluir_quadro").and_then(Value::as_bool).unwrap_or(true),
+        ponto_quadro: args.get("quadro_ponto").map(|p| crate::json::ponto(p, "quadro_ponto")).transpose()?,
         exagero_vertical: numero_opcional(args, "exagero_vertical"),
     };
 
-    let resumo = feathercad_core::topografia::criar_levantamento_topografico(&mut ag.doc, &pontos, &opcoes)?;
+    // `so_estatisticas`: faz a conta num rascunho e devolve os números sem tocar no desenho aberto.
+    let so_estatisticas = args.get("so_estatisticas").and_then(Value::as_bool).unwrap_or(false);
+    let resumo = if so_estatisticas {
+        let mut rascunho = feathercad_core::documento::Documento::default();
+        feathercad_core::topografia::criar_levantamento_topografico(&mut rascunho, &pontos, &opcoes)?
+    } else {
+        feathercad_core::topografia::criar_levantamento_topografico(&mut ag.doc, &pontos, &opcoes)?
+    };
+    if so_estatisticas {
+        return Ok(json!({ "so_estatisticas": true, "total_pontos": resumo.total_pontos, "cota_min": resumo.cota_min, "cota_max": resumo.cota_max, "desnivel": resumo.desnivel, "cota_media": resumo.cota_media, "equidistancia": resumo.equidistancia, "area_m2": resumo.area_m2, "area_ha": resumo.area_m2 / 10_000.0, "extensao_x": resumo.max_x - resumo.min_x, "extensao_y": resumo.max_y - resumo.min_y, "total_curvas": resumo.total_curvas, "desenho_alterado": false }));
+    }
     if let Some(caminho) = args.get("caminho").and_then(Value::as_str) {
         ag.arquivo = Some(PathBuf::from(caminho));
     }
