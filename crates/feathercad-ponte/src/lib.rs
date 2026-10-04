@@ -487,6 +487,28 @@ fn segmento(v: &Vista, a: Ponto, b: Ponto) -> Segmento {
 }
 
 impl Ponte {
+    /// O documento vivo, para quem trabalha **nele** por fora da interface (o MCP ao vivo). Quem muda o documento deve chamar
+    /// [`Ponte::depois_de_mudanca_externa`] se a versão mudou.
+    pub fn documento_mut(&mut self) -> &mut Documento {
+        &mut self.doc
+    }
+
+    /// O caminho do arquivo aberto, se há.
+    pub fn caminho_do_arquivo(&self) -> Option<&str> {
+        self.arquivo.as_ref().map(|a| a.caminho.as_str())
+    }
+
+    /// O desenho passou a não ter arquivo (ex.: a IA abriu uma nuvem de pontos, que ainda não é um desenho gravado).
+    pub fn esquecer_arquivo(&mut self) {
+        self.arquivo = None;
+    }
+
+    /// O documento mudou por fora (a IA desenhou): cancela a ferramenta em andamento e a seleção, que podem apontar para
+    /// objetos que não existem mais. Mantém o histórico do desenho (Ctrl+Z desfaz o passo da IA) e os interruptores.
+    pub fn depois_de_mudanca_externa(&mut self) {
+        self.sessao.recomecar();
+    }
+
     /// Atende um comando. O `Err` é a mensagem para o usuário, em português.
     /// Os comandos que **só leem** o estado (o quadro, o cursor, a vista): podem rodar ao mesmo tempo, sem esperar
     /// uns pelos outros. A casca os chama com uma trava de leitura, para o mouse continuar andando enquanto o

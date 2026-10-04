@@ -9,6 +9,9 @@ export const TITULO_CSS = `
 .titulo { display: flex; align-items: center; gap: 2px; height: 30px; padding: 0 8px; background: var(--fundo-faixa); border-bottom: 1px solid var(--borda); }
 .titulo .nome { flex: 1; text-align: center; color: var(--texto-suave); }
 .titulo .separador { width: 1px; height: 16px; margin: 0 4px; background: var(--borda); }
+.titulo .ia { padding: 1px 8px; border-radius: 10px; font-size: 11px; background: var(--destaque-suave); border: 1px solid var(--destaque); color: var(--texto); animation: ia-pulsa 1.2s ease-in-out infinite; }
+.titulo .ia[hidden] { display: none; }
+@keyframes ia-pulsa { 50% { opacity: .55; } }
 .titulo button { background: none; border: 0; padding: 2px 8px; border-radius: 3px; cursor: pointer; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; color: var(--texto); }
 .titulo button:hover:not(:disabled) { background: var(--fundo-painel); }
 .titulo button:disabled { opacity: .35; cursor: default; }
@@ -31,6 +34,8 @@ interface Acoes {
 export interface Titulo {
   el: HTMLElement;
   atualizar(e: Estado, temDesenho: boolean): void;
+  /** Mostra (ou esconde) o aviso de que a IA está desenhando. */
+  ia(trabalhando: boolean): void;
   /** Mostra o modo atual do tema no botão. */
   modoDoTema(modo: ModoDoTema): void;
 }
@@ -64,9 +69,16 @@ export function criarTitulo(t: Textos, acoes: Acoes): Titulo {
   const config = botao('configuracoes', t.config.abrir, acoes.configuracoes);
   const tema = botao('tema', '', acoes.tema);
   tema.style.marginLeft = '4px';
-  el.append(novo, abrir, salvar, exportar, separador, desfazer, refazer, nome, tema, config);
+  const ia = document.createElement('span');
+  ia.className = 'ia';
+  ia.hidden = true;
+  ia.textContent = t.titulo.iaTrabalhando;
+  el.append(novo, abrir, salvar, exportar, separador, desfazer, refazer, nome, ia, tema, config);
   return {
     el,
+    ia(trabalhando) {
+      ia.hidden = !trabalhando;
+    },
     modoDoTema(modo) {
       tema.title = t.tema.dica.replace('{modo}', t.tema.modos[modo]);
     },

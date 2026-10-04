@@ -1,0 +1,40 @@
+//! O servidor MCP do FeatherCAD como biblioteca: o binário `feathercad-mcp` (stdio) e o aplicativo (que hospeda o mesmo
+//! motor de ferramentas **ao vivo**, sobre o documento aberto na tela) usam o mesmo código.
+
+pub mod agente;
+pub mod ao_vivo;
+pub mod ao_longo;
+pub mod compacto;
+pub mod componentes;
+pub mod consulta;
+pub mod dados;
+pub mod detalhe;
+pub mod eletroduto;
+pub mod esquemas;
+pub mod exemplos;
+pub mod expressao;
+pub mod ferramentas;
+pub mod folhas;
+pub mod fonte;
+pub mod grafico;
+pub mod guias;
+pub mod imagem;
+pub mod json;
+pub mod leiaute;
+pub mod lote;
+pub mod malha_norte;
+pub mod medidas;
+pub mod modelos;
+pub mod mutacoes;
+pub mod nuvem_ferramentas;
+pub mod pecas;
+pub mod projecao;
+pub mod regras;
+pub mod rpc;
+pub mod simbolos;
+pub mod tabela;
+pub mod texto_bloco;
+pub mod topografia;
+pub mod via;
+pub mod viario;
+pub mod viario_projeto;

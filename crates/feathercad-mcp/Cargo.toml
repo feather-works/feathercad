@@ -18,6 +18,10 @@ base64 = "0.22"
 # Texto das legendas (coordenadas, ids). A fonte é lida do sistema; sem ela, as legendas usam um alfabeto de traços próprio.
 ab_glyph = "0.2"
 
+[lib]
+name = "feathercad_mcp"
+path = "src/lib.rs"
+
 [[bin]]
 name = "feathercad-mcp"
 path = "src/main.rs"

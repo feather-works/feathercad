@@ -86,6 +86,15 @@ export type MudancaNoDisco = { recarregado: Estado } | { conflito: string };
 /** O arquivo aberto mudou por fora (o servidor MCP, por exemplo)? O Rust decide e, se dá, já recarrega. */
 export const desenhoVerificarDisco = (): Promise<MudancaNoDisco | null> => chamar<MudancaNoDisco | null>('desenho_verificar_disco');
 
+/** O MCP ao vivo: `ativa` = a IA chamou uma ferramenta há pouco; `estado` só vem quando ela mexeu no desenho da tela. */
+export interface VivoMcp {
+  ativa: boolean;
+  estado: Estado | null;
+}
+
+/** A IA (Claude Code etc.) trabalhando no desenho aberto: o Rust avisa o que mudou. */
+export const mcpVivoVerificar = (): Promise<VivoMcp> => chamar<VivoMcp>('mcp_vivo_verificar');
+
 /** Exporta o desenho em PDF (uma página por folha) num arquivo escolhido na caixa; `null` se cancelou. */
 export const desenhoExportarPdf = (opcoes: OpcoesPdf): Promise<{ caminho: string; bytes: number } | null> =>
   chamar<{ caminho: string; bytes: number } | null>('desenho_exportar_pdf', { opcoes });

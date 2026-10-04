@@ -9,6 +9,7 @@
 mod arquivos;
 mod memoria_arvore;
 mod mcp;
+mod mcp_vivo;
 mod metricas;
 
 use std::sync::RwLock;
@@ -160,6 +161,7 @@ pub fn run() {
             ligar_aceleracao_por_gpu(app);
             #[cfg(not(target_os = "linux"))]
             let _ = app;
+            mcp_vivo::iniciar(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -179,9 +181,11 @@ pub fn run() {
             arquivos::inicio_miniatura,
             metricas::metricas_do_motor,
             mcp::mcp_estado,
+            mcp_vivo::mcp_vivo_verificar,
             mcp::mcp_testar,
         ])
         .run(tauri::generate_context!());
+    mcp_vivo::encerrar();
     if let Err(erro) = executado {
         eprintln!("[FeatherCAD] Não consegui abrir a janela: {erro}");
     }

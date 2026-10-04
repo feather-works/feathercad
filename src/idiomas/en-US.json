@@ -17,7 +17,8 @@
     "novo": "New (Ctrl+N)",
     "abrir": "Open (Ctrl+O)",
     "salvar": "Save (Ctrl+S)",
-    "exportar": "Export the sheets as PDF (A3)"
+    "exportar": "Export the sheets as PDF (A3)",
+    "iaTrabalhando": "AI drawing…"
   },
   "ribbon": {
     "abas": {

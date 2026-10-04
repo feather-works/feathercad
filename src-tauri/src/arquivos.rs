@@ -65,7 +65,7 @@ fn ponte(app: &AppHandle, comando: &str, corpo: &[u8]) -> Result<Vec<u8>, String
     p.chamar(comando, corpo)
 }
 
-fn estado(app: &AppHandle) -> Result<Value, String> {
+pub(crate) fn estado(app: &AppHandle) -> Result<Value, String> {
     let bytes = ponte(app, "estado", b"")?;
     serde_json::from_slice(&bytes).map_err(|e| format!("estado ilegível: {e}"))
 }
@@ -130,6 +130,27 @@ pub async fn desenho_abrir(app: AppHandle, caminho: Option<String>) -> Result<Op
         lembrar(&app, &caminho)?;
     }
     estado(&app).map(Some)
+}
+
+/// A IA (MCP ao vivo) abriu, criou ou gravou: põe a casca em dia com o que o servidor fez. `antes`/`depois` = o arquivo do
+/// desenho antes e depois da ferramenta; `gravou` = a ferramenta foi `cad_salvar` (o arquivo no disco mudou por ela, e
+/// recarregá-lo agora apagaria o histórico do desenho).
+pub(crate) fn depois_da_ia(app: &AppHandle, antes: Option<&Path>, depois: Option<&Path>, gravou: bool) {
+    if antes != depois {
+        match depois.and_then(|c| formato_do_caminho(c).map(|f| (c, f))) {
+            Some((c, f)) => {
+                let corpo = json!({ "caminho": c.to_string_lossy(), "formato": f.extensao(), "salvo": true });
+                let _ = ponte(app, "documento_arquivo_definir", corpo.to_string().as_bytes());
+                let _ = lembrar(app, c);
+            }
+            None => app.state::<RwLock<Ponte>>().write().unwrap_or_else(|e| e.into_inner()).esquecer_arquivo(),
+        }
+    }
+    if antes != depois || gravou {
+        if let Some(c) = depois.filter(|c| formato_do_caminho(c).is_some()) {
+            app.state::<VistoNoDisco>().definir(data_do_arquivo(c));
+        }
+    }
 }
 
 /// Chamado de tempos em tempos pela interface: o arquivo aberto mudou no disco? Se mudou e o

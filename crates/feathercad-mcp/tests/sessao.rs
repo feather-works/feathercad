@@ -13,7 +13,7 @@ struct Servidor {
 
 impl Servidor {
     fn novo() -> Self {
-        let mut filho = Command::new(env!("CARGO_BIN_EXE_feathercad-mcp")).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
+        let mut filho = Command::new(env!("CARGO_BIN_EXE_feathercad-mcp")).env("FEATHERCAD_VIVO", "0").stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().unwrap();
         let leitor = BufReader::new(filho.stdout.take().unwrap());
         Self { filho, leitor, proximo: 1 }
     }

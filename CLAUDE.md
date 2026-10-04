@@ -140,6 +140,16 @@ cd src-tauri && cargo clippy
   `npm run mcp:build` é preciso reconectar o MCP no Claude Code (`/mcp`)**: o processo antigo continua com o binário velho.
   O servidor MCP tem o **desenho dele na memória, separado do app**: o app só vê o que for gravado no arquivo que ele tem
   aberto (recarrega em ~1 s se não há alteração pendente). Ligar o MCP ao motor do app ao vivo ainda não existe.
+- **MCP ao vivo** (04/10/2026, `crates/feathercad-mcp/src/ao_vivo.rs`, `src-tauri/src/mcp_vivo.rs`; feito, testado, não commitado antes deste commit):
+  o aplicativo escuta num socket Unix (`$XDG_RUNTIME_DIR/feathercad/mcp.sock`, pasta 0700, só local) e roda as ferramentas do MCP **sobre o
+  documento aberto na tela** (o `Documento` da `Ponte` é trocado de lugar com o do `Agente` durante a chamada; o `Agente` do app guarda
+  alinhamentos/nuvens/greides). O `feathercad-mcp` do Claude Code virou proxy: com o app aberto repassa os `tools/call`; sem ele, trabalha
+  sozinho como antes (`FEATHERCAD_VIVO=0` força isolado — os testes de integração usam). Cada ferramenta = um Ctrl+Z; a interface pergunta
+  `mcp_vivo_verificar` a cada 300 ms, aplica o `estado` (abre aba sozinha se estava na página inicial) e mostra "IA desenhando…" na barra
+  de título. `cad_abrir`/`cad_salvar` acertam o arquivo da `Ponte` (`arquivos.rs::depois_da_ia`) para o recarregar-do-disco não apagar o
+  histórico. `cad_ver` vê a tela do usuário. **Limites:** só Unix (Windows segue independente); a ferramenta segura a trava de escrita (o mouse
+  espera nas lentas, como o modelo `ferrovia`); em release `panic = "abort"` — pânico numa ferramenta derruba o app; a vista (zoom) do app não
+  acompanha a IA ainda; um segundo app aberto não aceita a IA. Depois de mexer no MCP, **fechar e abrir o `app:dev`** e rodar `npm run mcp:build`.
 - **MCP: plano de 01/10 (04/10/2026, feito, testado, não commitado):** ver o topo de `docs/PLANO-MCP.md`. Em resumo: `cad_modelo ferrovia` (e modelos do
   usuário em `~/.config/feathercad/modelos/*.json`, que rodam como `cad_lote`), `cad_alinhamento/_ajustar`, `cad_superelevacao`, `cad_greide`, `cad_via`
   (trilho/dormente vêm de `biblioteca/ferrovia/*.fct`), `cad_nuvem_secoes|feicoes (trilhos, bordos)|qualidade`, `cad_tabela_estacas`, `cad_projetar`,

@@ -31,7 +31,7 @@ import { instalarEstilos } from './styles.ts';
 import { teclaDoEvento } from './teclado.ts';
 import { definirModo, modoSalvo, proximoModo } from './tema.ts';
 import { avisar } from './toast.ts';
-import { abrirJanelaMonitor, desenhoVerificarDisco, noApp } from '../ponte/nativo.ts';
+import { abrirJanelaMonitor, desenhoVerificarDisco, mcpVivoVerificar, noApp } from '../ponte/nativo.ts';
 import { devConsole } from './console-depuracao.ts';
 import { criarTitulo } from './titulo.ts';
 
@@ -538,6 +538,40 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
   aplicar(motor.fundoDefinir(fundoPreferido()));
   ativarAba('inicio');
   vigiarArquivo();
+  vigiarIa();
+
+  /** A IA mexeu no desenho (MCP ao vivo): sem aba de desenho aberta, abre uma para ele; com aba, só se atualiza. */
+  function receberDaIa(e: Estado): void {
+    if (temDesenho()) {
+      aplicar(e);
+      return;
+    }
+    guardarEstadoDaAbaAtual();
+    const id = `tab_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    // sem `bytes`: o desenho já está no motor (com o histórico); recarregá-lo apagaria o Ctrl+Z
+    abasDoc.push({ id, nome: e.arquivo?.nome ?? `${t.app.semTitulo} ${contadorSemTitulo++}`, caminho: e.arquivo?.caminho, formato: e.arquivo?.formato as 'dxf' | 'fcdz' | undefined, sujo: e.sujo });
+    atual = e;
+    ativarAba(id);
+  }
+
+  /** Pergunta ao Rust, várias vezes por segundo, se a IA mexeu no desenho e se está trabalhando. */
+  function vigiarIa(): void {
+    if (!noApp()) return;
+    let ocupado = false;
+    setInterval(() => {
+      if (ocupado || atual.arrastando) return;
+      ocupado = true;
+      mcpVivoVerificar()
+        .then((r) => {
+          titulo.ia(r.ativa);
+          if (r.estado) receberDaIa(r.estado);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          ocupado = false;
+        });
+    }, 300);
+  }
 
   function vigiarArquivo(): void {
     if (!noApp()) return;

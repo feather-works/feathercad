@@ -17,7 +17,8 @@
     "novo": "Novo (Ctrl+N)",
     "abrir": "Abrir (Ctrl+O)",
     "salvar": "Salvar (Ctrl+S)",
-    "exportar": "Exportar as folhas em PDF (A3)"
+    "exportar": "Exportar as folhas em PDF (A3)",
+    "iaTrabalhando": "IA desenhando…"
   },
   "ribbon": {
     "abas": {
