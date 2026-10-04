@@ -64,7 +64,7 @@ fn flag(d: &Value, nome: &str) -> bool {
 }
 
 /// Texto que acompanha a direção `g` sem ficar de cabeça para baixo: (giro, alinhamento horizontal).
-fn legivel(g: f64) -> (f64, AlinhaH) {
+pub(crate) fn legivel(g: f64) -> (f64, AlinhaH) {
     let g = g.rem_euclid(360.0);
     if g > 90.0 + 1e-6 && g <= 270.0 + 1e-6 { (g - 180.0, AlinhaH::Direita) } else { (g, AlinhaH::Esquerda) }
 }

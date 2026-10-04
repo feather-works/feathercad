@@ -163,9 +163,12 @@ pub fn tabela_estacas(ag: &mut Agente, args: &Value) -> Res<Value> {
     }
     let passo = numero_opcional(args, "passo").unwrap_or(20.0);
     let so_curvas = args.get("so_curvas").and_then(Value::as_bool).unwrap_or(false);
-    let n = (a.comprimento / passo + 1e-9).floor() as usize + 1;
+    // `de`/`ate` (progressiva, m): só o trecho pedido (uma folha por trecho)
+    let (de, ate) = (numero_opcional(args, "de").unwrap_or(a.progressiva_inicial), numero_opcional(args, "ate").unwrap_or(a.progressiva_final()));
+    let k0 = ((de - a.progressiva_inicial) / passo - 1e-9).ceil().max(0.0) as usize;
+    let n = (((ate.min(a.progressiva_final()) - a.progressiva_inicial) / passo + 1e-9).floor().max(-1.0) + 1.0) as usize;
     let mut linhas: Vec<Value> = Vec::new();
-    for k in 0..n {
+    for k in k0..n {
         let s = a.progressiva_inicial + k as f64 * passo;
         let am = a.em(s);
         if so_curvas && am.curva.is_none() {
@@ -206,7 +209,7 @@ pub fn tabela_estacas(ag: &mut Agente, args: &Value) -> Res<Value> {
     if let Some(t) = args.get("desenhar_tabela") {
         let mut o = t.clone();
         let titulos = |c: &str| match c { "estaca" => "Estaca", "km" => "Km", "elemento" => "Elem.", "curva" => "Curva", "h_atual" => "h atual", "h_projeto" => "h proj.", "flecha_medida" => "f med.", "flecha_projetada" => "f proj.", "ripagem" => "Ripag.", "cota_existente" => "Cota ex.", "cota_projeto" => "Cota pr.", "levante" => "Lev.", outro => outro }.to_string();
-        let cols: Vec<Value> = colunas.iter().map(|c| json!({ "titulo": titulos(c), "largura": if c == "estaca" || c == "km" { 18.0 } else { 14.0 }, "alinhamento": if c == "estaca" || c == "km" || c == "elemento" || c == "curva" { "centro" } else { "direita" } })).collect();
+        let cols: Vec<Value> = colunas.iter().map(|c| json!({ "titulo": titulos(c), "largura": (if c == "estaca" || c == "km" { 18.0 } else { 14.0 }) * numero_opcional(t, "largura_fator").unwrap_or(1.0), "alinhamento": if c == "estaca" || c == "km" || c == "elemento" || c == "curva" { "centro" } else { "direita" } })).collect();
         o["colunas"] = o.get("colunas").cloned().unwrap_or(Value::Array(cols));
         o["linhas"] = Value::Array(linhas.iter().map(|l| Value::Array(l.as_array().cloned().unwrap_or_default().iter().map(|c| if c.is_null() { json!("-") } else { c.clone() }).collect())).collect());
         r["tabela_desenhada"] = crate::tabela::tabela(&mut ag.doc, &o)?;

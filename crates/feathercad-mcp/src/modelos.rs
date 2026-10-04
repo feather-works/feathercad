@@ -61,30 +61,30 @@ fn listar_de_fabrica() -> Value {
     }] })
 }
 
-fn passo(ag: &mut Agente, fonte: &Fonte, nome: &str, args: &Value) -> Res<Value> {
+pub(crate) fn passo(ag: &mut Agente, fonte: &Fonte, nome: &str, args: &Value) -> Res<Value> {
     let c = chamar(ag, fonte, nome, args).map_err(|e| format!("{nome}: {e}"))?;
     let t = c.iter().find_map(|b| b.get("text").and_then(Value::as_str)).unwrap_or("{}");
     serde_json::from_str(t).map_err(|e| format!("{nome}: resposta ilegível: {e}"))
 }
 
 /// Um passo "bonito" (1, 2, 5 × 10ⁿ) para ~`n` marcas no intervalo.
-fn passo_bonito(intervalo: f64, n: f64) -> f64 {
+pub(crate) fn passo_bonito(intervalo: f64, n: f64) -> f64 {
     let bruto = (intervalo / n).max(1e-9);
     let mag = 10f64.powf(bruto.log10().floor());
     [1.0, 2.0, 5.0, 10.0].into_iter().map(|m| m * mag).find(|p| *p >= bruto).unwrap_or(10.0 * mag)
 }
 
-fn arredondar_limites(lo: f64, hi: f64, passo: f64) -> (f64, f64) {
+pub(crate) fn arredondar_limites(lo: f64, hi: f64, passo: f64) -> (f64, f64) {
     ((lo / passo).floor() * passo, (hi / passo).ceil() * passo)
 }
 
 /// Ponto da folha: `x_mm`,`y_mm` do canto inferior esquerdo, em unidades do desenho.
-fn na_folha(f: &InfoFolha, x_mm: f64, y_mm: f64) -> Value {
+pub(crate) fn na_folha(f: &InfoFolha, x_mm: f64, y_mm: f64) -> Value {
     let k = f.escala / 1000.0;
     json!([f.min.x + x_mm * k, f.min.y + y_mm * k])
 }
 
-fn inserir_folha(ag: &mut Agente, fonte: &Fonte, ctx: &Contexto, papel: &str, escala: Option<f64>, titulo: &str, n: usize) -> Res<InfoFolha> {
+pub(crate) fn inserir_folha(ag: &mut Agente, fonte: &Fonte, ctx: &Contexto, papel: &str, escala: Option<f64>, titulo: &str, n: usize) -> Res<InfoFolha> {
     let mut campos = ctx.carimbo.clone();
     campos["titulo"] = json!(titulo);
     campos["folha"] = json!(format!("{n:02}/{:02}", ctx.total));
@@ -102,11 +102,11 @@ fn inserir_folha(ag: &mut Agente, fonte: &Fonte, ctx: &Contexto, papel: &str, es
     })
 }
 
-struct Contexto {
-    papel: String,
-    escala: f64,
-    carimbo: Value,
-    total: usize,
+pub(crate) struct Contexto {
+    pub(crate) papel: String,
+    pub(crate) escala: f64,
+    pub(crate) carimbo: Value,
+    pub(crate) total: usize,
 }
 
 fn serie_h(a: &feathercad_core::viario::alinhamento::Alinhamento, tabela: &[ResultadoCurva]) -> (Vec<Value>, Vec<Value>) {
@@ -210,45 +210,38 @@ fn prancha_planta(ag: &mut Agente, fonte: &Fonte, ctx: &mut Contexto, n: usize, 
     Ok(f)
 }
 
-fn prancha_secao_e_3d(ag: &mut Agente, fonte: &Fonte, ctx: &Contexto, n: usize, tabela: &[ResultadoCurva]) -> Res<()> {
-    let a = ag.alinhamentos.values().next().ok_or("sem alinhamento")?.0.clone();
-    let f = inserir_folha(ag, fonte, ctx, &ctx.papel, Some(ctx.escala), "Seção tipo e perspectiva da curva crítica", n)?;
-    let critica = (0..a.curvas.len()).max_by(|x, y| tabela[*x].h_mm.total_cmp(&tabela[*y].h_mm).then(a.curvas[*y].raio.total_cmp(&a.curvas[*x].raio)));
-    let h = critica.map_or(0.0, |i| tabela[i].h_mm);
-    passo(ag, fonte, "cad_via", &json!({ "desenho": "secao", "ponto": na_folha(&f, 200.0, f.altura_mm - 280.0), "h_mm": h, "ampliacao": ctx.escala / 20.0 }))?;
-    if let Some(i) = critica {
-        let c = &a.curvas[i];
-        let (de, ate) = ((c.ts_marco.progressiva - 60.0).max(a.progressiva_inicial), (c.st.progressiva + 60.0).min(a.progressiva_final()));
-        let b = 1.075;
-        let mut linhas: Vec<Value> = Vec::new();
-        let n_pontos = ((ate - de) / 4.0).ceil() as usize;
-        for lado in [-1.0, 1.0] {
-            let pts: Vec<Value> = (0..=n_pontos).map(|j| {
-                let s = (de + j as f64 * 4.0).min(ate);
-                let am = a.em(s);
-                let (sn, cs) = am.direcao.to_radians().sin_cos();
-                let z = h_em(&a, tabela, s) / 1000.0 * if (lado > 0.0) == (c.lado < 0) { 1.0 } else { 0.0 } * 50.0;
-                json!([am.ponto.x - sn * lado * b / 2.0, am.ponto.y + cs * lado * b / 2.0, z])
-            }).collect();
-            linhas.push(Value::Array(pts));
+/// Linhas da tabela por estaca que cabem numa folha A1 (3 blocos de 52 linhas, texto de 3,5 mm).
+const LINHAS_POR_FOLHA_DE_ESTACAS: usize = 156;
+
+/// O eixo existente em trechos contínuos (quebra onde a nuvem tem lacuna de mais de 60 m ou um par suspeito).
+fn eixo_existente(f: &crate::nuvem_ferramentas::Feicoes) -> Vec<Vec<feathercad_core::geom::Ponto>> {
+    let mut segs: Vec<Vec<feathercad_core::geom::Ponto>> = vec![Vec::new()];
+    for (i, p) in f.pares.iter().enumerate() {
+        let atual = segs.last_mut().expect("sempre há um trecho");
+        if f.suspeitos.contains(&i) || atual.last().is_some_and(|u| u.distancia(p.meio) > 60.0) {
+            if !atual.is_empty() {
+                segs.push(Vec::new());
+            }
+            if f.suspeitos.contains(&i) {
+                continue;
+            }
         }
-        let centro = a.em((de + ate) / 2.0).ponto;
-        passo(ag, fonte, "cad_projetar", &json!({ "camera": { "azimute": 20.0, "elevacao": 35.0, "escala": 500.0 / (ate - de).max(1.0) * ctx.escala / 1000.0 }, "linhas": linhas.iter().map(|l| l.as_array().cloned().unwrap_or_default().into_iter().map(|p| { let v = p.as_array().cloned().unwrap_or_default(); json!([v[0].as_f64().unwrap_or(0.0) - centro.x, v[1].as_f64().unwrap_or(0.0) - centro.y, v[2]]) }).collect::<Vec<_>>()).collect::<Vec<_>>(), "origem": na_folha(&f, f.largura_mm * 0.65, f.altura_mm * 0.45), "camada": "PERSPECTIVA", "cor": "#FFFFFF" }))?;
-        passo(ag, fonte, "cad_texto_bloco", &json!({ "origem": na_folha(&f, f.largura_mm * 0.55, f.altura_mm * 0.25), "escala": ctx.escala, "largura": 300.0, "altura_texto": 3.0, "itens": [{ "tipo": "nota", "texto": format!("Perspectiva da curva {} (R = {} m, h = {} mm): superelevação exagerada 50 vezes na vertical.", i + 1, a.curvas[i].raio, h) }] }))?;
+        segs.last_mut().expect("sempre há um trecho").push(p.meio);
     }
-    Ok(())
+    segs.retain(|s| s.len() > 1);
+    segs
 }
 
-fn prancha_memorial(ag: &mut Agente, fonte: &Fonte, ctx: &Contexto, n: usize, memorial: &str) -> Res<()> {
-    let f = inserir_folha(ag, fonte, ctx, &ctx.papel, Some(ctx.escala), "Memorial de cálculo da superelevação", n)?;
-    let itens: Vec<Value> = memorial.split("\n\n").map(|b| json!({ "tipo": "texto", "texto": b })).collect();
-    passo(ag, fonte, "cad_texto_bloco", &json!({ "origem": na_folha(&f, 90.0, f.altura_mm - 130.0), "escala": ctx.escala, "largura": f.largura_mm - 180.0, "altura_texto": 3.0, "colunas": 3, "altura_max": f.altura_mm - 260.0, "itens": itens })).map(|_| ())
-}
-
-fn prancha_estacas(ag: &mut Agente, fonte: &Fonte, ctx: &Contexto, n: usize) -> Res<()> {
-    let f = inserir_folha(ag, fonte, ctx, "A1", Some(ctx.escala), "Tabela por estaca", n)?;
-    passo(ag, fonte, "cad_tabela_estacas", &json!({ "colunas": ["estaca", "elemento", "curva", "h_atual", "h_projeto", "flecha_projetada", "ripagem", "cota_existente", "cota_projeto", "levante"],
-        "desenhar_tabela": { "origem": na_folha(&f, 40.0, f.altura_mm - 60.0), "escala": ctx.escala, "titulo": "TABELA POR ESTACA", "blocos": 4, "altura_linha": 4.0, "altura_texto": 2.0 } }))?;
+/// A tabela por estaca em `n_folhas` folhas A1, cada uma com 3 blocos legíveis.
+fn prancha_estacas(ag: &mut Agente, fonte: &Fonte, ctx: &Contexto, primeira: usize, n_folhas: usize, a: &feathercad_core::viario::alinhamento::Alinhamento) -> Res<()> {
+    let total_linhas = (a.comprimento / 20.0).floor() as usize + 1;
+    let por_folha = total_linhas.div_ceil(n_folhas.max(1));
+    for k in 0..n_folhas {
+        let f = inserir_folha(ag, fonte, ctx, "A1", Some(ctx.escala), "Tabela por estaca", primeira + k)?;
+        let (de, ate) = (a.progressiva_inicial + (k * por_folha) as f64 * 20.0, a.progressiva_inicial + (((k + 1) * por_folha) as f64 - 1.0) * 20.0);
+        passo(ag, fonte, "cad_tabela_estacas", &json!({ "colunas": ["estaca", "elemento", "curva", "h_atual", "h_projeto", "flecha_projetada", "ripagem", "cota_existente", "cota_projeto", "levante"], "de": de, "ate": ate,
+            "desenhar_tabela": { "origem": na_folha(&f, 40.0, f.altura_mm - 45.0), "escala": ctx.escala, "titulo": format!("TABELA POR ESTACA — FOLHA {} DE {}", k + 1, n_folhas), "blocos": 3, "altura_linha": 7.4, "altura_texto": 3.5, "largura_fator": 1.7 } }))?;
+    }
     Ok(())
 }
 
@@ -321,16 +314,23 @@ fn ferrovia(ag: &mut Agente, fonte: &Fonte, d: &Value, caminho: &str) -> Res<Val
     let aj_eixo = json!({ "pis": ajuste["pis"], "curvas": ajuste["raios"].as_array().map(|r| r.iter().zip(a.curvas.iter()).map(|(r, c)| json!({ "R": r, "Ls": c.ls })).collect::<Vec<_>>()), "desenhar": { "eixo": true }, "camada_base": "PROJETO", "nome": "A1" });
     passo(ag, fonte, "cad_alinhamento", &aj_eixo)?;
     let carimbo = d.get("carimbo").cloned().unwrap_or(json!({}));
-    let total = 5;
+    let trechos = crate::planta_a1::dividir(&a);
+    let n_estacas = ((a.comprimento / 20.0).floor() as usize + 1).div_ceil(LINHAS_POR_FOLHA_DE_ESTACAS);
+    let total = 4 + trechos.len() + n_estacas;
     let mut ctx = Contexto { papel: texto_opcional(d, "papel").unwrap_or("A0").to_string(), escala: numero_opcional(d, "escala").unwrap_or(0.0), carimbo, total };
     let f1 = prancha_planta(ag, fonte, &mut ctx, 1, &tabela)?;
     // textos da planta já na escala certa
     let rot = json!({ "pis": ajuste["pis"], "curvas": aj_eixo["curvas"], "desenhar": { "estacas": true, "km": true, "notaveis": true, "rotulos": false }, "camada_base": "PROJETO", "escala": f1.escala, "nome": "A1", "altura_texto": 3.0, "rotular_estacas_a_cada": ((35.0 * f1.escala / 1000.0 / 20.0 / 5.0).ceil() * 5.0).max(5.0) });
     passo(ag, fonte, "cad_alinhamento", &rot)?;
     prancha_graficos(ag, fonte, &ctx, 2, &tabela)?;
-    prancha_secao_e_3d(ag, fonte, &ctx, 3, &tabela)?;
-    prancha_memorial(ag, fonte, &ctx, 4, sup["memorial"].as_str().unwrap_or(""))?;
-    prancha_estacas(ag, fonte, &ctx, 5)?;
+    crate::pranchas::prancha_secao_e_3d(ag, fonte, &ctx, 3, &a, &tabela)?;
+    let num = |v: &Value| v.as_f64().unwrap_or(0.0);
+    let resumo = crate::pranchas::Resumo { comprimento: a.comprimento, pontos: secoes["pontos"].as_u64().unwrap_or(0) as usize, pares: feic["pares"].as_u64().unwrap_or(0) as usize, suspeitos: qual["cota_fora_da_mediana"]["total"].as_u64().unwrap_or(0) as usize,
+        rip_rms: num(&ajuste["ripagem"]["rms"]), rip_max: num(&ajuste["ripagem"]["maxima"]), lev_medio: num(&g["levante"]["medio"]), lev_max: num(&g["levante"]["maximo"]), pivs: g["pivs"].as_array().map_or(0, Vec::len) };
+    crate::pranchas::prancha_memorial(ag, fonte, &ctx, 4, (&a, &tabela, &regras, &resumo), sup["memorial"].as_str().unwrap_or(""))?;
+    let existente = eixo_existente(&f_existente);
+    crate::planta_a1::plantas(ag, fonte, &ctx, (&a, &tabela, &existente), 5, &trechos)?;
+    prancha_estacas(ag, fonte, &ctx, 5 + trechos.len(), n_estacas, &a)?;
     let leiaute = crate::leiaute::verificar_leiaute(&ag.doc);
     let mut saidas = serde_json::Map::new();
     if let Some(s) = d.get("saida") {
@@ -385,7 +385,7 @@ mod testes {
         let mut ag = Agente::default();
         let fonte = crate::fonte::carregar();
         let r = modelo(&mut ag, &fonte, &json!({ "nome": "ferrovia", "dados": { "nuvem": csv.display().to_string(), "V": 80, "voltas": 1, "inicio": [0, 0], "direcao": 0, "carimbo": { "cliente": "Teste", "titulo": "Via sintética" } } })).unwrap();
-        assert_eq!(r["folhas"], 5, "{r}");
+        assert!(r["folhas"].as_u64().unwrap() >= 5, "memorial, seção, gráficos, planta geral, ao menos uma planta e a tabela: {r}");
         assert!(r["alinhamento"]["ripagem"]["rms"].as_f64().unwrap() < 1.5, "{r}");
         assert!(!ag.projeto, "o modo projeto volta ao que era");
         assert!(ag.doc.entidades().len() > 300, "{} entidades", ag.doc.entidades().len());

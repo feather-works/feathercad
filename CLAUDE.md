@@ -155,6 +155,14 @@ cd src-tauri && cargo clippy
   `profile.release` do `src-tauri` **não** tem mais `panic = "abort"`. **Limites:** a ferramenta segura a trava de escrita (o mouse espera nas
   lentas, como o modelo `ferrovia`); a vista (zoom) do app não acompanha a IA (decisão do usuário: não precisa). Depois de mexer no MCP,
   **fechar e abrir o `app:dev`** (o `tauri dev` reinicia sozinho quando muda `src-tauri/`) e rodar `npm run mcp:build`.
+- **Modelo `ferrovia` refeito (04/10/2026, feito e testado no MCP isolado; NÃO conferido ao vivo no app depois do reinício):** o usuário achou as pranchas
+  fracas e pediu "refazer tudo" tomando de modelo o desenho dele (`~/Documentos/FeatherCAD/ferrovia_otimizacao/tracado_ferroviario_otimizado.fcdz`: 4 A0 +
+  8 A1 em 1:2000). Agora são 13 folhas (nº dinâmico): 1 planta geral e 2 gráficos (A0, como antes); 3 **seção tipo + bloco 3D da superestrutura +
+  esquema 3D + planta da via TS→SC** (`pranchas.rs`, `cad_via` ganhou `destino {de,para,ampliacao,giro}`); 4 **memorial** em colunas (premissas, memória por
+  curva, tabela de verificação e resumo); 5.. **plantas A1 em 1:2000** (`planta_a1.rs`: janela que segue o traçado, malha, existente, ripagem ×20,
+  trilhos, estacas, km, TS/SC/CS/ST, tabelas das curvas do trecho, legenda e chave de articulação); últimas: **tabela por estaca** em 2 A1 legíveis
+  (`cad_tabela_estacas` ganhou `de`/`ate`, `largura_fator`). `cad_verificar {leiaute}` no CSV real: 11 `texto_sobre_texto` (rótulos de curvas coladas) e
+  28 `texto_sobre_linha` nas plantas A1 — **a investigar**. Pendente: olhar as folhas 1 e 2 de novo, rodar o modelo ao vivo (`cad_modelo` pelo MCP) e conferir no app.
 - **MCP: plano de 01/10 (04/10/2026, feito, testado, não commitado):** ver o topo de `docs/PLANO-MCP.md`. Em resumo: `cad_modelo ferrovia` (e modelos do
   usuário em `~/.config/feathercad/modelos/*.json`, que rodam como `cad_lote`), `cad_alinhamento/_ajustar`, `cad_superelevacao`, `cad_greide`, `cad_via`
   (trilho/dormente vêm de `biblioteca/ferrovia/*.fct`), `cad_nuvem_secoes|feicoes (trilhos, bordos)|qualidade`, `cad_tabela_estacas`, `cad_projetar`,

@@ -49,6 +49,26 @@ fn metros(doc: &Documento) -> f64 {
     1000.0 / doc.unidade().map_or(1000.0, feathercad_core::documento::Unidade::em_milimetros)
 }
 
+/// `destino: {de: [x,y], para: [x,y], ampliacao: k, giro?: graus}`: leva o desenho da planta para outro lugar (uma folha) trocando o ponto `de` do
+/// traçado por `para` e multiplicando as distâncias por `ampliacao` — a "planta da via no trecho" de uma prancha em escala maior.
+fn mover_para_a_folha(pecas: &mut [Peca], args: &Value) -> Res<()> {
+    let Some(d) = args.get("destino") else { return Ok(()) };
+    let (de, para, k) = (ponto_de(d, "de")?, ponto_de(d, "para")?, numero_opcional(d, "ampliacao").unwrap_or(1.0));
+    let (sn, cs) = numero_opcional(d, "giro").unwrap_or(0.0).to_radians().sin_cos();
+    let t = |q: Ponto| {
+        let (dx, dy) = (q.x - de.x, q.y - de.y);
+        Ponto::novo(para.x + (dx * cs - dy * sn) * k, para.y + (dx * sn + dy * cs) * k)
+    };
+    for peca in pecas {
+        match &mut peca.g {
+            feathercad_core::documento::Geometria::Polilinha { vertices, .. } => vertices.iter_mut().for_each(|v| v.p = t(v.p)),
+            feathercad_core::documento::Geometria::Linha { a, b } => (*a, *b) = (t(*a), t(*b)),
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 fn planta(ag: &mut Agente, a: &Alinhamento, args: &Value) -> Res<Value> {
     let v = via_de(args)?;
     let km = metros(&ag.doc);
@@ -77,6 +97,7 @@ fn planta(ag: &mut Agente, a: &Alinhamento, args: &Value) -> Res<Value> {
     for desloc in [v.b / 2.0 - v.hb, v.b / 2.0 + v.hb, -v.b / 2.0 + v.hb, -v.b / 2.0 - v.hb] {
         p.polilinha(&trecho.paralela(desloc * km));
     }
+    mover_para_a_folha(&mut p.pecas, args)?;
     let caixa = caixa_das(&p.pecas);
     let ids = aplicar(&mut ag.doc, p.pecas)?;
     let mut r = relatorio(&ids, caixa);

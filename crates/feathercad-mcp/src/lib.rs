@@ -28,6 +28,8 @@ pub mod modelos;
 pub mod mutacoes;
 pub mod nuvem_ferramentas;
 pub mod pecas;
+pub mod pranchas;
+pub mod planta_a1;
 pub mod projecao;
 pub mod regras;
 pub mod rpc;
