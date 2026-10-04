@@ -100,6 +100,11 @@ fn normalizado(g: f64) -> f64 {
 }
 
 pub fn verificar_leiaute(d: &Documento) -> Value {
+    verificar_leiaute_com(d, LIMITE_POR_TIPO)
+}
+
+/// Como [`verificar_leiaute`], com `limite` problemas listados por tipo (a contagem é sempre a total).
+pub fn verificar_leiaute_com(d: &Documento, limite: usize) -> Value {
     let textos = caixas(d);
     let folhas = d.folhas_inseridas();
     let mut lista: Vec<Value> = Vec::new();
@@ -107,7 +112,7 @@ pub fn verificar_leiaute(d: &Documento) -> Value {
     let mut anotar = |tipo: &'static str, v: Value, lista: &mut Vec<Value>| {
         let n = contagem.entry(tipo).or_insert(0);
         *n += 1;
-        if *n <= LIMITE_POR_TIPO {
+        if *n <= limite {
             lista.push(v);
         }
     };

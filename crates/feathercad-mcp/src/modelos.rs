@@ -301,35 +301,6 @@ struct Calculo {
     ajuste: Value,
     sup: Value,
     g: Value,
-    regras_args: Value,
-}
-
-/// Os pontos do levantamento projetados no traçado: progressiva, cota e ripagem (suspeitos de fora).
-fn observacoes(a: &feathercad_core::viario::alinhamento::Alinhamento, f: &crate::nuvem_ferramentas::Feicoes) -> Vec<feathercad_core::viario::criticidade::Observacao> {
-    let t = feathercad_core::trajeto::Trajeto::novo(&a.amostrar(0.5));
-    let mut v: Vec<_> = f
-        .pares
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| !f.suspeitos.contains(i))
-        .filter_map(|(_, p)| t.as_ref().map(|t| { let (d, s) = t.projetar(p.meio); feathercad_core::viario::criticidade::Observacao { s: s + a.progressiva_inicial, z: p.z, ripagem: d } }))
-        .collect();
-    v.sort_by(|x, y| x.s.total_cmp(&y.s));
-    v
-}
-
-/// Os limiares da análise: os padrões de `Criterios` com o que vier em `dados.criterios` por cima.
-fn criterios_de(d: &Value) -> feathercad_core::viario::criticidade::Criterios {
-    let mut c = feathercad_core::viario::criticidade::Criterios::default();
-    let Some(o) = d.get("criterios").and_then(Value::as_object) else { return c };
-    let n = |k: &str| o.get(k).and_then(Value::as_f64);
-    let campos: [(&str, &mut f64); 14] = [("fracao_h", &mut c.fracao_h), ("fracao_i", &mut c.fracao_i), ("folga_r", &mut c.folga_r), ("folga_v", &mut c.folga_v), ("folga_ls", &mut c.folga_ls), ("ripagem_atencao", &mut c.ripagem_atencao), ("ripagem_critica", &mut c.ripagem_critica), ("movimento_minimo", &mut c.movimento_minimo), ("movimento_atencao", &mut c.movimento_atencao), ("movimento_critico", &mut c.movimento_critico), ("rampa_atencao_pct", &mut c.rampa_atencao_pct), ("rampa_critica_pct", &mut c.rampa_critica_pct), ("tangente_minima", &mut c.tangente_minima), ("largura_plataforma", &mut c.largura_plataforma)];
-    for (nome, campo) in campos {
-        if let Some(v) = n(nome) {
-            *campo = v;
-        }
-    }
-    c
 }
 
 /// Nuvem → feições → traçado ajustado → superelevação → greide → análise de criticidade.
@@ -359,9 +330,9 @@ fn calcular_projeto(ag: &mut Agente, fonte: &Fonte, d: &Value, caminho: &str) ->
     let tabela = calcular(&a, &regras);
     let existente = ag.feicoes.values().next().ok_or("sem feições")?.clone();
     let greide = ag.greides.values().next().ok_or("sem greide")?.clone();
-    let obs = observacoes(&a, &existente);
-    let analise = feathercad_core::viario::criticidade::analisar(&a, &tabela, &regras, &greide, &obs, &criterios_de(d));
-    Ok(Calculo { a, tabela, regras, greide, obs, analise, existente, secoes, feic, qual, ajuste, sup, g, regras_args })
+    let obs = crate::analise_ferramenta::observacoes(&a, &existente);
+    let analise = feathercad_core::viario::criticidade::analisar(&a, &tabela, &regras, &greide, &obs, &crate::analise_ferramenta::criterios_de(d));
+    Ok(Calculo { a, tabela, regras, greide, obs, analise, existente, secoes, feic, qual, ajuste, sup, g })
 }
 
 /// O eixo existente (azul) e o de projeto no desenho, que a planta geral e os detalhes copiam.
@@ -406,7 +377,7 @@ fn montar_folhas(ag: &mut Agente, fonte: &Fonte, d: &Value, c: &Calculo, eixo: &
     let resumo = crate::pranchas::Resumo { comprimento: c.a.comprimento, pontos: c.secoes["pontos"].as_u64().unwrap_or(0) as usize, pares: c.feic["pares"].as_u64().unwrap_or(0) as usize, suspeitos: c.qual["cota_fora_da_mediana"]["total"].as_u64().unwrap_or(0) as usize,
         rip_rms: num(&c.ajuste["ripagem"]["rms"]), rip_max: num(&c.ajuste["ripagem"]["maxima"]), lev_medio: num(&c.g["levante"]["medio"]), lev_max: num(&c.g["levante"]["maximo"]), pivs: c.g["pivs"].as_array().map_or(0, Vec::len) };
     crate::pranchas::prancha_memorial(ag, fonte, &ctx, 4, (&c.a, &c.tabela, &c.regras, &resumo), c.sup["memorial"].as_str().unwrap_or(""))?;
-    let projeto = crate::projeto::Projeto { a: &c.a, tabela: &c.tabela, regras: &c.regras, greide: &c.greide, analise: &c.analise, obs: &c.obs };
+    let projeto = crate::projeto::Projeto { a: &c.a, tabela: &c.tabela, greide: &c.greide, analise: &c.analise, obs: &c.obs };
     crate::perfil::perfis(ag, fonte, &ctx, &projeto, 5)?;
     let existente = eixo_existente(&c.existente);
     crate::planta_a1::plantas(ag, fonte, &ctx, (&c.a, &c.tabela, &existente), 5 + n.perfis, &trechos)?;

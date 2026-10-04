@@ -29,9 +29,9 @@ pub(crate) fn numero_de_folhas(comprimento: f64) -> usize {
     ((comprimento / COMPRIMENTO_POR_FOLHA).ceil() as usize).max(1)
 }
 
-/// A escala vertical (denominador) mais detalhada em que o perfil cabe em 130 mm.
+/// A escala vertical (denominador) mais detalhada em que o perfil, com folga de 1 m, cabe em 125 mm: cada folha tem a sua, dita no título.
 fn escala_vertical(zmin: f64, zmax: f64) -> f64 {
-    [200.0, 250.0, 500.0, 1000.0, 2000.0].into_iter().find(|v| (zmax - zmin) * 1000.0 / v <= 130.0).unwrap_or(5000.0)
+    [50.0, 100.0, 200.0, 250.0, 500.0, 1000.0, 2000.0].into_iter().find(|v| (zmax - zmin + 1.0) * 1000.0 / v <= 125.0).unwrap_or(5000.0)
 }
 
 struct Quadro {
@@ -58,9 +58,12 @@ fn virgula(v: f64, casas: usize) -> String {
     format!("{v:.casas$}").replace('.', ",")
 }
 
+type Amostra3 = (f64, f64, f64);
+type Faixa = (bool, Vec<Amostra3>);
+
 /// Uma faixa contínua entre duas curvas onde `a` está de um lado de `b`: pontos `(s, a, b)` de uma mesma classe.
-fn faixas(pontos: &[(f64, f64, f64)], minimo: f64) -> Vec<(bool, Vec<(f64, f64, f64)>)> {
-    let mut saida: Vec<(bool, Vec<(f64, f64, f64)>)> = Vec::new();
+fn faixas(pontos: &[Amostra3], minimo: f64, passo: f64) -> Vec<Faixa> {
+    let mut saida: Vec<Faixa> = Vec::new();
     for p in pontos {
         let d = p.1 - p.2;
         if d.abs() < minimo {
@@ -68,7 +71,7 @@ fn faixas(pontos: &[(f64, f64, f64)], minimo: f64) -> Vec<(bool, Vec<(f64, f64, 
         }
         let acima = d > 0.0;
         match saida.last_mut() {
-            Some((c, v)) if *c == acima && p.0 - v.last().map_or(0.0, |u| u.0) <= 4.1 => v.push(*p),
+            Some((c, v)) if *c == acima && p.0 - v.last().map_or(0.0, |u| u.0) <= passo * 1.05 => v.push(*p),
             _ => saida.push((acima, vec![*p])),
         }
     }
@@ -99,7 +102,7 @@ fn preencher(c: &mut Caneta, q: &Quadro, p: &Projeto) {
     let passo = 2.0;
     let n = ((q.c1 - q.c0) / passo).ceil() as usize;
     let pts: Vec<(f64, f64, f64)> = (0..=n).filter_map(|i| { let s = (q.c0 + i as f64 * passo).min(q.c1); p.ze(s).map(|ze| (s, p.zg(s), ze)) }).collect();
-    for (acima, v) in faixas(&pts, 0.01) {
+    for (acima, v) in faixas(&pts, 0.01, passo) {
         let mut contorno: Vec<Mm> = v.iter().map(|(s, zg, _)| (q.x(*s), q.y(*zg))).collect();
         contorno.extend(v.iter().rev().map(|(s, _, ze)| (q.x(*s), q.y(*ze))));
         c.em(if acima { "PERFIL_ATERRO" } else { "PERFIL_ESCAVACAO" }, Some(if acima { COR_ATERRO } else { COR_ESCAVACAO }));
@@ -129,8 +132,9 @@ fn pivs(c: &mut Caneta, q: &Quadro, p: &Projeto) {
         let x = q.x(s);
         c.em("PERFIL_PIV", Some(COR_PROJETO));
         c.linha((x, q.y(piv.z)), (x, Y_BASE + q.altura + 4.0));
-        let rotulo = format!("PIV {} — est. {} — cota {} m{}", i + 1, estaca_texto(s, 20.0), virgula(piv.z, 2), if piv.lv > 0.0 { format!(" — Lv {:.0} m ({})", piv.lv, if piv.convexa { "convexa" } else { "côncava" }) } else { String::new() });
-        c.texto((x - 0.8, Y_BASE + q.altura + 5.0), 2.3, 90.0, &rotulo, AlinhaH::Esquerda, AlinhaV::Meio);
+        let estaca = format!("{}+{:02.0}", (s / 20.0).floor() as i64, s - (s / 20.0).floor() * 20.0);
+        let rotulo = format!("PIV {} · {} · {} m", i + 1, estaca, virgula(piv.z, 2));
+        c.texto((x - 0.8, Y_BASE + q.altura + 5.0), 2.1, 90.0, &rotulo, AlinhaH::Esquerda, AlinhaV::Meio);
         if piv.lv > 0.0 {
             c.linha((q.x(s - piv.lv / 2.0), q.y(piv.z) - 3.0), (q.x(s + piv.lv / 2.0), q.y(piv.z) - 3.0));
         }
@@ -174,7 +178,7 @@ fn tabela(c: &mut Caneta, q: &Quadro, p: &Projeto) -> f64 {
         let x = q.x(s);
         c.em("PERFIL_TABELA", None);
         let cem = (s / 100.0 - (s / 100.0).round()).abs() < 1e-6;
-        c.texto((x, centro_de(0)), 2.1, 90.0, &if cem { estaca_texto(s, 20.0) } else { format!("{}", (s / 20.0).round() as i64) }, AlinhaH::Centro, AlinhaV::Meio);
+        c.texto((x, centro_de(0)), 2.1, 90.0, &if cem { format!("{}+00", (s / 20.0).round() as i64) } else { format!("{}", (s / 20.0).round() as i64) }, AlinhaH::Centro, AlinhaV::Meio);
         if let Some(ze) = p.ze(s) {
             let (zg, lev) = (p.zg(s), p.zg(s) - ze);
             c.texto((x, centro_de(1)), 2.1, 90.0, &virgula(ze, 2), AlinhaH::Centro, AlinhaV::Meio);
@@ -261,7 +265,7 @@ fn diagrama_de_levante(c: &mut Caneta, q: &Quadro, p: &Projeto, y0: f64) -> f64 
     }
     let n = ((q.c1 - q.c0) / 5.0).ceil() as usize;
     let pts: Vec<(f64, f64, f64)> = (0..=n).filter_map(|i| { let s = (q.c0 + i as f64 * 5.0).min(q.c1); p.ze(s).map(|ze| (s, p.zg(s) - ze, 0.0)) }).collect();
-    for (acima, v) in faixas(&pts, 0.005) {
+    for (acima, v) in faixas(&pts, 0.005, 5.0) {
         let mut contorno: Vec<Mm> = v.iter().map(|(s, l, _)| (q.x(*s), y0 + l.clamp(-0.3, 0.3) * mm_por_m)).collect();
         contorno.extend(v.iter().rev().map(|(s, _, _)| (q.x(*s), y0)));
         c.em("PERFIL_LEVANTE", Some(if acima { COR_ATERRO } else { COR_ESCAVACAO }));
@@ -304,12 +308,12 @@ fn pontos_de_atencao(c: &mut Caneta, q: &Quadro, p: &Projeto, y_topo: f64) {
 pub(crate) fn perfis(ag: &mut Agente, fonte: &Fonte, ctx: &Contexto, p: &Projeto, primeira: usize) -> Res<()> {
     let (p0, pf) = (p.a.progressiva_inicial, p.a.progressiva_final());
     let n = numero_de_folhas(pf - p0);
-    let zs: Vec<f64> = p.obs.iter().map(|o| o.z).chain((0..=((pf - p0) / 10.0) as usize).map(|i| p.zg(p0 + i as f64 * 10.0))).collect();
-    let (zmin, zmax) = zs.iter().fold((f64::MAX, f64::MIN), |m, z| (m.0.min(*z), m.1.max(*z)));
-    let (z0, z1) = ((zmin - 0.5).floor(), (zmax + 0.5).ceil());
-    let esc_v = escala_vertical(z0, z1);
     for i in 0..n {
         let (c0, c1) = (p0 + (pf - p0) * i as f64 / n as f64, p0 + (pf - p0) * (i + 1) as f64 / n as f64);
+        let zs: Vec<f64> = p.obs.iter().filter(|o| o.s >= c0 && o.s <= c1).map(|o| o.z).chain((0..=((c1 - c0) / 5.0) as usize).map(|k| p.zg(c0 + k as f64 * 5.0))).collect();
+        let (zmin, zmax) = zs.iter().fold((f64::MAX, f64::MIN), |m, z| (m.0.min(*z), m.1.max(*z)));
+        let esc_v = escala_vertical(zmin, zmax);
+        let (z0, z1) = ((zmin - 0.5).floor(), (zmax + 0.5).ceil());
         let f = inserir_folha(ag, fonte, ctx, "A1", Some(ESCALA_H), "Perfil longitudinal", primeira + i)?;
         let q = Quadro { c0, c1, z0, esc_v, altura: (z1 - z0) * 1000.0 / esc_v };
         let mut c = Caneta::nova(&f, "PERFIL_TITULO");
@@ -354,7 +358,7 @@ mod testes {
     #[test]
     fn faixas_separam_aterro_de_escavacao_e_ignoram_ruido() {
         let pts: Vec<(f64, f64, f64)> = vec![(0.0, 1.0, 1.005), (2.0, 1.2, 1.0), (4.0, 1.3, 1.0), (6.0, 0.9, 1.0), (8.0, 0.8, 1.0), (10.0, 0.7, 1.0)];
-        let f = faixas(&pts, 0.01);
+        let f = faixas(&pts, 0.01, 2.0);
         assert_eq!(f.len(), 2, "{f:?}");
         assert!(f[0].0 && !f[1].0);
         assert_eq!(f[0].1.len(), 2);
@@ -363,6 +367,7 @@ mod testes {
     #[test]
     fn escolhe_a_escala_vertical_pelo_tamanho_do_perfil() {
         assert_eq!(escala_vertical(37.0, 60.0), 200.0);
+        assert_eq!(escala_vertical(45.0, 47.5), 50.0, "perfil quase plano: escala bem detalhada");
         assert_eq!(escala_vertical(0.0, 40.0), 500.0);
         assert_eq!(numero_de_folhas(6230.0), 5);
     }

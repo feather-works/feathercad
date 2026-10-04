@@ -152,7 +152,24 @@ fn ler_estaca(t: &str, passo: f64) -> Option<f64> {
     Some(n.trim().parse::<f64>().ok()? * passo + r.trim().replace(',', ".").parse::<f64>().ok()?)
 }
 
+/// `cad_alinhamento_ponto {de, ate, passo}`: o traçado amostrado — progressiva, E, N, direção, curvatura, elemento e curva.
+fn amostrar_o_alinhamento(ag: &Agente, args: &Value) -> Res<Value> {
+    let (nome, (a, passo_estaca)) = achar(ag, args)?;
+    let (de, ate) = (numero_opcional(args, "de").unwrap_or(a.progressiva_inicial).max(a.progressiva_inicial), numero_opcional(args, "ate").unwrap_or(a.progressiva_final()).min(a.progressiva_final()));
+    let passo = numero_opcional(args, "passo").unwrap_or(5.0).max(0.1);
+    if ate <= de {
+        return Err(format!("`ate` precisa ser maior que `de` (o alinhamento vai de {:.1} a {:.1})", a.progressiva_inicial, a.progressiva_final()));
+    }
+    let n = ((ate - de) / passo).ceil() as usize;
+    let linhas: Vec<Value> = (0..=n).map(|i| { let s = (de + i as f64 * passo).min(ate); let am = a.em(s); json!([arred(s), arred(am.ponto.x), arred(am.ponto.y), arred(am.direcao), arred(am.curvatura * 1e6) / 1e6, am.tipo.letra(), am.curva.map(|c| c + 1)]) }).collect();
+    let resumo = json!({ "alinhamento": nome, "passo_estaca": passo_estaca, "colunas": ["progressiva", "E", "N", "direcao", "curvatura", "elemento", "curva"], "de": arred(de), "ate": arred(ate), "passo": passo });
+    crate::dados::com_linhas(ag, args, "alinhamento_pontos", resumo, linhas)
+}
+
 pub fn alinhamento_ponto(ag: &Agente, args: &Value) -> Res<Value> {
+    if args.get("ate").is_some() || args.get("passo").is_some() {
+        return amostrar_o_alinhamento(ag, args);
+    }
     let (nome, (a, passo)) = achar(ag, args)?;
     let s = match (numero_opcional(args, "progressiva"), texto_opcional(args, "estaca")) {
         (Some(s), _) => s,

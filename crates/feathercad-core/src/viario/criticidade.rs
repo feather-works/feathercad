@@ -64,9 +64,9 @@ impl Default for Criterios {
             fracao_i: 0.80,
             folga_r: 1.25,
             folga_v: 1.15,
-            folga_ls: 1.10,
+            folga_ls: 1.03,
             ripagem_atencao: 0.50,
-            ripagem_critica: 1.00,
+            ripagem_critica: 0.75,
             movimento_minimo: 0.05,
             movimento_atencao: 0.10,
             movimento_critico: 0.20,
@@ -326,7 +326,8 @@ fn medidas(de: f64, ate: f64, lev: &[(f64, f64, f64)], obs: &[Observacao], g: &G
     let rip_rms = (rips.iter().map(|r| r * r).sum::<f64>() / rips.len().max(1) as f64).sqrt();
     let passos = (((ate - de) / PASSO).ceil() as usize).max(1);
     let rampas: Vec<f64> = (0..=passos).map(|k| g.rampa((de + (ate - de) * k as f64 / passos as f64) - p0) * 100.0).collect();
-    let cotas: Vec<f64> = dentro.iter().map(|l| l.2).collect();
+    // elemento sem estação do levantamento (tangente de poucos metros): as cotas são as do greide nas pontas
+    let cotas: Vec<f64> = if dentro.is_empty() { vec![g.z(de - p0), g.z(ate - p0)] } else { dentro.iter().map(|l| l.2).collect() };
     let mut motivos = Vec::new();
     if rips.len() < c.observacoes_minimas {
         motivos.push(Motivo { nivel: Nivel::Atencao, texto: format!("só {} ponto(s) do levantamento no elemento: pouca base para confiar na análise", rips.len()) });

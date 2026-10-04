@@ -370,7 +370,7 @@ pub fn verificar(d: &Documento, args: &Value) -> Value {
     }
     let mut res = json!({ "ok": problemas.is_empty(), "tolerancia_usada": arred(tol), "problemas": problemas, "nota": "folga = extremidade que fica perto de outra forma sem tocar; dentro da tolerância, provavelmente era para fechar" });
     if args.get("leiaute").and_then(Value::as_bool).unwrap_or(false) {
-        res["leiaute"] = crate::leiaute::verificar_leiaute(d);
+        res["leiaute"] = crate::leiaute::verificar_leiaute_com(d, args.get("limite").and_then(Value::as_u64).map_or(40, |n| n as usize));
     }
     if let Some(dom) = texto_opcional(args, "dominio") {
         res["checklist_dominio"] = checklist_do_dominio(d, dom);

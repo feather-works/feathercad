@@ -2,6 +2,7 @@
 //! motor de ferramentas **ao vivo**, sobre o documento aberto na tela) usam o mesmo código.
 
 pub mod agente;
+pub mod analise_ferramenta;
 pub mod ao_vivo;
 pub mod ao_longo;
 pub mod compacto;
