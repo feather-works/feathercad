@@ -163,6 +163,14 @@ cd src-tauri && cargo clippy
   trilhos, estacas, km, TS/SC/CS/ST, tabelas das curvas do trecho, legenda e chave de articulação); últimas: **tabela por estaca** em 2 A1 legíveis
   (`cad_tabela_estacas` ganhou `de`/`ate`, `largura_fator`). `cad_verificar {leiaute}` no CSV real: 11 `texto_sobre_texto` (rótulos de curvas coladas) e
   28 `texto_sobre_linha` nas plantas A1 — **a investigar**. Pendente: olhar as folhas 1 e 2 de novo, rodar o modelo ao vivo (`cad_modelo` pelo MCP) e conferir no app.
+- **Projeto ferroviário completo (04/10/2026, feito e testado, commitado):** `exemplos/ferrovia_completa.py nuvem.csv saida_base [--vivo] [--so C6,T7]` (módulos
+  `ferrovia_lib/_elementos/_nuvem/_resumo.py`) dirige o MCP: `cad_modelo ferrovia` (18 folhas-base, agora com **perfil longitudinal** em A1 e greide compensado) +
+  **uma folha A3 por curva e por tangente** (criticidade, aterro/escavação, dormentes) + **folha da nuvem de pontos** com detalhe geográfico + **resumo/quantitativos**;
+  renumera o carimbo e grava `.fcdz/.dxf/.pdf` (47 folhas no caso de teste, 41 s). **Por pedido do usuário o cálculo auxiliar é em Python** (a meta "sem Python" do
+  plano ficou de lado aqui); o que já estava em Rust ficou: `viario/criticidade.rs` (Criterios ajustáveis, `analisar`), `geodesia.rs` (UTM→graus; a zona 23 S é
+  premissa), `perfil.rs`, e as ferramentas `cad_analise`, `cad_geografico`, `cad_alinhamento_ponto {de,ate,passo}`, `cad_tabela_estacas {de,ate}`, `cad_verificar {limite}`.
+  Achados do caso de teste: ripagem de 0,8 m deixa C6 e T1 CRÍTICOS; 17 em ATENÇÃO; **282 de 299 pares têm os 2 trilhos na mesma cota** (cota copiada, a superelevação
+  medida não é confiável); aterro ≈ escavação ≈ 420 m³ (estimativa, plataforma de 4 m). Limites: limiares da criticidade são premissas (não norma); volumes sem seção do terreno.
 - **MCP e cores/tema (04/10/2026, feito e testado):** o prompt inicial (`rpc.rs::INSTRUCOES`) agora manda escolher cores que contrastem com o fundo do tema
   (claro/escuro): #FFFFFF e #000000 são automáticos (`quadro::cor_na_tela` troca), nada quase branco no tema claro nem quase preto no escuro. O app informa o
   tema ao motor pelos pedidos de `quadro` (`Ponte::tema_claro`), o `mcp_vivo` o passa ao `Agente.tema_claro`, `cad_resumo` devolve `tema`, e `cad_criar` devolve
