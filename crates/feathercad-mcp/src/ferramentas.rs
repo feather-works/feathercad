@@ -139,6 +139,11 @@ fn editar_ou_criar(ag: &mut Agente, nome: &str, args: &Value) -> Res<Value> {
 /// Executa a ferramenta `nome`.
 pub fn chamar(ag: &mut Agente, fonte: &Fonte, nome: &str, args: &Value) -> Res<Conteudo> {
     match nome {
+        #[cfg(test)]
+        "cad_teste_panico" => {
+            ag.doc.adicionar_linha(feathercad_core::geom::Ponto::novo(0.0, 0.0), feathercad_core::geom::Ponto::novo(1.0, 1.0));
+            panic!("pânico de teste");
+        }
         "cad_novo" => ag.novo(texto_de(args, "unidade")?).map(|v| texto(&v)),
         "cad_abrir" => ag.abrir(texto_de(args, "caminho")?).map(|v| texto(&v)),
         "cad_salvar" => ag.salvar(texto_opcional(args, "caminho"), args.get("sobrescrever").and_then(Value::as_bool).unwrap_or(false), args.get("verificar_checklist").and_then(Value::as_bool).unwrap_or(false), texto_opcional(args, "dominio")).map(|v| texto(&v)),

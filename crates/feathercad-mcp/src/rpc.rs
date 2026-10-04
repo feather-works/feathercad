@@ -28,12 +28,21 @@ fn inicializar(params: &Value) -> Value {
 }
 
 /// O resultado de `tools/call`: erro de ferramenta volta como resultado com `isError` (não como erro de protocolo).
+/// Um **pânico** na ferramenta não derruba o servidor nem o aplicativo (que hospeda este código ao vivo): vira erro, e o que a
+/// ferramenta já tinha mudado no desenho é desfeito.
 fn chamar_ferramenta(ag: &mut Agente, fonte: &Fonte, params: &Value) -> Value {
     let nome = params.get("name").and_then(Value::as_str).unwrap_or("");
     let args = params.get("arguments").cloned().unwrap_or_else(|| json!({}));
-    match chamar(ag, fonte, nome, &args) {
-        Ok(conteudo) => json!({ "content": conteudo, "isError": false }),
-        Err(e) => json!({ "content": [{ "type": "text", "text": e }], "isError": true }),
+    let marca = ag.doc.marca_do_historico();
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| chamar(ag, fonte, nome, &args))) {
+        Ok(Ok(conteudo)) => json!({ "content": conteudo, "isError": false }),
+        Ok(Err(e)) => json!({ "content": [{ "type": "text", "text": e }], "isError": true }),
+        Err(causa) => {
+            let motivo = causa.downcast_ref::<&str>().map(|s| (*s).to_string()).or_else(|| causa.downcast_ref::<String>().cloned()).unwrap_or_else(|| "motivo desconhecido".into());
+            let desfeito = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| ag.doc.desfazer_ate(marca))).is_ok();
+            let texto = format!("erro interno na ferramenta `{nome}`: {motivo}. {}", if desfeito { "O que ela já tinha mudado no desenho foi desfeito." } else { "Confira o desenho: não consegui desfazer o que ela mudou." });
+            json!({ "content": [{ "type": "text", "text": texto }], "isError": true })
+        }
     }
 }
 
@@ -54,4 +63,22 @@ pub fn atender(ag: &mut Agente, fonte: &Fonte, msg: &Value) -> Option<Value> {
         "tools/call" => resposta(id, chamar_ferramenta(ag, fonte, &params)),
         outro => erro(id, -32601, &format!("método desconhecido: {outro}")),
     })
+}
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test]
+    fn panico_na_ferramenta_vira_erro_e_desfaz_o_que_ela_fez() {
+        let mut ag = Agente::default();
+        let fonte = crate::fonte::carregar();
+        ag.doc = feathercad_core::documento::Documento::default().com_unidade(Some(feathercad_core::documento::Unidade::Metro));
+        let r = chamar_ferramenta(&mut ag, &fonte, &json!({ "name": "cad_teste_panico", "arguments": {} }));
+        assert_eq!(r["isError"], true);
+        assert!(r["content"][0]["text"].as_str().unwrap().contains("erro interno"), "{r}");
+        assert_eq!(ag.doc.entidades().len(), 0, "a linha que a ferramenta desenhou antes do pânico foi desfeita");
+        let ok = chamar_ferramenta(&mut ag, &fonte, &json!({ "name": "cad_resumo", "arguments": {} }));
+        assert_eq!(ok["isError"], false, "o servidor segue funcionando");
+    }
 }

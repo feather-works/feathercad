@@ -90,6 +90,8 @@ export const desenhoVerificarDisco = (): Promise<MudancaNoDisco | null> => chama
 export interface VivoMcp {
   ativa: boolean;
   estado: Estado | null;
+  /** Arquivos que outro FeatherCAD (ou a linha de comando) pediu para abrir: a interface os abre em abas. */
+  abrir: string[];
 }
 
 /** A IA (Claude Code etc.) trabalhando no desenho aberto: o Rust avisa o que mudou. */

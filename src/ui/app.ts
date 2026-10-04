@@ -565,6 +565,7 @@ export function iniciarApp(raiz: HTMLElement, motor: Motor): void {
         .then((r) => {
           titulo.ia(r.ativa);
           if (r.estado) receberDaIa(r.estado);
+          for (const caminho of r.abrir) void abrir(caminho);
         })
         .catch(() => undefined)
         .finally(() => {

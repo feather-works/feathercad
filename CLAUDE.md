@@ -147,9 +147,14 @@ cd src-tauri && cargo clippy
   sozinho como antes (`FEATHERCAD_VIVO=0` força isolado — os testes de integração usam). Cada ferramenta = um Ctrl+Z; a interface pergunta
   `mcp_vivo_verificar` a cada 300 ms, aplica o `estado` (abre aba sozinha se estava na página inicial) e mostra "IA desenhando…" na barra
   de título. `cad_abrir`/`cad_salvar` acertam o arquivo da `Ponte` (`arquivos.rs::depois_da_ia`) para o recarregar-do-disco não apagar o
-  histórico. `cad_ver` vê a tela do usuário. **Limites:** só Unix (Windows segue independente); a ferramenta segura a trava de escrita (o mouse
-  espera nas lentas, como o modelo `ferrovia`); em release `panic = "abort"` — pânico numa ferramenta derruba o app; a vista (zoom) do app não
-  acompanha a IA ainda; um segundo app aberto não aceita a IA. Depois de mexer no MCP, **fechar e abrir o `app:dev`** e rodar `npm run mcp:build`.
+  histórico. `cad_ver` vê a tela do usuário. **Um aplicativo só** (as várias telas são abas): quem abre o FeatherCAD de novo entrega os
+  arquivos da linha de comando ao que já está aberto (`ao_vivo::pedir_foco`, método `feathercad/instancia`), que vem para a frente e os abre
+  em abas (`mcp_vivo_verificar` devolve `abrir`); o segundo processo sai. **Transporte:** socket Unix no Linux/macOS; no Windows, TCP em
+  `127.0.0.1` com token num arquivo de `%LOCALAPPDATA%\feathercad\mcp.porta` (testado no Linux e compila para `x86_64-pc-windows-gnu`, **não rodado
+  no Windows**). **Pânico:** `rpc.rs::chamar_ferramenta` captura (`catch_unwind`), desfaz o que a ferramenta mudou e devolve erro; por isso o
+  `profile.release` do `src-tauri` **não** tem mais `panic = "abort"`. **Limites:** a ferramenta segura a trava de escrita (o mouse espera nas
+  lentas, como o modelo `ferrovia`); a vista (zoom) do app não acompanha a IA (decisão do usuário: não precisa). Depois de mexer no MCP,
+  **fechar e abrir o `app:dev`** (o `tauri dev` reinicia sozinho quando muda `src-tauri/`) e rodar `npm run mcp:build`.
 - **MCP: plano de 01/10 (04/10/2026, feito, testado, não commitado):** ver o topo de `docs/PLANO-MCP.md`. Em resumo: `cad_modelo ferrovia` (e modelos do
   usuário em `~/.config/feathercad/modelos/*.json`, que rodam como `cad_lote`), `cad_alinhamento/_ajustar`, `cad_superelevacao`, `cad_greide`, `cad_via`
   (trilho/dormente vêm de `biblioteca/ferrovia/*.fct`), `cad_nuvem_secoes|feicoes (trilhos, bordos)|qualidade`, `cad_tabela_estacas`, `cad_projetar`,

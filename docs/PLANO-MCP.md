@@ -1,7 +1,7 @@
 # Plano de trabalho — tirar o Python do MCP
 
 > **Estado em 04/10/2026 (NÃO commitado):** feitos 0.1–0.5, 1.1–1.5, **1.7**, 2.1–2.6, **2.7**, 3.1–3.7, 4.1–4.3 (+4.4 pelo nome guardado na sessão), **4.2 `bordos`** e modelos do usuário.
-> **MCP ao vivo feito (04/10):** o MCP age no desenho aberto no app (ver `CLAUDE.md`, "MCP ao vivo"). Falta fazer a vista do app acompanhar a IA e Windows.
+> **MCP ao vivo feito (04/10):** o MCP age no desenho aberto no app (ver `CLAUDE.md`, "MCP ao vivo"). Instância única do app, transporte TCP para o Windows (não rodado lá) e captura de pânico também feitos.
 > **Faltam:** 1.6 (HATCH no DXF, bloqueado: exige R2000+) e 4.2 `meio-fio`. Conferir `bordos` com um levantamento real (testado só com seções sintéticas).
 > **Fechado nesta rodada (04/10):** `cad_pdf papel:"auto"` (cada página no papel da própria folha) e `pdf_indice` em `cad_folha listar`;
 > `.fct` com `camera …` + `L3`/`P3` (projetados ao importar); `cad_via` lê `trilho_*`/`dormente_*` de `biblioteca/ferrovia/*.fct` (`trilho:"TR-57"`, `dormente:"concreto"`);

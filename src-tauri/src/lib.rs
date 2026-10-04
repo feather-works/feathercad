@@ -144,6 +144,12 @@ fn ligar_aceleracao_por_gpu(app: &tauri::App) {
 /// Sobe a janela do FeatherCAD. O conteúdo é o mesmo `dist/index.html` que roda no navegador.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Um aplicativo só (as várias telas são abas dentro dele): se já há um aberto, ele recebe os arquivos, vem para a frente
+    // e este processo sai.
+    if feathercad_mcp::ao_vivo::pedir_foco(&mcp_vivo::arquivos_da_linha_de_comando()) {
+        eprintln!("[FeatherCAD] Já há um FeatherCAD aberto; ele foi trazido para a frente.");
+        return;
+    }
     eprintln!("[FeatherCAD] Aplicativo iniciado (PID: {}). Logs ativados no terminal.", std::process::id());
     let executado = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())

@@ -60,7 +60,7 @@ opt-level = "s"
 lto = true
 codegen-units = 1
 strip = true
-panic = "abort"
+# Sem `panic = "abort"`: um pânico numa ferramenta do MCP ao vivo é capturado (`rpc.rs`) em vez de derrubar o aplicativo.
 
 [lints.clippy]
 too_many_lines = "deny"
