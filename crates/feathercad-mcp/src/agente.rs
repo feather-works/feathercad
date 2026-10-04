@@ -17,6 +17,8 @@ pub struct Agente {
     pub arquivo: Option<PathBuf>,
     /// Modo projeto (`cad_modo`): troca os padrões de `cad_ver` por versões baratas em contexto.
     pub projeto: bool,
+    /// O tema do aplicativo (fundo claro?), quando o servidor roda ao vivo dentro dele; `None` = isolado.
+    pub tema_claro: Option<bool>,
     /// Alinhamentos calculados nesta sessão (nome → alinhamento e passo da estaca), para as ferramentas viárias.
     pub alinhamentos: std::collections::BTreeMap<String, (feathercad_core::viario::alinhamento::Alinhamento, f64)>,
     pub alinhamento_atual: Option<String>,

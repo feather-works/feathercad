@@ -97,6 +97,8 @@ pub struct Ponte {
     /// O último ponto do cursor (já resolvido): a direção de uma distância digitada.
     /// (`Mutex`, não `Cell`: os comandos de leitura rodam ao mesmo tempo em várias threads.)
     ultimo_cursor: std::sync::Mutex<Option<Ponto>>,
+    /// O tema da interface (0 = ainda não se sabe, 1 = fundo claro, 2 = escuro): visto nos pedidos de quadro, que levam `fundo_claro`.
+    tema: std::sync::atomic::AtomicU8,
     doc: Documento,
     sessao: Sessao,
     /// O arquivo em disco de onde veio (ou onde foi salvo) o documento.
@@ -491,6 +493,15 @@ impl Ponte {
     /// [`Ponte::depois_de_mudanca_externa`] se a versão mudou.
     pub fn documento_mut(&mut self) -> &mut Documento {
         &mut self.doc
+    }
+
+    /// O tema da interface: `Some(true)` = fundo claro; `None` = nenhum quadro foi pedido ainda.
+    pub fn tema_claro(&self) -> Option<bool> {
+        match self.tema.load(std::sync::atomic::Ordering::Relaxed) {
+            1 => Some(true),
+            2 => Some(false),
+            _ => None,
+        }
     }
 
     /// O caminho do arquivo aberto, se há.
@@ -1154,6 +1165,7 @@ impl Ponte {
     fn quadro(&self, corpo: &[u8]) -> Result<Vec<u8>, String> {
         let q: PedidoQuadro = ler("quadro", corpo)?;
         let fundo = (self.sessao.fundo != Fundo::Nada).then_some(PASSO_DA_GRADE);
+        self.tema.store(if q.fundo_claro { 1 } else { 2 }, std::sync::atomic::Ordering::Relaxed);
         Ok(quadro::montar_arrastando(&self.doc, &q.vista, q.versao_conhecida, fundo, q.fundo_claro, self.sessao.selecao(), self.sessao.revisao_da_selecao(), self.sessao.arrastando()))
     }
 

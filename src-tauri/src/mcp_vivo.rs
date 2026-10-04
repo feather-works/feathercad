@@ -45,6 +45,7 @@ fn chamar_ao_vivo(app: &AppHandle, vivo: &Vivo, msg: &Value) -> Option<Value> {
     let mut ponte = estado.write().unwrap_or_else(|e| e.into_inner());
     std::mem::swap(&mut ag.doc, ponte.documento_mut());
     let versao = ag.doc.versao();
+    ag.tema_claro = ponte.tema_claro();
     ag.arquivo = ponte.caminho_do_arquivo().map(PathBuf::from);
     let antes = ag.arquivo.clone();
     let resposta = rpc::atender(&mut ag, &vivo.fonte, msg);

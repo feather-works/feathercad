@@ -362,7 +362,7 @@ impl Documento {
         };
         let existentes = self.folhas_inseridas();
         let captura = self.captura();
-        let (camada_folha, camada_carimbo) = (self.indice_da_camada_ou_nova(CAMADA_FOLHA, 0xFF_FF_FF, Some(0.5)), self.indice_da_camada_ou_nova(CAMADA_CARIMBO, 0xE0_E0_E0, None));
+        let (camada_folha, camada_carimbo) = (self.indice_da_camada_ou_nova(CAMADA_FOLHA, 0xFF_FF_FF, Some(0.5)), self.indice_da_camada_ou_nova(CAMADA_CARIMBO, 0x8C_8C_8C, None));
         let mut n = existentes.len() + 1;
         while self.bloco_por_nome(&format!("{PREFIXO}{n}")).is_some() {
             n += 1;
@@ -420,7 +420,7 @@ impl Documento {
     pub fn folha_campos_definir(&mut self, indice: usize, campos: &Campos) -> Result<InfoFolha, String> {
         let info = self.folhas_inseridas().get(indice).cloned().ok_or_else(|| format!("a folha {} não existe", indice + 1))?;
         let Some(Geometria::Insercao { bloco, .. }) = self.entidades.iter().find(|e| e.id == info.id).map(|e| e.geometria.clone()) else { return Err("a folha sumiu".into()) };
-        let camada_carimbo = self.indice_da_camada_ou_nova(CAMADA_CARIMBO, 0xE0_E0_E0, None);
+        let camada_carimbo = self.indice_da_camada_ou_nova(CAMADA_CARIMBO, 0x8C_8C_8C, None);
         self.desfazer.push(Passo::Tudo(Box::new(self.captura())));
         self.refazer.clear();
         let f = info.largura_mm / BASE_W;

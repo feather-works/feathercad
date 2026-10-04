@@ -105,7 +105,14 @@ fn importar_texto(ag: &mut Agente, args: &Value) -> Res<Conteudo> {
 
 fn editar_ou_criar(ag: &mut Agente, nome: &str, args: &Value) -> Res<Value> {
     match nome {
-        "cad_criar" => criar(&mut ag.doc, args),
+        "cad_criar" => criar(&mut ag.doc, args).map(|mut r| {
+            let camada = r["camada"].as_str().and_then(|n| ag.doc.camadas().iter().find(|c| c.nome == n)).map(|c| c.cor);
+            let cor = args.get("cor").and_then(Value::as_str).and_then(|c| crate::mutacoes::cor_hex(c).ok()).or(camada);
+            if let Some(av) = cor.and_then(|c| crate::cores::aviso(c, ag.tema_claro)) {
+                r["aviso"] = json!(av);
+            }
+            r
+        }),
         "cad_editar" => editar(&mut ag.doc, args),
         "cad_camadas" => camadas(&mut ag.doc, args),
         "cad_hachurar" => hachurar(&mut ag.doc, args),

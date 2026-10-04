@@ -41,6 +41,7 @@ pub fn resumo(a: &Agente) -> Value {
         "por_tipo": por_tipo, "camadas": camadas, "blocos": d.blocos().iter().map(|b| b.nome.clone()).collect::<Vec<_>>(),
         "arquivo": a.arquivo.as_ref().map(|p| p.display().to_string()), "alterado_desde_o_ultimo_salvar": d.sujo(),
         "pode_desfazer": d.pode_desfazer(), "pode_refazer": d.pode_refazer(), "convencao": CONVENCAO,
+        "tema": a.tema_claro.map(|c| if c { "claro" } else { "escuro" }), "cores": "tema do aplicativo: escolha cores que contrastem com o fundo (#FFFFFF/#000000 trocam sozinhos; nada quase branco no tema claro nem quase preto no escuro)",
     })
 }
 

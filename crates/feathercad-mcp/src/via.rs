@@ -151,7 +151,7 @@ fn secao(ag: &mut Agente, a: &Alinhamento, args: &Value) -> Res<Value> {
     p.pecas.push(Peca { camada: p.camada.clone(), cor: Some(0x80_80_80), g: feathercad_core::documento::Geometria::Polilinha { vertices: lastro_pts.iter().map(|q| feathercad_core::geom::Vertice { p: *q, bulge: 0.0 }).collect(), fechada: true } });
     let sub = [fixo(xbe, base_y), fixo(xbd, base_y), fixo(xbd + sublastro * talude, base_y - sublastro), fixo(xbe - sublastro * talude, base_y - sublastro)];
     p.pecas.push(Peca { camada: p.camada.clone(), cor: Some(0x60_60_60), g: feathercad_core::documento::Geometria::Polilinha { vertices: sub.iter().map(|q| feathercad_core::geom::Vertice { p: *q, bulge: 0.0 }).collect(), fechada: true } });
-    p.cor = Some(0xC0_C0_C0);
+    p.cor = Some(0x80_80_80);
     let dec = |x: f64| formatar(x, 3, true);
     for (txt, pos) in [(format!("bitola {} m (eixo a eixo {})", dec(v.b - 2.0 * v.hb), dec(v.b)), fixo(0.0, 0.25)), (format!("h = {} mm", formatar(h_mm, 0, false)), fixo(0.0, 0.40)), (format!("lastro e = {} m", dec(lastro)), fixo(0.0, base_y - 0.5 * lastro)), (format!("sublastro e = {} m", dec(sublastro)), fixo(0.0, base_y - 1.4 * sublastro))] {
         p.texto(pos, ht, 0.0, &txt, AlinhaH::Centro, AlinhaV::Meio);

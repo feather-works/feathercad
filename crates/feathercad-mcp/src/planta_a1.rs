@@ -159,7 +159,7 @@ fn malha(p: &mut Pincel, j: &Janela) {
 
 /// Marcas de estaca a cada 20 m, rótulo a cada 100 m e o quilômetro destacado.
 fn estacas(p: &mut Pincel, a: &Alinhamento, t: &Trecho, j: &Janela) {
-    p.em("PLANTA_ESTACAS", Some(0xC0_C0_C0));
+    p.em("PLANTA_ESTACAS", Some(0x80_80_80));
     let mut s = (t.de / 20.0).ceil() * 20.0;
     while s <= t.ate + 1e-9 {
         let am = a.em(s);
@@ -181,7 +181,7 @@ fn estacas(p: &mut Pincel, a: &Alinhamento, t: &Trecho, j: &Janela) {
                 let (giro, h) = legivel(am.direcao - 90.0);
                 let d = 4.2 * K;
                 p.texto(Ponto::novo(c.x - normal.0 * d, c.y - normal.1 * d), 3.0 * K, giro, &format!("KM {}", km_texto(s)), h, AlinhaV::Meio);
-                p.em("PLANTA_ESTACAS", Some(0xC0_C0_C0));
+                p.em("PLANTA_ESTACAS", Some(0x80_80_80));
             }
         }
         s += 20.0;
@@ -289,7 +289,7 @@ fn tabelas_das_curvas(ag: &mut Agente, fonte: &Fonte, c: &Coluna) -> Res<()> {
 fn legenda(ag: &mut Agente, c: &Coluna) -> Res<()> {
     let mut p = Pincel::novo("PLANTA_LEGENDA");
     p.texto(pf(c.f, X_COLUNA, 440.0), 3.0 * K, 0.0, "LEGENDA", AlinhaH::Esquerda, AlinhaV::Base);
-    let itens: [(u32, &str, bool); 6] = [(0xFF_7F_00, "Eixo existente (ponto médio de cada par de trilhos)", false), (0x7F_FF_00, "Ripagem ampliada 20 vezes (projeto → existente)", false), (0xFF_00_FF, "Eixo de projeto (tangentes, espirais e circulares)", false), (0x7F_9F_FF, "Trilhos de projeto (bitola métrica)", false), (0xC0_C0_C0, "Estaca de 20 m (rótulo a cada 100 m); KM em destaque", false), (0xFF_7F_9F, "Ponto notável: TS, SC, CS, ST", true)];
+    let itens: [(u32, &str, bool); 6] = [(0xFF_7F_00, "Eixo existente (ponto médio de cada par de trilhos)", false), (0x7F_FF_00, "Ripagem ampliada 20 vezes (projeto → existente)", false), (0xFF_00_FF, "Eixo de projeto (tangentes, espirais e circulares)", false), (0x7F_9F_FF, "Trilhos de projeto (bitola métrica)", false), (0x80_80_80, "Estaca de 20 m (rótulo a cada 100 m); KM em destaque", false), (0xFF_7F_9F, "Ponto notável: TS, SC, CS, ST", true)];
     for (n, (cor, texto, circulo)) in itens.iter().enumerate() {
         let y = 431.0 - n as f64 * 7.0;
         p.em("PLANTA_LEGENDA", Some(*cor));

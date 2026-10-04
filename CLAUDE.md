@@ -163,6 +163,11 @@ cd src-tauri && cargo clippy
   trilhos, estacas, km, TS/SC/CS/ST, tabelas das curvas do trecho, legenda e chave de articulação); últimas: **tabela por estaca** em 2 A1 legíveis
   (`cad_tabela_estacas` ganhou `de`/`ate`, `largura_fator`). `cad_verificar {leiaute}` no CSV real: 11 `texto_sobre_texto` (rótulos de curvas coladas) e
   28 `texto_sobre_linha` nas plantas A1 — **a investigar**. Pendente: olhar as folhas 1 e 2 de novo, rodar o modelo ao vivo (`cad_modelo` pelo MCP) e conferir no app.
+- **MCP e cores/tema (04/10/2026, feito e testado):** o prompt inicial (`rpc.rs::INSTRUCOES`) agora manda escolher cores que contrastem com o fundo do tema
+  (claro/escuro): #FFFFFF e #000000 são automáticos (`quadro::cor_na_tela` troca), nada quase branco no tema claro nem quase preto no escuro. O app informa o
+  tema ao motor pelos pedidos de `quadro` (`Ponte::tema_claro`), o `mcp_vivo` o passa ao `Agente.tema_claro`, `cad_resumo` devolve `tema`, e `cad_criar` devolve
+  `aviso` quando a cor (ou a da camada) tem contraste < 2 com o fundo (`cores.rs`). Cores do modelo `ferrovia` e do carimbo (`CARIMBO` era #E0E0E0, sumia no tema
+  claro) foram escurecidas. Falta: avisar também nas outras ferramentas que aceitam `cor` (via, tabela, gráfico…) e nas cores por camada de `cad_camadas`.
 - **MCP: plano de 01/10 (04/10/2026, feito, testado, não commitado):** ver o topo de `docs/PLANO-MCP.md`. Em resumo: `cad_modelo ferrovia` (e modelos do
   usuário em `~/.config/feathercad/modelos/*.json`, que rodam como `cad_lote`), `cad_alinhamento/_ajustar`, `cad_superelevacao`, `cad_greide`, `cad_via`
   (trilho/dormente vêm de `biblioteca/ferrovia/*.fct`), `cad_nuvem_secoes|feicoes (trilhos, bordos)|qualidade`, `cad_tabela_estacas`, `cad_projetar`,

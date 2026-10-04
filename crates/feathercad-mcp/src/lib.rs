@@ -7,6 +7,7 @@ pub mod ao_longo;
 pub mod compacto;
 pub mod componentes;
 pub mod consulta;
+pub mod cores;
 pub mod dados;
 pub mod detalhe;
 pub mod eletroduto;
