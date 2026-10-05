@@ -221,11 +221,52 @@ fn ripagem(p: &mut Pincel, a: &Alinhamento, tr: &Trajeto, existente: &[Vec<Ponto
     }
 }
 
+/// Cores das faixas de cota da nuvem (as mesmas da folha da nuvem de pontos).
+const PALETA_DA_NUVEM: [u32; 6] = [0x30_60_D0, 0x20_A0_B0, 0x30_A0_40, 0xB0_90_00, 0xE0_70_00, 0xD0_30_30];
+
+/// Os pontos do levantamento e os limites (quantis) das 6 faixas de cota.
+pub(crate) struct Nuvem<'a> {
+    pub pontos: &'a [Ponto],
+    pub limites: [f64; 5],
+}
+
+impl<'a> Nuvem<'a> {
+    pub fn nova(pontos: &'a [Ponto]) -> Self {
+        let mut z: Vec<f64> = pontos.iter().map(|p| p.z).collect();
+        z.sort_by(f64::total_cmp);
+        let q = |k: usize| z.get(z.len() * k / 6).copied().unwrap_or(0.0);
+        Self { pontos, limites: [q(1), q(2), q(3), q(4), q(5)] }
+    }
+
+    fn faixa(&self, z: f64) -> usize {
+        self.limites.iter().position(|l| z < *l).unwrap_or(5)
+    }
+}
+
+/// Os pontos da nuvem na janela, por faixa de cota, e a cota (1 casa) a cada ~80 m de distância entre rótulos.
+fn pontos_da_nuvem(p: &mut Pincel, n: &Nuvem, j: &Janela) {
+    for faixa in 0..6 {
+        p.em(&format!("PLANTA_NUVEM_{}", faixa + 1), Some(PALETA_DA_NUVEM[faixa]));
+        for q in n.pontos.iter().filter(|q| j.dentro(**q) && n.faixa(q.z) == faixa) {
+            p.pecas.push(Peca { camada: p.camada.clone(), cor: p.cor, g: Geometria::Circulo { centro: j.p(*q), raio: 0.55 * K } });
+        }
+    }
+    p.em("PLANTA_NUVEM_COTAS", Some(0x80_80_80));
+    let mut ultimo: Option<Ponto> = None;
+    for q in n.pontos.iter().filter(|q| j.dentro(**q)) {
+        if ultimo.map_or(true, |u| u.distancia(*q) > 80.0) {
+            p.texto(Ponto::novo(j.p(*q).x + 1.2 * K, j.p(*q).y - 0.8 * K), 1.8 * K, 0.0, &format!("{:.1}", q.z).replace('.', ","), AlinhaH::Esquerda, AlinhaV::Topo);
+            ultimo = Some(*q);
+        }
+    }
+}
+
 /// O mapa da folha, tudo numa gravação só.
-fn mapa(ag: &mut Agente, a: &Alinhamento, existente: &[Vec<Ponto>], t: &Trecho, j: &Janela) -> Res<()> {
+fn mapa(ag: &mut Agente, a: &Alinhamento, existente: &[Vec<Ponto>], nuvem: &Nuvem, t: &Trecho, j: &Janela) -> Res<()> {
     let mut p = Pincel::novo("PLANTA_MOLDURA");
     p.retangulo(j.org, j.p(j.max));
     malha(&mut p, j);
+    pontos_da_nuvem(&mut p, nuvem, j);
     p.em("PLANTA_EXISTENTE", Some(0xFF_7F_00));
     for seg in existente {
         polilinhas(&mut p, j, seg);
@@ -260,6 +301,7 @@ struct Coluna<'a> {
     trechos: &'a [Trecho],
     idx: usize,
     f: &'a InfoFolha,
+    nuvem: &'a Nuvem<'a>,
 }
 
 fn titulo_da_folha(ag: &mut Agente, fonte: &Fonte, c: &Coluna) -> Res<()> {
@@ -301,7 +343,29 @@ fn legenda(ag: &mut Agente, c: &Coluna) -> Res<()> {
         p.em("PLANTA_LEGENDA", None);
         p.texto(pf(c.f, X_COLUNA + 16.0, y), 2.4 * K, 0.0, texto, AlinhaH::Esquerda, AlinhaV::Meio);
     }
+    faixas_da_nuvem(&mut p, c);
     aplicar(&mut ag.doc, p.pecas).map(|_| ())
+}
+
+/// A legenda das faixas de cota dos pontos da nuvem (cor = faixa).
+fn faixas_da_nuvem(p: &mut Pincel, c: &Coluna) {
+    let y = 431.0 - 6.0 * 7.0;
+    p.em("PLANTA_LEGENDA", None);
+    p.texto(pf(c.f, X_COLUNA, y), 2.4 * K, 0.0, "Pontos da nuvem do levantamento, por faixa de cota (m):", AlinhaH::Esquerda, AlinhaV::Meio);
+    let l = c.nuvem.limites;
+    for faixa in 0..6 {
+        let (x, yy) = (X_COLUNA + faixa as f64 * 30.0, y - 5.5);
+        p.em("PLANTA_LEGENDA", Some(PALETA_DA_NUVEM[faixa]));
+        p.pecas.push(Peca { camada: p.camada.clone(), cor: p.cor, g: Geometria::Circulo { centro: pf(c.f, x + 2.0, yy), raio: 0.9 * K } });
+        let rotulo = match faixa {
+            0 => format!("< {:.1}", l[0]),
+            5 => format!("> {:.1}", l[4]),
+            k => format!("{:.1}–{:.1}", l[k - 1], l[k]),
+        }
+        .replace('.', ",");
+        p.em("PLANTA_LEGENDA", None);
+        p.texto(pf(c.f, x + 4.5, yy), 2.0 * K, 0.0, &rotulo, AlinhaH::Esquerda, AlinhaV::Meio);
+    }
 }
 
 /// A miniatura do traçado todo com a janela de cada folha; a desta fica em destaque.
@@ -334,12 +398,12 @@ fn chave(ag: &mut Agente, c: &Coluna) -> Res<()> {
 }
 
 /// Todas as folhas de planta (`primeira` = o número da primeira folha no carimbo).
-pub(crate) fn plantas(ag: &mut Agente, fonte: &Fonte, ctx: &Contexto, dados: (&Alinhamento, &[ResultadoCurva], &[Vec<Ponto>]), primeira: usize, trechos: &[Trecho]) -> Res<()> {
-    let (a, tabela, existente) = dados;
+pub(crate) fn plantas(ag: &mut Agente, fonte: &Fonte, ctx: &Contexto, dados: (&Alinhamento, &[ResultadoCurva], &[Vec<Ponto>], &Nuvem), primeira: usize, trechos: &[Trecho]) -> Res<()> {
+    let (a, tabela, existente, nuvem) = dados;
     for (i, t) in trechos.iter().enumerate() {
         let f = inserir_folha(ag, fonte, ctx, "A1", Some(ESCALA), "Planta e curvas", primeira + i)?;
-        mapa(ag, a, existente, t, &Janela::nova(t, &f))?;
-        let c = Coluna { a, tabela, trechos, idx: i, f: &f };
+        mapa(ag, a, existente, nuvem, t, &Janela::nova(t, &f))?;
+        let c = Coluna { a, tabela, trechos, idx: i, f: &f, nuvem };
         titulo_da_folha(ag, fonte, &c)?;
         tabelas_das_curvas(ag, fonte, &c)?;
         legenda(ag, &c)?;

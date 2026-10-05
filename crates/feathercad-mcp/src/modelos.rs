@@ -380,7 +380,9 @@ fn montar_folhas(ag: &mut Agente, fonte: &Fonte, d: &Value, c: &Calculo, eixo: &
     let projeto = crate::projeto::Projeto { a: &c.a, tabela: &c.tabela, greide: &c.greide, analise: &c.analise, obs: &c.obs };
     crate::perfil::perfis(ag, fonte, &ctx, &projeto, 5)?;
     let existente = eixo_existente(&c.existente);
-    crate::planta_a1::plantas(ag, fonte, &ctx, (&c.a, &c.tabela, &existente), 5 + n.perfis, &trechos)?;
+    let pontos = ag.nuvens.values().next().map(|n| n.pontos.clone()).unwrap_or_default();
+    let nuvem = crate::planta_a1::Nuvem::nova(&pontos);
+    crate::planta_a1::plantas(ag, fonte, &ctx, (&c.a, &c.tabela, &existente, &nuvem), 5 + n.perfis, &trechos)?;
     prancha_estacas(ag, fonte, &ctx, 5 + n.perfis + n.plantas, n.estacas, &c.a)?;
     Ok(f1.escala)
 }

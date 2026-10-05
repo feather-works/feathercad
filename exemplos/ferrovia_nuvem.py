@@ -55,8 +55,6 @@ def mapa(c, pts, dados, limites):
         ge += passo
     # eixo de projeto e quilômetros
     al = dados["al"]
-    c.camada("NUVEM_EIXO", "#FF00FF")
-    c.poli([(X(r[1]), Y(r[2])) for r in al[::5]])
     c.camada("NUVEM_KM", "#FF7FDF")
     ss = [r[0] for r in al]
     km = 0.0
@@ -77,6 +75,7 @@ def mapa(c, pts, dados, limites):
     for k2, s in enumerate(dados["suspeitos"]):
         c.circulo((X(s["E"]), Y(s["N"])), 2.2)
         c.texto((X(s["E"]) + 3.0, Y(s["N"])), 2.2, f"S{k2 + 1}: cota {v(s['cota'], 2)} (mediana local {v(s['mediana_local'], 2)})", "em", cor=COR_SUSPEITO)
+    tracado_sobre_a_nuvem(c, dados, X, Y)
     # cotas pontuais a cada ~150 m
     c.camada("NUVEM_COTAS_PONTUAIS", "#808080")
     ult = None
@@ -103,7 +102,35 @@ def mapa(c, pts, dados, limites):
     for t in (0, 25, 50):
         c.linha((x0 + 8.0 + t, y0 + 7.8), (x0 + 8.0 + t, y0 + 10.2))
     c.texto((x0 + 33.0, y0 + 12.0), 2.2, "500 m", "cm")
-    c.texto((x0 + 62.0, y0 + 9.0), 2.0, "laranja: lacuna ≥ 40 m  ·  vermelho: ponto suspeito", "em")
+    c.texto((x0 + 62.0, y0 + 9.0), 2.0, "traçado: azul tangente · magenta espiral · vermelho circular   |   laranja: lacuna ≥ 40 m   |   círculo vermelho grande: ponto suspeito", "em")
+
+
+def tracado_sobre_a_nuvem(c, dados, X, Y):
+    """O traçado de projeto por cima dos pontos: tangente (azul), espiral (magenta) e circular (vermelho) em traço grosso, as curvas
+    numeradas, os pontos notáveis TS/SC/CS/ST e os quilômetros."""
+    al = dados["al"]
+    for tipo, cor, nome in (("T", "#2080E0", "NUVEM_TRACADO_TANGENTE"), ("E", "#B000B0", "NUVEM_TRACADO_ESPIRAL"), ("C", "#D02020", "NUVEM_TRACADO_CIRCULAR")):
+        c.camada(nome, cor, espessura=0.9)
+        corrida = []
+        for r in al:
+            if r[5] == tipo:
+                corrida.append((X(r[1]), Y(r[2])))
+            elif corrida:
+                c.poli(corrida[::3] + [corrida[-1]])
+                corrida = []
+        if corrida:
+            c.poli(corrida[::3] + [corrida[-1]])
+    c.camada("NUVEM_NOTAVEIS", "#FFFFFF")
+    for e in dados["analise"]["elementos"]:
+        if e["tipo"] != "curva":
+            continue
+        cv = e["curva"]
+        for nome in ("TS", "SC", "CS", "ST"):
+            m = cv[nome]
+            c.circulo((X(m["E"]), Y(m["N"])), 0.9)
+        meio = ((cv["SC"]["E"] + cv["CS"]["E"]) / 2.0, (cv["SC"]["N"] + cv["CS"]["N"]) / 2.0)
+        lado = 1 if cv["lado"] == "direita" else -1
+        c.texto((X(meio[0]) + lado * 5.0, Y(meio[1])), 3.0, f"C{e['n']}  R{cv['raio']:.0f}", "e" + "m" if lado > 0 else "d" + "m", cor="#D02020")
 
 
 def perfil_das_cotas(c, pares, limites, comp):
@@ -224,7 +251,7 @@ def folha_da_nuvem(mcp, dados, caminho, carimbo):
     c = Fct(f)
     c.camada("NUVEM_TITULO", "#FFFFFF")
     c.texto((60.0, 790.0), 9.0, "NUVEM DE PONTOS DO LEVANTAMENTO — DETALHAMENTO GEOGRÁFICO")
-    c.texto((60.0, 779.0), 4.0, f"{caminho.split('/')[-1]} — {len(pts)} pontos — somente o levantamento, sem o projeto (o eixo magenta é a referência do rastreio)")
+    c.texto((60.0, 779.0), 4.0, f"{caminho.split('/')[-1]} — {len(pts)} pontos — pontos do levantamento com o traçado de projeto sobreposto")
     mapa(c, pts, dados, limites)
     perfil_das_cotas(c, pares, limites, comp)
     histograma(c, (400.0, 340.0), (770.0, 540.0), "BITOLA MEDIDA ENTRE OS TRILHOS (eixo a eixo)", [p[2] * 1000.0 for p in dados["pares_bn"]], 1060.0, 1090.0, 30, "bitola (mm)")
