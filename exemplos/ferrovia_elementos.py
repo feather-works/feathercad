@@ -135,6 +135,7 @@ def desenhar_planta(c, e):
             gn += passo
         ge += passo
     c.texto((PLANTA[0] + 2, PLANTA[1] + 2.0), 2.0, f"Malha E/N a cada {passo} m. Cantos: E {cantos[0][0]:.0f} N {cantos[0][1]:.0f} (inf. esq.) — E {cantos[1][0]:.0f} N {cantos[1][1]:.0f} (sup. dir.)", cor="#909090")
+    superficie(c, pl, d, area)
     # eixo existente
     c.camada("ELEM_EXISTENTE", COR_EXISTENTE)
     for parte in recortar_poli([pl.mm(E, N) for E, N in d["existente"]], area):
@@ -161,12 +162,77 @@ def desenhar_planta(c, e):
                 c.poli(parte)
     if pl.esc <= 500:
         dormentes(c, pl, d, e)
+    if e.tipo == "curva":
+        raios(c, pl, e, area)
     estacas(c, pl, e, area)
     marcos(c, pl, e, area)
     zonas(c, pl, e, area, d)
     rosa_e_barra(c, pl)
     detalhe_dormentes(c, e)
     return pl
+
+
+def superficie(c, pl, d, area):
+    """Malha triangular (TIN) e curvas de nível da nuvem sob o traçado, cortadas pelo painel (cota nas mestras)."""
+    tin = d["tin"]
+    P = tin["pontos"]
+    c.camada("ELEM_TIN", "#B0B0B0")
+    vistas = set()
+    for t in tin["triangulos"]:
+        for a, b in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+            chave = (min(a, b), max(a, b))
+            if chave in vistas:
+                continue
+            vistas.add(chave)
+            pa, pb = pl.mm(P[a][0], P[a][1]), pl.mm(P[b][0], P[b][1])
+            if max(pa[0], pb[0]) < area[0] or min(pa[0], pb[0]) > area[2] or max(pa[1], pb[1]) < area[1] or min(pa[1], pb[1]) > area[3]:
+                continue
+            for parte in recortar_poli([pa, pb], area):
+                c.poli(parte)
+    for mestra, cor, nome in ((False, "#C08050", "ELEM_CURVA_NIVEL"), (True, "#A05020", "ELEM_CURVA_MESTRA")):
+        c.camada(nome, cor)
+        for cv in tin["curvas"]:
+            if cv["mestra"] != mestra:
+                continue
+            pts = [pl.mm(q[0], q[1]) for q in cv["pontos"]]
+            if cv["fechada"]:
+                pts.append(pts[0])
+            partes = recortar_poli(pts, area)
+            for parte in partes:
+                c.poli(parte)
+            if mestra and partes:
+                x, y = partes[0][len(partes[0]) // 2]
+                if area[0] + 8 < x < area[2] - 8 and area[1] + 8 < y < area[3] - 8:
+                    c.texto((x + 1.2, y + 1.0), 2.0, f"{cv['cota']:.0f}", "eb", cor=cor)
+
+
+def raios(c, pl, e, area):
+    """Raio da curva: do centro até o SC, o meio e o CS (cortado pelo painel), com `R = …`."""
+    cv = e.el["curva"]
+    r = min(e.d["al"], key=lambda q: abs(q[0] - cv["SC"]["progressiva"]))
+    t = math.radians(r[3])
+    lado = 1.0 if cv["lado"] == "esquerda" else -1.0
+    centro = (cv["SC"]["E"] - math.sin(t) * cv["raio"] * lado, cv["SC"]["N"] + math.cos(t) * cv["raio"] * lado)
+    ss = [q[0] for q in e.d["al"]]
+    sm = (cv["SC"]["progressiva"] + cv["CS"]["progressiva"]) / 2.0
+    meio = (interpolar(ss, [q[1] for q in e.d["al"]], sm), interpolar(ss, [q[2] for q in e.d["al"]], sm))
+    c.camada("ELEM_RAIOS", "#00A0C0")
+    for alvo in ((cv["SC"]["E"], cv["SC"]["N"]), meio, (cv["CS"]["E"], cv["CS"]["N"])):
+        for parte in recortar_poli([pl.mm(*centro), pl.mm(*alvo)], area):
+            c.poli(parte)
+    mx, my = pl.mm(*meio)
+    cx, cy = pl.mm(*centro)
+    dx, dy = cx - mx, cy - my
+    d = math.hypot(dx, dy) or 1.0
+    giro = math.degrees(math.atan2(dy, dx))
+    if giro > 90 or giro <= -90:
+        giro += 180.0
+    px, py = mx + dx / d * 7.0, my + dy / d * 7.0
+    if area[0] + 12 < px < area[2] - 12 and area[1] + 6 < py < area[3] - 6:
+        c.texto((px, py), 2.6, f"R = {cv['raio']:.0f} m", "cm", giro, cor="#00A0C0")
+    if area[0] < cx < area[2] and area[1] < cy < area[3]:
+        c.linha((cx - 1.5, cy), (cx + 1.5, cy))
+        c.linha((cx, cy - 1.5), (cx, cy + 1.5))
 
 
 def dormentes(c, pl, d, e):
@@ -275,8 +341,11 @@ def rosa_e_barra(c, pl):
 
 def detalhe_dormentes(c, e):
     """Detalhe 1:100: 7 m de via (4 filetes de trilho, dormentes de 2,00 × 0,22 m a cada 0,60 m) no ponto mais exigido do elemento."""
-    cx = (PLANTA[0] + PLANTA[2]) / 2.0
-    x0, y0, x1, y1 = cx - 42.0, PLANTA[1] + 7.0, cx + 42.0, PLANTA[1] + 46.0
+    # do lado oposto ao centro da curva (curva à direita: o centro fica abaixo, o detalhe vai para cima), no canto
+    em_cima = e.tipo == "curva" and e.el["curva"]["lado"] == "direita"
+    x0 = PLANTA[0] + 3.0
+    y0 = PLANTA[3] - 50.0 if em_cima else PLANTA[1] + 7.0
+    x1, y1 = x0 + 84.0, y0 + 46.0
     c.camada("ELEM_DETALHE", "#FFFFFF")
     c.ret((x0, y0), (x1, y1))
     ponto = "SC" if e.tipo == "curva" else "meio"

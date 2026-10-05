@@ -362,11 +362,14 @@ impl Contagem {
     }
 }
 
-fn montar_folhas(ag: &mut Agente, fonte: &Fonte, d: &Value, c: &Calculo, eixo: &Value) -> Res<f64> {
+fn montar_folhas(ag: &mut Agente, fonte: &Fonte, d: &Value, c: &Calculo, (eixo, caminho): (&Value, &str)) -> Res<f64> {
     let trechos = crate::planta_a1::dividir(&c.a);
     let n = Contagem::de(&c.a, trechos.len());
     let carimbo = d.get("carimbo").cloned().unwrap_or(json!({}));
     let mut ctx = Contexto { papel: texto_opcional(d, "papel").unwrap_or("A0").to_string(), escala: numero_opcional(d, "escala").unwrap_or(0.0), carimbo, total: n.total() };
+    // a superfície da nuvem no desenho (TIN, curvas de nível, borda e pontos), como o leitor de nuvem a gera: a planta geral e os detalhes a mostram
+    passo(ag, fonte, "cad_topografia", &json!({ "caminho": caminho, "incluir_faces_3d": false, "incluir_quadro": false, "rotular_pontos": false }))?;
+    ag.arquivo = None;
     let f1 = prancha_planta(ag, fonte, &mut ctx, 1, &c.tabela)?;
     // textos da planta já na escala certa
     let rot = json!({ "pis": eixo["pis"], "curvas": eixo["curvas"], "desenhar": { "estacas": true, "km": true, "notaveis": true, "rotulos": false }, "camada_base": "PROJETO", "escala": f1.escala, "nome": "A1", "altura_texto": 3.0, "rotular_estacas_a_cada": ((35.0 * f1.escala / 1000.0 / 20.0 / 5.0).ceil() * 5.0).max(5.0) });
@@ -390,7 +393,7 @@ fn montar_folhas(ag: &mut Agente, fonte: &Fonte, d: &Value, c: &Calculo, eixo: &
 fn ferrovia(ag: &mut Agente, fonte: &Fonte, d: &Value, caminho: &str) -> Res<Value> {
     let c = calcular_projeto(ag, fonte, d, caminho)?;
     let eixo = desenhar_eixos(ag, fonte, &c)?;
-    let escala = montar_folhas(ag, fonte, d, &c, &eixo)?;
+    let escala = montar_folhas(ag, fonte, d, &c, (&eixo, caminho))?;
     let leiaute = crate::leiaute::verificar_leiaute(&ag.doc);
     let mut saidas = serde_json::Map::new();
     if let Some(s) = d.get("saida") {

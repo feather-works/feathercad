@@ -4,7 +4,7 @@ import csv
 import math
 import statistics
 
-from ferrovia_lib import Fct, Folha, interpolar, tabela, v
+from ferrovia_lib import Fct, Folha, interpolar, recortar_poli, tabela, v
 
 PALETA = ["#3060D0", "#20A0B0", "#30A040", "#B09000", "#E07000", "#D03030"]
 COR_SUSPEITO = "#E03030"
@@ -26,6 +26,36 @@ def painel(c, a, b, titulo):
     c.texto((a[0] + 2.0, b[1] + 2.5), 4.0, titulo)
 
 
+def superficie(c, X, Y, dados, area):
+    """A malha triangular (TIN) e as curvas de nível da nuvem, cortadas pelo painel; as mestras levam a cota."""
+    tin = dados["tin"]
+    P = tin["pontos"]
+    c.camada("NUVEM_TIN", "#909090")
+    vistas = set()
+    for t in tin["triangulos"]:
+        for a, b in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+            chave = (min(a, b), max(a, b))
+            if chave in vistas:
+                continue
+            vistas.add(chave)
+            for parte in recortar_poli([(X(P[a][0]), Y(P[a][1])), (X(P[b][0]), Y(P[b][1]))], area):
+                c.poli(parte)
+    for mestra, cor, nome in ((False, "#C08050", "NUVEM_CURVA_NIVEL"), (True, "#A05020", "NUVEM_CURVA_MESTRA")):
+        c.camada(nome, cor)
+        for cv in tin["curvas"]:
+            if cv["mestra"] != mestra:
+                continue
+            pts = [(X(q[0]), Y(q[1])) for q in cv["pontos"]]
+            if cv["fechada"]:
+                pts.append(pts[0])
+            for parte in recortar_poli(pts, area):
+                c.poli(parte)
+            if mestra and pts:
+                x, y = pts[len(pts) // 2]
+                if area[0] + 6 < x < area[2] - 6 and area[1] + 6 < y < area[3] - 6:
+                    c.texto((x + 1.2, y + 1.0), 2.0, f"{cv['cota']:.0f}", "eb", cor=cor)
+
+
 def mapa(c, pts, dados, limites):
     x0, y0, x1, y1 = 60.0, 170.0, 360.0, 760.0
     painel(c, (x0, y0), (x1, y1), "MAPA DOS PONTOS (escala 1:10000, norte da quadrícula para cima)")
@@ -37,6 +67,7 @@ def mapa(c, pts, dados, limites):
     oy = y0 + 18.0 - nmin * k
     X = lambda e: ox + e * k
     Y = lambda n: oy + n * k
+    superficie(c, X, Y, dados, (x0 + 1.0, y0 + 12.0, x1 - 1.0, y1 - 1.0))
     # malha de 500 m com coordenadas
     c.camada("NUVEM_MALHA", "#909090")
     passo = 500.0
@@ -105,6 +136,34 @@ def mapa(c, pts, dados, limites):
     c.texto((x0 + 62.0, y0 + 9.0), 2.0, "traçado: azul tangente · magenta espiral · vermelho circular   |   laranja: lacuna ≥ 40 m   |   círculo vermelho grande: ponto suspeito", "em")
 
 
+def centro_da_curva(cv, dados):
+    """Centro do arco: do SC, perpendicular à direção do traçado, para o lado da curva."""
+    sc = cv["SC"]
+    al = dados["al"]
+    r = min(al, key=lambda q: abs(q[0] - sc["progressiva"]))
+    t = math.radians(r[3])
+    lado = 1.0 if cv["lado"] == "esquerda" else -1.0
+    return (sc["E"] - math.sin(t) * cv["raio"] * lado, sc["N"] + math.cos(t) * cv["raio"] * lado)
+
+
+def raios_da_curva(c, cv, X, Y, dados):
+    """Linhas do centro até o SC, o meio do arco e o CS, com `R = …`."""
+    centro = centro_da_curva(cv, dados)
+    ss = [r[0] for r in dados["al"]]
+    sm = (cv["SC"]["progressiva"] + cv["CS"]["progressiva"]) / 2.0
+    meio = (interpolar(ss, [r[1] for r in dados["al"]], sm), interpolar(ss, [r[2] for r in dados["al"]], sm))
+    for alvo in ((cv["SC"]["E"], cv["SC"]["N"]), meio, (cv["CS"]["E"], cv["CS"]["N"])):
+        c.linha((X(centro[0]), Y(centro[1])), (X(alvo[0]), Y(alvo[1])))
+    c.linha((X(centro[0]) - 1.5, Y(centro[1])), (X(centro[0]) + 1.5, Y(centro[1])))
+    c.linha((X(centro[0]), Y(centro[1]) - 1.5), (X(centro[0]), Y(centro[1]) + 1.5))
+    dx, dy = X(centro[0]) - X(meio[0]), Y(centro[1]) - Y(meio[1])
+    d = math.hypot(dx, dy) or 1.0
+    giro = math.degrees(math.atan2(dy, dx))
+    if giro > 90 or giro <= -90:
+        giro += 180.0
+    c.texto((X(meio[0]) + dx / d * 6.0, Y(meio[1]) + dy / d * 6.0), 2.4, f"R = {cv['raio']:.0f} m", "cm", giro, cor="#00A0C0")
+
+
 def tracado_sobre_a_nuvem(c, dados, X, Y):
     """O traçado de projeto por cima dos pontos: tangente (azul), espiral (magenta) e circular (vermelho) em traço grosso, as curvas
     numeradas, os pontos notáveis TS/SC/CS/ST e os quilômetros."""
@@ -120,6 +179,10 @@ def tracado_sobre_a_nuvem(c, dados, X, Y):
                 corrida = []
         if corrida:
             c.poli(corrida[::3] + [corrida[-1]])
+    c.camada("NUVEM_RAIOS", "#00A0C0")
+    for e in dados["analise"]["elementos"]:
+        if e["tipo"] == "curva":
+            raios_da_curva(c, e["curva"], X, Y, dados)
     c.camada("NUVEM_NOTAVEIS", "#FFFFFF")
     for e in dados["analise"]["elementos"]:
         if e["tipo"] != "curva":

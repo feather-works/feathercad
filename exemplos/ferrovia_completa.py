@@ -38,7 +38,11 @@ def carregar(m, comprimento):
     pares = lista(m, fe)
     pares.sort(key=lambda r: r[1])
     q = m.call("cad_nuvem_qualidade", {"feicoes": "FP", "marcar": False})
+    tin_r = m.call("cad_tin", {})
+    with open(tin_r["arquivo"]) as f:
+        tin = json.load(f)
     return {
+        "tin": tin,
         "suspeitos": [{"E": s["E"], "N": s["N"], "cota": s["cota"], "mediana_local": s["mediana_local"]} for s in q["cota_fora_da_mediana"]["lista"]],
         "lacunas": q["lacunas"]["lista"],
         "zero": q["cotas_identicas_em_serie"]["pares_com_nivelamento_zero"],

@@ -63,3 +63,30 @@ pub fn topografia(ag: &mut Agente, args: &Value) -> Res<Value> {
         "entidades_criadas": resumo.ids_criados.len(),
     }))
 }
+
+/// `cad_tin`: a malha triangular (TIN) e as curvas de nível da nuvem, **em dados** (não desenha): `pontos` [E, N, cota], `triangulos`
+/// (índices) e `curvas` ({cota, mestra, fechada, pontos}). Vão para um arquivo JSON (`arquivo`) — quem monta uma folha lê de lá.
+pub fn tin(ag: &Agente, args: &Value) -> Res<Value> {
+    let pontos: Vec<feathercad_core::geom::Ponto> = if let Some(caminho) = args.get("caminho").and_then(Value::as_str) {
+        feathercad_core::topografia::ler_nuvem_pontos(&std::fs::read_to_string(caminho).map_err(|e| format!("não consegui ler `{caminho}`: {e}"))?)?
+    } else {
+        let nome = args.get("nuvem").and_then(Value::as_str).map(str::to_string).or_else(|| ag.nuvem_atual.clone()).ok_or("diga `caminho` ou `nuvem` (nome de uma nuvem lida nesta sessão)")?;
+        ag.nuvens.get(&nome).map(|n| n.pontos.clone()).ok_or_else(|| format!("a nuvem `{nome}` não existe nesta sessão"))?
+    };
+    if pontos.len() < 3 {
+        return Err("a nuvem precisa de ao menos 3 pontos".into());
+    }
+    let z: Vec<f64> = pontos.iter().map(|p| p.z).collect();
+    let desnivel = z.iter().copied().fold(f64::MIN, f64::max) - z.iter().copied().fold(f64::MAX, f64::min);
+    let equidistancia = numero_opcional(args, "equidistancia").unwrap_or_else(|| feathercad_core::topografia::equidistancia_padrao(desnivel));
+    let passo_mestra = args.get("passo_mestra").and_then(Value::as_u64).map_or(5, |v| v as usize);
+    let triangulos = feathercad_core::topografia::triangular_delaunay(&pontos, numero_opcional(args, "max_aresta"));
+    let curvas = feathercad_core::topografia::gerar_curvas_nivel(&pontos, &triangulos, equidistancia, passo_mestra);
+    let dados = json!({
+        "pontos": pontos.iter().map(|p| json!([p.x, p.y, p.z])).collect::<Vec<_>>(),
+        "triangulos": triangulos.iter().map(|t| json!([t.a, t.b, t.c])).collect::<Vec<_>>(),
+        "curvas": curvas.iter().map(|c| json!({ "cota": c.cota, "mestra": c.eh_mestra, "fechada": c.fechada, "pontos": c.pontos.iter().map(|p| json!([p.x, p.y])).collect::<Vec<_>>() })).collect::<Vec<_>>(),
+    });
+    let arquivo = crate::dados::gravar(ag, "tin", &dados)?;
+    Ok(json!({ "pontos": pontos.len(), "triangulos": triangulos.len(), "curvas": curvas.len(), "equidistancia": equidistancia, "passo_mestra": passo_mestra, "arquivo": arquivo }))
+}

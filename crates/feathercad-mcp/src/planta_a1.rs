@@ -228,6 +228,9 @@ const PALETA_DA_NUVEM: [u32; 6] = [0x30_60_D0, 0x20_A0_B0, 0x30_A0_40, 0xB0_90_0
 pub(crate) struct Nuvem<'a> {
     pub pontos: &'a [Ponto],
     pub limites: [f64; 5],
+    /// A malha triangular (a mesma do leitor de nuvem) e as curvas de nível.
+    pub triangulos: Vec<feathercad_core::topografia::Triangulo>,
+    pub curvas: Vec<feathercad_core::topografia::CurvaNivel>,
 }
 
 impl<'a> Nuvem<'a> {
@@ -235,7 +238,10 @@ impl<'a> Nuvem<'a> {
         let mut z: Vec<f64> = pontos.iter().map(|p| p.z).collect();
         z.sort_by(f64::total_cmp);
         let q = |k: usize| z.get(z.len() * k / 6).copied().unwrap_or(0.0);
-        Self { pontos, limites: [q(1), q(2), q(3), q(4), q(5)] }
+        let desnivel = z.last().copied().unwrap_or(0.0) - z.first().copied().unwrap_or(0.0);
+        let triangulos = feathercad_core::topografia::triangular_delaunay(pontos, None);
+        let curvas = feathercad_core::topografia::gerar_curvas_nivel(pontos, &triangulos, feathercad_core::topografia::equidistancia_padrao(desnivel), 5);
+        Self { pontos, limites: [q(1), q(2), q(3), q(4), q(5)], triangulos, curvas }
     }
 
     fn faixa(&self, z: f64) -> usize {
@@ -243,10 +249,34 @@ impl<'a> Nuvem<'a> {
     }
 }
 
+/// A superfície triangulada (arestas do TIN) e as curvas de nível, cortadas pela janela; as mestras levam a cota.
+fn superficie(p: &mut Pincel, n: &Nuvem, j: &Janela) {
+    p.em("PLANTA_TIN", Some(0x90_90_90));
+    let mut vistas = std::collections::HashSet::new();
+    for t in &n.triangulos {
+        for (u, v) in t.arestas() {
+            if vistas.insert((u, v)) {
+                polilinhas(p, j, &[n.pontos[u], n.pontos[v]]);
+            }
+        }
+    }
+    for c in &n.curvas {
+        p.em(if c.eh_mestra { "PLANTA_CURVA_MESTRA" } else { "PLANTA_CURVA_NIVEL" }, Some(if c.eh_mestra { 0xA0_50_20 } else { 0xC0_80_50 }));
+        let mut pts: Vec<Ponto> = c.pontos.clone();
+        if c.fechada {
+            pts.push(pts[0]);
+        }
+        polilinhas(p, j, &pts);
+        if let Some(m) = pts.iter().step_by(1).find(|q| j.dentro(**q)).filter(|_| c.eh_mestra) {
+            p.texto(Ponto::novo(j.p(*m).x + 1.0 * K, j.p(*m).y + 1.0 * K), 2.0 * K, 0.0, &format!("{:.0}", c.cota), AlinhaH::Esquerda, AlinhaV::Base);
+        }
+    }
+}
+
 /// Os pontos da nuvem na janela, por faixa de cota, e a cota (1 casa) a cada ~80 m de distância entre rótulos.
 fn pontos_da_nuvem(p: &mut Pincel, n: &Nuvem, j: &Janela) {
-    for faixa in 0..6 {
-        p.em(&format!("PLANTA_NUVEM_{}", faixa + 1), Some(PALETA_DA_NUVEM[faixa]));
+    for (faixa, cor) in PALETA_DA_NUVEM.iter().enumerate() {
+        p.em(&format!("PLANTA_NUVEM_{}", faixa + 1), Some(*cor));
         for q in n.pontos.iter().filter(|q| j.dentro(**q) && n.faixa(q.z) == faixa) {
             p.pecas.push(Peca { camada: p.camada.clone(), cor: p.cor, g: Geometria::Circulo { centro: j.p(*q), raio: 0.55 * K } });
         }
@@ -261,11 +291,41 @@ fn pontos_da_nuvem(p: &mut Pincel, n: &Nuvem, j: &Janela) {
     }
 }
 
+/// Raios das curvas: do centro até o SC, o meio do arco e o CS, com "R = …" perto do arco (a parte fora da janela é cortada).
+fn raios(p: &mut Pincel, a: &Alinhamento, j: &Janela) {
+    p.em("PLANTA_RAIOS", Some(0x00_A0_C0));
+    for c in &a.curvas {
+        let sc = a.em(c.sc.progressiva);
+        let (sn, cs) = sc.direcao.to_radians().sin_cos();
+        let lado = f64::from(c.lado);
+        let centro = Ponto::novo(c.sc.ponto.x - sn * c.raio * lado, c.sc.ponto.y + cs * c.raio * lado);
+        let meio = a.em((c.sc.progressiva + c.cs.progressiva) / 2.0).ponto;
+        for alvo in [c.sc.ponto, meio, c.cs.ponto] {
+            for parte in j.recortar(&[centro, alvo]) {
+                p.polilinha(&parte);
+            }
+        }
+        if j.dentro(centro) {
+            let m = j.p(centro);
+            p.linha(Ponto::novo(m.x - 1.5 * K, m.y), Ponto::novo(m.x + 1.5 * K, m.y));
+            p.linha(Ponto::novo(m.x, m.y - 1.5 * K), Ponto::novo(m.x, m.y + 1.5 * K));
+        }
+        if j.dentro(meio) {
+            let (dx, dy) = (centro.x - meio.x, centro.y - meio.y);
+            let d = dx.hypot(dy).max(1e-9);
+            let pos = j.p(Ponto::novo(meio.x + dx / d * 9.0 * K, meio.y + dy / d * 9.0 * K));
+            let (giro, h) = legivel(dy.atan2(dx).to_degrees());
+            p.texto(pos, 2.4 * K, giro, &format!("R = {:.0} m", c.raio), h, AlinhaV::Meio);
+        }
+    }
+}
+
 /// O mapa da folha, tudo numa gravação só.
 fn mapa(ag: &mut Agente, a: &Alinhamento, existente: &[Vec<Ponto>], nuvem: &Nuvem, t: &Trecho, j: &Janela) -> Res<()> {
     let mut p = Pincel::novo("PLANTA_MOLDURA");
     p.retangulo(j.org, j.p(j.max));
     malha(&mut p, j);
+    superficie(&mut p, nuvem, j);
     pontos_da_nuvem(&mut p, nuvem, j);
     p.em("PLANTA_EXISTENTE", Some(0xFF_7F_00));
     for seg in existente {
@@ -281,6 +341,7 @@ fn mapa(ag: &mut Agente, a: &Alinhamento, existente: &[Vec<Ponto>], nuvem: &Nuve
     }
     p.em("PLANTA_PROJETO", Some(0xFF_00_FF));
     polilinhas(&mut p, j, &eixo);
+    raios(&mut p, a, j);
     estacas(&mut p, a, t, j);
     notaveis(&mut p, a, j);
     aplicar(&mut ag.doc, p.pecas).map(|_| ())
@@ -331,7 +392,7 @@ fn tabelas_das_curvas(ag: &mut Agente, fonte: &Fonte, c: &Coluna) -> Res<()> {
 fn legenda(ag: &mut Agente, c: &Coluna) -> Res<()> {
     let mut p = Pincel::novo("PLANTA_LEGENDA");
     p.texto(pf(c.f, X_COLUNA, 440.0), 3.0 * K, 0.0, "LEGENDA", AlinhaH::Esquerda, AlinhaV::Base);
-    let itens: [(u32, &str, bool); 6] = [(0xFF_7F_00, "Eixo existente (ponto médio de cada par de trilhos)", false), (0x7F_FF_00, "Ripagem ampliada 20 vezes (projeto → existente)", false), (0xFF_00_FF, "Eixo de projeto (tangentes, espirais e circulares)", false), (0x7F_9F_FF, "Trilhos de projeto (bitola métrica)", false), (0x80_80_80, "Estaca de 20 m (rótulo a cada 100 m); KM em destaque", false), (0xFF_7F_9F, "Ponto notável: TS, SC, CS, ST", true)];
+    let itens: [(u32, &str, bool); 9] = [(0x90_90_90, "Malha triangular (TIN) da nuvem de pontos", false), (0xA0_50_20, "Curva de nível mestra (cota em m) / secundária mais clara", false), (0x00_A0_C0, "Raio da curva (do centro ao SC, ao meio e ao CS)", false), (0xFF_7F_00, "Eixo existente (ponto médio de cada par de trilhos)", false), (0x7F_FF_00, "Ripagem ampliada 20 vezes (projeto → existente)", false), (0xFF_00_FF, "Eixo de projeto (tangentes, espirais e circulares)", false), (0x7F_9F_FF, "Trilhos de projeto (bitola métrica)", false), (0x80_80_80, "Estaca de 20 m (rótulo a cada 100 m); KM em destaque", false), (0xFF_7F_9F, "Ponto notável: TS, SC, CS, ST", true)];
     for (n, (cor, texto, circulo)) in itens.iter().enumerate() {
         let y = 431.0 - n as f64 * 7.0;
         p.em("PLANTA_LEGENDA", Some(*cor));
@@ -349,13 +410,13 @@ fn legenda(ag: &mut Agente, c: &Coluna) -> Res<()> {
 
 /// A legenda das faixas de cota dos pontos da nuvem (cor = faixa).
 fn faixas_da_nuvem(p: &mut Pincel, c: &Coluna) {
-    let y = 431.0 - 6.0 * 7.0;
+    let y = 431.0 - 9.0 * 7.0;
     p.em("PLANTA_LEGENDA", None);
     p.texto(pf(c.f, X_COLUNA, y), 2.4 * K, 0.0, "Pontos da nuvem do levantamento, por faixa de cota (m):", AlinhaH::Esquerda, AlinhaV::Meio);
     let l = c.nuvem.limites;
-    for faixa in 0..6 {
+    for (faixa, cor) in PALETA_DA_NUVEM.iter().enumerate() {
         let (x, yy) = (X_COLUNA + faixa as f64 * 30.0, y - 5.5);
-        p.em("PLANTA_LEGENDA", Some(PALETA_DA_NUVEM[faixa]));
+        p.em("PLANTA_LEGENDA", Some(*cor));
         p.pecas.push(Peca { camada: p.camada.clone(), cor: p.cor, g: Geometria::Circulo { centro: pf(c.f, x + 2.0, yy), raio: 0.9 * K } });
         let rotulo = match faixa {
             0 => format!("< {:.1}", l[0]),

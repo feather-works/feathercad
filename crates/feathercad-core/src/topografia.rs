@@ -634,7 +634,7 @@ fn adicionar_mudanca(mudancas: &mut Vec<Mudanca>, camada: usize, geo: Geometria,
     }));
 }
 
-fn equidistancia_padrao(desnivel: f64) -> f64 {
+pub fn equidistancia_padrao(desnivel: f64) -> f64 {
     if desnivel <= 5.0 {
         0.50
     } else if desnivel <= 20.0 {

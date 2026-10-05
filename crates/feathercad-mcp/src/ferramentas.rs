@@ -125,6 +125,7 @@ fn editar_ou_criar(ag: &mut Agente, nome: &str, args: &Value) -> Res<Value> {
         "cad_nuvem_qualidade" => crate::nuvem_ferramentas::qualidade_ferramenta(ag, args),
         "cad_alinhamento_ajustar" => crate::viario_projeto::alinhamento_ajustar(ag, args),
         "cad_greide" => crate::viario_projeto::greide(ag, args),
+        "cad_tin" => crate::topografia::tin(ag, args),
         "cad_analise" => crate::analise_ferramenta::analise(ag, args),
         "cad_geografico" => crate::analise_ferramenta::geografico(args),
         "cad_tabela_estacas" => crate::viario_projeto::tabela_estacas(ag, args),
