@@ -270,6 +270,69 @@ fn no_de_ligacao() -> Peca {
     c
 }
 
+
+/// Luminária em bloco de 3 células (potência | circuito | comando), como nos projetos de referência.
+fn luminaria_3_celulas(p: &Par) -> Peca {
+    let mut c = Peca::default();
+    c.retangulo((-6.0, -2.2), (6.0, 2.2));
+    c.linha((0.6, -2.2), (0.6, 2.2));
+    c.linha((3.6, -2.2), (3.6, 2.2));
+    let h = p.altura_texto;
+    if let Some(t) = p.potencia_formatada() {
+        c.texto((-5.6, -h * 0.35), h, &t);
+    }
+    if let Some(t) = &p.circuito {
+        c.texto((1.0, -h * 0.35), h, t);
+    }
+    if let Some(t) = &p.comando {
+        c.texto((4.1, -h * 0.35), h, t);
+    }
+    c
+}
+
+/// Luminária LED de teto (círculo com X): circuito no alto, etiqueta (`comando`) embaixo.
+fn luminaria_led(p: &Par) -> Peca {
+    let mut c = Peca::default();
+    c.circulo((0.0, 0.0), 2.2);
+    c.linha((-1.55, -1.55), (1.55, 1.55));
+    c.linha((-1.55, 1.55), (1.55, -1.55));
+    let h = p.altura_texto;
+    if let Some(t) = &p.circuito {
+        c.texto((-1.0, 2.2 + h * 0.5), h, t);
+    }
+    if let Some(t) = &p.comando {
+        c.texto((-1.4, -2.2 - h * 1.4), h, t);
+    }
+    c
+}
+
+/// Fotocélula de dimerização: círculo com FC.
+fn fotocelula(p: &Par) -> Peca {
+    let mut c = Peca::default();
+    c.circulo((0.0, 0.0), 1.9);
+    c.texto((-1.2, -p.altura_texto * 0.35), p.altura_texto, "FC");
+    if let Some(t) = &p.comando {
+        c.texto((-1.2, -1.9 - p.altura_texto * 1.4), p.altura_texto, t);
+    }
+    c
+}
+
+/// Bloco autônomo de iluminação de emergência: quadrado com E.
+fn bloco_emergencia() -> Peca {
+    let mut c = Peca::default();
+    c.retangulo((-2.2, -2.2), (2.2, 2.2));
+    c.texto((-0.6, -0.65), 1.8, "E");
+    c
+}
+
+/// Sinalização de saída de emergência.
+fn saida_emergencia() -> Peca {
+    let mut c = Peca::default();
+    c.retangulo((-5.0, -1.8), (5.0, 1.8));
+    c.texto((-4.2, -0.65), 1.6, "SAÍDA");
+    c
+}
+
 /// Um símbolo do catálogo: nome, o que é, e o que ele aceita além de `ponto`.
 pub struct Info {
     pub nome: &'static str,
@@ -279,7 +342,7 @@ pub struct Info {
 
 const PAREDE: &str = "parede (norte|sul|leste|oeste = de que lado do símbolo está a parede)";
 
-pub const CATALOGO: [Info; 22] = [
+pub const CATALOGO: [Info; 27] = [
     Info { nome: "tomada_baixa", descricao: "Tomada baixa (triângulo vazio, ~30 cm do piso). `quantidade` 1/2/3 = simples/dupla/tripla.", parametros: "parede, quantidade, circuito, potencia" },
     Info { nome: "tomada_media", descricao: "Tomada média (triângulo meio cheio, ~110 cm; bancada de cozinha).", parametros: "parede, quantidade, circuito, potencia" },
     Info { nome: "tomada_alta", descricao: "Tomada alta (triângulo cheio, ~200 cm; chuveiro, ar-condicionado).", parametros: "parede, quantidade, circuito, potencia" },
@@ -296,6 +359,11 @@ pub const CATALOGO: [Info; 22] = [
     Info { nome: "quadro_parcial_embutido", descricao: "Quadro parcial de luz e força, embutido (6.2).", parametros: "potencia" },
     Info { nome: "quadro_geral_aparente", descricao: "Quadro geral de luz e força, aparente (6.3).", parametros: "potencia" },
     Info { nome: "quadro_geral_embutido", descricao: "Quadro geral de luz e força, embutido (6.4). Ancorado no centro da base.", parametros: "potencia" },
+    Info { nome: "luminaria_3_celulas", descricao: "Luminária em bloco de 3 células (potência | circuito | comando): a identificação fica dentro do símbolo, sem texto solto ao lado.", parametros: "potencia, circuito, comando" },
+    Info { nome: "luminaria_led", descricao: "Luminária LED de teto (círculo com X): circuito no alto, etiqueta (`comando`, ex. L01) embaixo.", parametros: "circuito, comando" },
+    Info { nome: "fotocelula", descricao: "Fotocélula de dimerização por luz natural (círculo com FC); `comando` = etiqueta (FC1).", parametros: "comando" },
+    Info { nome: "bloco_emergencia", descricao: "Bloco autônomo de iluminação de emergência (quadrado com E).", parametros: "" },
+    Info { nome: "saida_emergencia", descricao: "Sinalização de saída de emergência (retângulo SAÍDA).", parametros: "" },
     Info { nome: "caixa_telefone", descricao: "Caixa de telefones (6.5).", parametros: "" },
     Info { nome: "caixa_medidor", descricao: "Caixa para medidor (6.6).", parametros: "" },
     Info { nome: "caixa_passagem_piso", descricao: "Caixa de passagem no piso (quadrado com P).", parametros: "" },
@@ -328,6 +396,11 @@ fn montar(nome: &str, p: &Par) -> Option<Peca> {
         "luz_multifilar" => luz_multifilar(),
         "disjuntor" => disjuntor(),
         "no_de_ligacao" => no_de_ligacao(),
+        "luminaria_3_celulas" => luminaria_3_celulas(p),
+        "luminaria_led" => luminaria_led(p),
+        "fotocelula" => fotocelula(p),
+        "bloco_emergencia" => bloco_emergencia(),
+        "saida_emergencia" => saida_emergencia(),
         _ => return None,
     })
 }

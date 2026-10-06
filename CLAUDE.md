@@ -180,6 +180,22 @@ cd src-tauri && cargo clippy
   usuário em `~/.config/feathercad/modelos/*.json`, que rodam como `cad_lote`), `cad_alinhamento/_ajustar`, `cad_superelevacao`, `cad_greide`, `cad_via`
   (trilho/dormente vêm de `biblioteca/ferrovia/*.fct`), `cad_nuvem_secoes|feicoes (trilhos, bordos)|qualidade`, `cad_tabela_estacas`, `cad_projetar`,
   `.fct` com `camera`+`L3`/`P3`, `cad_pdf papel:"auto"`, `cad_verificar {leiaute}`. Falta HATCH no DXF (1.6) e `meio-fio`.
+- **MCP elétrico v2 (04/10/2026, feito e testado, não commitado):** ferramentas novas em `crates/feathercad-mcp/src/`: **`cad_circuitos`** (`circuitos.rs`:
+  lista de circuitos → corrente, disjuntor padronizado, seção por capacidade (NBR 5410, PVC 70 °C, B1, fatores de temperatura/agrupamento) e queda de tensão,
+  DR, distribuição/desequilíbrio de fases, alimentador, demanda; com `desenhar` faz quadro de cargas completo, quadro de demanda e unifilar dos mesmos números),
+  **`cad_luminotecnico`** (`luminotecnico.rs`: método dos lumens + grade de lux ponto a ponto com imagens nas paredes e valor só-direta, posições das luminárias,
+  mapa de lux em faixas; premissas e avisos no resultado), **`cad_notas_padrao`** (`notas.rs`: notas normativas por conjunto, escreve na folha), **`cad_carimbo`**
+  (`carimbo.rs`: caixas NOTAS/LEGENDA/RESPONSÁVEL da folha em coordenadas do desenho + linhas do responsável técnico; `folha.rs` agora expõe `X_NOTAS/X_LEG/X_REV/Y_FAIXA/AREA`),
+  5 símbolos novos (`luminaria_3_celulas`, `luminaria_led`, `fotocelula`, `bloco_emergencia`, `saida_emergencia`). Método e lacunas: `docs/REFERENCIA-ELETRICA-3-PROJETOS.md`.
+  Exemplo completo: `exemplos/luminotecnico_v3.py` (4 folhas A1 1:100, saída `../projeto_luminotecnico_galpao_v3.*`). **`exemplos/mcp_cliente.py` agora roda ISOLADO por
+  padrão (`FEATHERCAD_VIVO=0`)**: sem isso o cliente falava com o app aberto e `cad_novo` apagou o desenho da tela. Depois de `npm run mcp:build`, reconectar o MCP (`/mcp`).
+- **MCP guia a IA: `cad_projeto` (04/10/2026, `receita.rs`, feito e testado, não commitado):** funil pedido pelo usuário. Pedido SIMPLES (desenhar um círculo) vai direto
+  às ferramentas; pedido de PROJETO começa por `cad_projeto {acao:iniciar}` → pergunta a disciplina (elétrica/civil/ferroviário) → `escolher {caminho:[…]}` até a
+  RECEITA (perguntar antes, regras, fases e itens obrigatórios com a ferramenta de cada um) → `status {caminho}` confere cada item contra o desenho aberto
+  (camadas/textos esperados; `feito|pendente|manual`), dá o `proximo` passo e **o equilíbrio por folha** (ocupação da área útil, caixas NOTAS/LEGENDA vazias; limiar 60 %,
+  calibrado nos A1 de referência: 89–98 %). Receitas: `eletrica/luminotecnico` (completa), `eletrica/eletrica_geral` (básica), `civil/planta_baixa` (esboço),
+  `ferroviario/tracado_nuvem` (aponta a cadeia viária existente); `outra` = projeto sem receita. Receita nova = entrada em `receita.rs` (itens com `Detecta`).
+  As `INSTRUCOES` do MCP (`rpc.rs`) mandam usar o funil só em pedido de projeto. O v3 do galpão passa nos itens (23/26) mas **reprova no equilíbrio** (31–50 % de ocupação).
 - **MCP: biblioteca de componentes em arquivos** (29-30/09/2026, `crates/feathercad-mcp/src/componentes.rs`, `build.rs`, pasta `biblioteca/`):
   cada equipamento é um `.fct` em mm reais (origem no canto inferior esquerdo) com cabeçalho `// descricao|categoria|tamanho|parametros: a=1 b=x`
   e `{{a}}` no corpo. `cad_componentes {busca?}` lista, `cad_componente {nome, ponto, valores?, ampliacao?, rotacao?, camada?}` coloca (um

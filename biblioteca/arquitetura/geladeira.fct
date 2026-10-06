@@ -1,0 +1,9 @@
+// nome: geladeira
+// descricao: Geladeira/refrigerador, vista em planta (parede no lado de cima).
+// categoria: eletrodoméstico
+// tamanho: 700 x 700 mm
+unidade mm
+camada MOVEL #8E9AA6 esp=0.25
+R 0 0 700 700
+L 0 640 700 640
+R 600 600 50 25

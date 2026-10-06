@@ -1,0 +1,10 @@
+// nome: lavatorio
+// descricao: Lavatório de bancada/coluna, vista em planta (parede no lado de cima).
+// categoria: louça
+// tamanho: 500 x 400 mm
+unidade mm
+camada LOUCA #8E9AA6 esp=0.25
+R 0 0 500 400
+C 250 190 140
+C 250 190 14
+C 250 372 12

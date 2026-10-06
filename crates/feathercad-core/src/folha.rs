@@ -137,9 +137,14 @@ fn guardar_o_campo(campos: &mut Campos, nome: &str, valor: String) {
 
 // ---------------------------------------------------------------- o modelo de folha (em mm de papel, base A1 841 x 594)
 
-const BASE_W: f64 = 841.0;
+pub const BASE_W: f64 = 841.0;
+/// A faixa inferior (mm de papel, base A1): onde começam as caixas de notas, legenda, revisões/responsável e carimbo, e o topo da faixa.
+pub const X_NOTAS: f64 = 165.3;
+pub const X_LEG: f64 = 505.7;
+pub const X_REV: f64 = 656.4;
+pub const Y_FAIXA: f64 = 99.0;
 /// A área útil para o desenho: dentro da moldura, acima da faixa, com 10 mm de respiro (base A1).
-const AREA: (f64, f64, f64, f64) = (35.0, 109.0, 821.0, 574.0);
+pub const AREA: (f64, f64, f64, f64) = (35.0, 109.0, 821.0, 574.0);
 
 struct Pena {
     f: f64,
@@ -194,7 +199,7 @@ fn desenhar(largura_mm: f64, escala: f64, campos: &Campos, numero_da_folha: usiz
         p.linha(25.0, 341.8, 831.0, 341.8);
     }
     // faixa inferior: notas, legenda, revisões e carimbo
-    let (x_notas, x_leg, x_rev, y_faixa) = (165.3, 505.7, 656.4, 99.0);
+    let (x_notas, x_leg, x_rev, y_faixa) = (X_NOTAS, X_LEG, X_REV, Y_FAIXA);
     p.linha(25.0, y_faixa, 831.0, y_faixa);
     for x in [x_notas, x_leg, x_rev] {
         p.linha(x, 10.0, x, y_faixa);

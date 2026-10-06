@@ -1,0 +1,20 @@
+// nome: pia_cozinha
+// descricao: Pia de cozinha com 2 cubas e escorredor, vista em planta (parede no lado de cima).
+// categoria: louça
+// tamanho: 1200 x 550 mm
+unidade mm
+camada LOUCA #8E9AA6 esp=0.25
+R 0 0 1200 550
+R 60 70 480 400
+R 600 70 300 400
+C 300 270 22
+C 750 270 22
+C 600 505 14
+L 930 70 1140 70
+L 930 130 1140 130
+L 930 190 1140 190
+L 930 250 1140 250
+L 930 310 1140 310
+L 930 370 1140 370
+L 930 430 1140 430
+R 930 70 210 360

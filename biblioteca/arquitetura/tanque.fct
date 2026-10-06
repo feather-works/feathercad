@@ -1,0 +1,17 @@
+// nome: tanque
+// descricao: Tanque de lavar roupa (área de serviço) com tábua, vista em planta (parede no lado de cima).
+// categoria: louça
+// tamanho: 600 x 550 mm
+unidade mm
+camada LOUCA #8E9AA6 esp=0.25
+R 0 0 600 550
+R 50 90 340 390
+C 220 285 20
+C 220 515 14
+R 420 90 130 390
+L 420 150 550 150
+L 420 210 550 210
+L 420 270 550 270
+L 420 330 550 330
+L 420 390 550 390
+L 420 450 550 450

@@ -1,0 +1,10 @@
+// nome: vaso_sanitario
+// descricao: Vaso sanitário com caixa acoplada, vista em planta (parede no lado de cima).
+// categoria: louça
+// tamanho: 360 x 680 mm
+unidade mm
+camada LOUCA #8E9AA6 esp=0.25
+R 20 500 320 170
+P 0 500 0 180 ~1 360 180 360 500 f
+P 40 480 40 190 ~1 320 190 320 480 f
+C 180 300 30

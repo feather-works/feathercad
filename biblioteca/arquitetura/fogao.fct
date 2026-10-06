@@ -1,0 +1,16 @@
+// nome: fogao
+// descricao: Fogão de 4 bocas, vista em planta (parede no lado de cima).
+// categoria: eletrodoméstico
+// tamanho: 500 x 550 mm
+unidade mm
+camada MOVEL #8E9AA6 esp=0.25
+R 0 0 500 550
+C 140 150 75
+C 140 150 28
+C 360 150 75
+C 360 150 28
+C 140 390 75
+C 140 390 28
+C 360 390 75
+C 360 390 28
+L 40 40 460 40

@@ -1,12 +1,14 @@
 """Cliente mínimo do servidor MCP do FeatherCAD (JSON-RPC por stdio), para dirigir o binário novo."""
-import json, subprocess
+import json, os, subprocess
 
 EXE = "/run/media/maragon/Arquivos/GitHub/FeatherOffice/feathercad/crates/feathercad-mcp/target/release/feathercad-mcp"
 
 
 class Mcp:
     def __init__(self, exe=EXE):
-        self.p = subprocess.Popen([exe], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
+        # Isolado por padrão: sem isto o servidor repassa tudo ao aplicativo aberto e `cad_novo` apaga o desenho da tela.
+        ambiente = {**os.environ, "FEATHERCAD_VIVO": os.environ.get("FEATHERCAD_VIVO", "0")}
+        self.p = subprocess.Popen([exe], env=ambiente, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
         self.n = 0
         self.pedir("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "gerador", "version": "1"}})
 

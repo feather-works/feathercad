@@ -54,6 +54,8 @@ quais usou e que os de fábrica não foram conferidos na norma.
 const TEXTO_ELETRICO: &str = "\
 GUIA DE PROJETO ELÉTRICO (valha só se o projeto for elétrico; senão ignore).
 
+0. PARA GERAR UM PROJETO COMPLETO comece por cad_projeto (funil: disciplina → tipo → receita com os itens obrigatórios) e confira com cad_projeto status; os itens abaixo são o detalhe de cada ferramenta.
+
 1. FOLHA. Todo projeto vai numa FOLHA: moldura com margem, carimbo (título, folha n/N, escala, data, unidade) e um assunto por folha \
 (planta baixa; iluminação e interruptores; tomadas e circuitos; quadro de cargas + unifilar/multifilar). Folhas ficam lado a lado no mesmo \
 desenho. A3 a 1:50 em cm = 2100 x 1485 cm; a 1:100 = 4200 x 2970. O tamanho de texto/símbolo é medido NO PAPEL: altura_desenho = mm_papel x escala \

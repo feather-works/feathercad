@@ -1,0 +1,8 @@
+// nome: porta_80
+// descricao: Porta de giro de 80 cm: folha aberta a 90 graus e arco de abertura (a parede corre ao longo do eixo X; use rotacao e ampliacao para outras larguras/lados).
+// categoria: porta
+// tamanho: 800 x 800 mm
+unidade mm
+camada PORTA #B07A5A esp=0.25
+R 0 0 40 800
+A 0 0 800 0 90
