@@ -1,5 +1,8 @@
 //! O desenho: camadas, entidades e o histórico de desfazer/refazer.
 
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, RwLock};
+
 use serde::{Deserialize, Serialize};
 
 use crate::geom::{Ponto, Transf, Vertice};
@@ -402,6 +405,9 @@ mod testes_unidade {
     }
 }
 
+/// A versão do desenho para a qual o mapa id → posição foi montado, e o mapa.
+type IndiceDeIds = Option<(u64, Arc<HashMap<Id, usize>>)>;
+
 /// O documento aberto.
 #[derive(Debug)]
 pub struct Documento {
@@ -417,6 +423,9 @@ pub struct Documento {
     pub(crate) layouts: Vec<InfoLayout>,
     pub(crate) espaco_ativo: Espaco,
     versao: u64,
+    /// Posição de cada id em `entidades`, montada sob demanda e válida só para a `versao` em que foi feita
+    /// (toda mudança passa por `mudou()`, que sobe a versão). Troca a busca linear por uma consulta.
+    indice: RwLock<IndiceDeIds>,
     limpo_na_versao: u64,
     pub(crate) desfazer: Vec<Passo>,
     pub(crate) refazer: Vec<Passo>,
@@ -471,6 +480,7 @@ impl Default for Documento {
             layouts: default_layouts,
             espaco_ativo: Espaco::Modelo,
             versao: 0,
+            indice: RwLock::new(None),
             limpo_na_versao: 0,
             desfazer: Vec::new(),
             refazer: Vec::new(),
@@ -614,31 +624,56 @@ impl Documento {
 
     /// A entidade de id `id`, se ainda existe.
     pub fn entidade(&self, id: Id) -> Option<&Entidade> {
-        self.entidades.iter().find(|e| e.id == id)
+        self.posicao(id).map(|p| &self.entidades[p])
+    }
+
+    /// Onde `id` está em `entidades`. O mapa id → posição é montado uma vez por versão do desenho (O(n)) e depois
+    /// cada consulta é O(1); antes, cada consulta varria a lista toda, e selecionar N objetos custava N × tamanho.
+    pub(crate) fn posicao(&self, id: Id) -> Option<usize> {
+        let versao = self.versao;
+        if let Some((v, mapa)) = self.indice.read().unwrap_or_else(|e| e.into_inner()).as_ref() {
+            if *v == versao {
+                return mapa.get(&id).copied();
+            }
+        }
+        let mapa: HashMap<Id, usize> = self.entidades.iter().enumerate().map(|(i, e)| (e.id, i)).collect();
+        let achada = mapa.get(&id).copied();
+        *self.indice.write().unwrap_or_else(|e| e.into_inner()) = Some((versao, Arc::new(mapa)));
+        achada
     }
 
     /// Aplica as mudanças como **um** passo de desfazer. Devolve os ids das entidades novas, na ordem.
     /// Pedido sobre id que não existe é ignorado; se nada mudou, o histórico não ganha passo.
     pub fn aplicar_mudancas(&mut self, mudancas: Vec<Mudanca>) -> Vec<Id> {
         let (mut inversos, mut novos) = (Vec::new(), Vec::new());
+        // Durante o lote nada sai da lista (as posições não andam): as remoções só são anotadas e feitas de uma vez no fim,
+        // e as entidades novas ganham a posição num mapa à parte. Assim o lote custa O(n + mudanças), não O(n × mudanças).
+        let mut removidas: HashSet<Id> = HashSet::new();
+        let mut recentes: HashMap<Id, usize> = HashMap::new();
         for m in mudancas {
             match m {
                 Mudanca::Novo(n) => {
                     let id = self.proximo_id;
                     self.proximo_id += 1;
                     let camada = if n.camada < self.camadas.len() { n.camada } else { 0 };
+                    recentes.insert(id, self.entidades.len());
                     self.entidades.push(Entidade { id, camada, cor: n.cor, geometria: n.geometria, props: n.props, espaco: n.espaco });
                     inversos.push(Passo::Adicionou(id));
                     novos.push(id);
                 }
                 Mudanca::Remover(id) => {
-                    if let Some(pos) = self.entidades.iter().position(|e| e.id == id) {
-                        inversos.push(Passo::Removeu(self.entidades.remove(pos)));
+                    if removidas.contains(&id) {
+                        continue;
+                    }
+                    if let Some(pos) = recentes.get(&id).copied().or_else(|| self.posicao(id)) {
+                        inversos.push(Passo::Removeu(self.entidades[pos].clone()));
+                        removidas.insert(id);
                     }
                 }
                 Mudanca::Alterar { id, camada, cor, props } => {
                     let total = self.camadas.len();
-                    if let Some(e) = self.entidades.iter_mut().find(|e| e.id == id) {
+                    let pos = if removidas.contains(&id) { None } else { recentes.get(&id).copied().or_else(|| self.posicao(id)) };
+                    if let Some(e) = pos.map(|p| &mut self.entidades[p]) {
                         let antiga = e.clone();
                         if let Some(c) = camada.filter(|c| *c < total) {
                             e.camada = c;
@@ -653,12 +688,16 @@ impl Documento {
                     }
                 }
                 Mudanca::Trocar(id, geometria) => {
-                    if let Some(e) = self.entidades.iter_mut().find(|e| e.id == id) {
+                    let pos = if removidas.contains(&id) { None } else { recentes.get(&id).copied().or_else(|| self.posicao(id)) };
+                    if let Some(e) = pos.map(|p| &mut self.entidades[p]) {
                         let antiga = Entidade { geometria: std::mem::replace(&mut e.geometria, geometria), ..e.clone() };
                         inversos.push(Passo::Trocou(antiga));
                     }
                 }
             }
+        }
+        if !removidas.is_empty() {
+            self.entidades.retain(|e| !removidas.contains(&e.id));
         }
         if !inversos.is_empty() {
             inversos.reverse();

@@ -1,8 +1,10 @@
 # FeatherCAD
 
-Aplicativo de CAD da suíte (ver o `README.md` da raiz). Esqueleto funcionando
-(motor, ponte, janela Tauri, aba Início com a ferramenta Linha); ver `CLAUDE.md`.
-Já nasce com o nome novo (não existe `OpenCAD`).
+**Direção atual — 07/10/2026: motor e interface 100% Rust, com Iced.**
+Prioridade: **FeatherSlide → FeatherDocs → FeatherSheet**; FeatherCAD
+depois, se houver tempo. O inventário abaixo registra funcionalidades e
+decisões anteriores; a migração da interface deste aplicativo ainda deve
+ser conferida no código, sem presumir que os recursos já existem em Iced.
 
 ## Formatos
 
@@ -12,13 +14,6 @@ Já nasce com o nome novo (não existe `OpenCAD`).
 - **Salvamento padrão configurável** pelo usuário nas configurações. Decisão
   de 29/09/2026: o padrão de fábrica é **`.dxf`**, por ser universal; o `.fcdz`
   fica como opção de quem quer o formato eficiente.
-
-## Arquitetura
-
-Igual à do FeatherSheet (`../feathersheet/docs/ARQUITETURA.md`): o motor em
-Rust é dono do desenho e faz a leitura/gravação de DXF; o TypeScript só
-desenha e manda os comandos do usuário. Nenhuma lógica de DXF no lado da
-interface.
 
 ## Referência
 

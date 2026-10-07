@@ -1,19 +1,5 @@
 # Plano de trabalho — tirar o Python do MCP
 
-> **Estado em 04/10/2026 (NÃO commitado):** feitos 0.1–0.5, 1.1–1.5, **1.7**, 2.1–2.6, **2.7**, 3.1–3.7, 4.1–4.3 (+4.4 pelo nome guardado na sessão), **4.2 `bordos`** e modelos do usuário.
-> **MCP ao vivo feito (04/10):** o MCP age no desenho aberto no app (ver `CLAUDE.md`, "MCP ao vivo"). Instância única do app, transporte TCP para o Windows (não rodado lá) e captura de pânico também feitos.
-> **Faltam:** 1.6 (HATCH no DXF, bloqueado: exige R2000+) e 4.2 `meio-fio`. Conferir `bordos` com um levantamento real (testado só com seções sintéticas).
-> **Fechado nesta rodada (04/10):** `cad_pdf papel:"auto"` (cada página no papel da própria folha) e `pdf_indice` em `cad_folha listar`;
-> `.fct` com `camera …` + `L3`/`P3` (projetados ao importar); `cad_via` lê `trilho_*`/`dormente_*` de `biblioteca/ferrovia/*.fct` (`trilho:"TR-57"`, `dormente:"concreto"`);
-> `cad_nuvem_feicoes {tipo:"bordos"}` (crista da plataforma + pé do talude; `desenhar:true`); `cad_modelo` roda `~/.config/feathercad/modelos/*.json`
-> (`{descricao, esquema, dados_padrao?, passos, retornar?}` = um `cad_lote`).
-> **Leiaute do modelo `ferrovia` com o CSV real:** rótulos de km à direita e TS/SC/CS/ST sempre à direita do eixo (estacas à esquerda), letras da rosa dos ventos
-> fora da ponta, perspectiva da prancha 3 na escala certa. `cad_verificar {leiaute}`: 24 → **8** `texto_sobre_texto` (todos entre rótulos de curvas coladas em 1:10000 —
-> inerente à escala, sem linha de chamada) e 0 `texto_sobre_linha`. Folhas 1, 3 e 5 conferidas por imagem; 2 e 4 ainda não.
-> Ajuste automático: RMS 0,237 / máx 0,785 (ref. manual 0,182 / 0,643), 13 curvas (ref. 12).
-> Código novo: core `viario/{alinhamento,superelevacao,greide,ajuste}.rs`, `nuvem.rs`, `trajeto.rs`; mcp `viario*.rs`, `via.rs`, `modelos.rs`, `nuvem_ferramentas.rs`,
-> `tabela/grafico/texto_bloco/detalhe/ao_longo/malha_norte/projecao/leiaute/dados/regras.rs`. Depois de `npm run mcp:build`, reconectar com `/mcp`.
-
 **Origem (01/10/2026).** Projeto ferroviário de teste: nuvem de pontos
 `levantamento_topografico.csv` (1 237 pontos, 6,2 km, bitola métrica, V = 65 km/h) virou 4 pranchas A0.
 O MCP fez ~20 % do trabalho (abrir, ver, folha, DXF/PDF); os outros 80 % foram scripts Python
@@ -26,15 +12,12 @@ sem nenhuma linha de Python**, e com bem menos tokens.
 1. **Toda conta é Rust.** Geometria e engenharia moram no `feathercad-core` (como `topografia.rs`
    já faz), em módulo próprio; a ferramenta MCP é só a casca (lê JSON, chama o core, desenha,
    devolve números). Assim o app ganha o mesmo recurso depois, sem reescrever.
-2. **Toda ferramenta nova devolve os números, não só desenha.** A IA precisa dos resultados
-   (TS/SC/CS/ST, he, I, levante…) para escrever o relatório sem recalcular.
 3. **Toda ferramenta nova funciona dentro do `cad_lote`** e é um passo de desfazer.
 4. **Limites normativos em tabela, não no código.** Um JSON de regras (embutido no binário + o do
    usuário em `~/.config/feathercad/regras/`), como a biblioteca de componentes. A norma muda,
    o binário não.
 5. **Teste com valores de referência** (tabela no fim deste arquivo): cada item só fecha quando
    reproduz os números do projeto de 01/10.
-6. Depois de `npm run mcp:build`, reconectar o MCP no Claude Code (`/mcp`).
 
 Legenda: ☐ a fazer · ◐ em andamento · ☑ feito.
 
@@ -178,10 +161,6 @@ Core novo: `crates/feathercad-core/src/viario/` (`alinhamento.rs`, `clotoide.rs`
 
 ☐ **3.1 `cad_alinhamento`** — `{pis:[[E,N]...], curvas:[{R, Ls}] (uma por PI interno),
 estaca_inicial?, passo_estaca?:20, desenhar?:{eixo, estacas, km, notaveis, rotulos}, camada_base?}`.
-- Conta: clotoide simétrica (θs, xs, ys pelas séries, p, k, Ts, E, Lc, Δ), integração do eixo,
-  validação (Lc ≥ mín, tangente entre curvas ≥ 0), estaqueamento `n+xx,xx` e `km+mmm`.
-- Devolve: por curva `{Δ, lado, R, Ls, Lc, Ts, E, θs, A, TS/SC/CS/ST:{estaca, km, E, N}}`, comprimento total,
-  e um **id de alinhamento** guardado no desenho (para as próximas ferramentas consultarem por estaca).
 - Consulta: `cad_alinhamento_ponto {id, estaca}` → E, N, azimute, curvatura, elemento (T/S/C).
 - Teste: os números da C6 na tabela de referência.
 
@@ -274,9 +253,7 @@ mesma pasta.
 | Ripagem | RMS 0,182 m; máx 0,643 m |
 | Levante | médio 0,087 m; máx 0,344 m; rebaixo máx 0,023 m |
 | Regras usadas | V 65 km/h; h_max 100 mm; I_max 50 mm; dh/dt 30 mm/s; rampa 1:600; ψ 0,35 m/s³; Ls ≥ 30 m, múltiplo de 10; h arredondado a 5 mm para cima; Rv 5 000 m |
-| C6 (crítica) | R 350; Δ 93,92° D; Ls 70; Lc 503,75; Ts 410,44; E 163,68; θs 5,730°; p 0,583; k 34,988; A 156,52 |
 | C6 superelevação | he 102,2 mm; h 100; I 2,2 mm; anc 0,020 m/s²; R_min 238,4 m; L_min 60,2 m; V_max 78,8 km/h; flecha 20 m 142,9 mm |
-| C6 estacas | TS 117+12,66; SC 121+02,66; CS 146+06,40; ST 149+16,40 |
 
 Raios das 12 curvas: 875, 405, 415, 380, 1100, 350, 510, 500, 725, 720, 750, 1150 m.
 

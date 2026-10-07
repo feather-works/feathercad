@@ -5,12 +5,6 @@ Servidor [MCP](https://modelcontextprotocol.io) do FeatherCAD. Conversa por **st
 
 ## Instalar
 
-```bash
-cd feathercad
-npm run mcp:build        # gera crates/feathercad-mcp/target/release/feathercad-mcp
-claude mcp add feathercad -- "$PWD/crates/feathercad-mcp/target/release/feathercad-mcp"
-```
-
 Em outro cliente MCP, o comando é só o caminho do binário (sem argumentos).
 
 ## Como a IA ganha "noção de espaço e geometria"

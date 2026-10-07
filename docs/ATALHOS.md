@@ -9,7 +9,6 @@ junto com o comando dele.
 
 Dois tipos de atalho, dois lugares — e os dois são do **Rust**:
 
-| Tipo | Exemplo | Onde mora | O TypeScript faz |
 | --- | --- | --- | --- |
 | **Tecla** (`Ctrl+G`, `F8`, `Esc`) | alterna grade | `feathercad-core/src/atalhos.rs`; a tecla é o mesmo em toda língua | traduz o evento do teclado em texto normalizado (`Ctrl+G`, `F8`, `Ctrl+Shift+H`) e manda ao Rust (`atalho`); mostra o estado que volta. **Não decide** o que a tecla faz |
 | **Apelido digitado** (`L`, `TR`, `CO`) | `L` = `LINHA` | `src/idiomas/comandos.<língua>.json` → `idioma_definir` → `Comandos` no Rust | manda o texto da linha de comando; mostra o prompt que volta |
@@ -142,17 +141,6 @@ QUICKCUI · `QP` PROPRIEDADESRAPIDAS ⚠ · `QSAVE` SALVARR · `QVD` VRDESENHO �
 `RA` REDESTUDO · `RC` RECORTARENDERIZ · `RE` REGEN · `REA` REGENTUDO · `REC`
 RETANGULO · `REG` REGIAO · `REN` RENOMEAR · `REV` REVOLUCAO · `RO` ROTAC ·
 `RP` PREDEFRENDERIZ · `RPR` PREFACABAM · `RR` RENDER · `RW` JANELARENDERIZ.
-
-### S – U
-`S` ESTICAR · `SC` ESCALA · `SCR` SCRIPT · `SEC` CORTE · `SET` DEFVAR · `SHA`
-MODOSOMBRA · `SL` FATIAR · `SN` SNAP · `SO` SOLIDO · `SP` ORTOGRAF · `SPE`
-EDITARSPLINE · `SPL` SPLINE · `SPLANE` PLANOCORTE · `SPLAY` REPROSEQUENCIA ·
-`SPLIT` DIVIDIRMALHA · `SSM` CONJUNTODEFOLHAS · `ST` ESTILO (de texto) · `STA`
-NORMAS · `SU` SUBTRAIR · `T` TEXTOM · `TA` ALINHARTEXTO · `TB` TABELA · `TEDIT`
-EDITARTEXTO · `TH` ESPESSURA · `TI` TILEMODE · `TO` BARRAFERR · `TOL`
-TOLERANCIA · `TOR` TOROIDE · `TP` PALETASFERRAM · `TR` APARAR (trim) · `TS`
-ESTILOTABELA · `UC` GERUCS · `UN` UNIDADES · `UNHIDE` / `UNISOLATE`
-UNISOLATEOBJECTS · `UNI` UNIAO.
 
 ### V – Z
 `V` VISTA · `VGO` IRPARAVISTA · `VP` DDVPOINT · `VPLAY` REPROVISTA · `VS`

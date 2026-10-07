@@ -5,12 +5,6 @@ do **AutoCAD LT 2026** com a aba **Home** ativa. Vai haver **várias sub-abas**
 na Ribbon (Home é só a primeira). Este arquivo só anota; nada aqui está
 implementado ainda.
 
-> **Regra que vale para tudo abaixo (dita pelo usuário):** o TypeScript é
-> *frontend*, só desenha. **Não calcula nada.** Snap, ortho, polar, distância,
-> ângulo, medida, cota, hachura, "qual objeto está sob o cursor", texto do
-> valor da entrada dinâmica, estado de camada — tudo isso é do Rust. O TS
-> traduz mouse/teclado em pedido e desenha a resposta.
-
 ## 1. Composição (de cima para baixo)
 
 1. **Barra de título / acesso rápido**
@@ -67,35 +61,16 @@ A lista de sub-abas é aberta: entra aba nova sem mexer nas outras (§5).
 
 ## 4. Paletas
 
-- **Gerenciador de Camadas:** tabela com Status, Nome, Ligada, Congelada,
-  Bloqueada, Plotar, Cor, Tipo de linha, Espessura; filtros em árvore
-  ("Todas", "Usadas", grupos); busca; "Inverter filtro"; contagem
-  "148 de 148 camadas". O TS mostra as linhas do quadro; ordenar e filtrar é
-  comando Rust (ver "nada por quadro pela ponte" na `RECEITA.md`).
-- **Paleta de Ferramentas:** abas verticais (Arquitetura, Mecânica, Elétrica,
-  Civil, Estrutural, Hachuras, Tabelas, Comandos, Chamadas…), com amostras
-  Imperial/Métrico. Conteúdo = blocos/ferramentas guardados pelo motor; o TS
-  só lista e dispara "inserir bloco X".
-
-## 5. Como isso se reparte (Rust × TS)
-
-| Coisa da tela | Rust (dono) | TS (só desenha) |
 | --- | --- | --- |
 | Botão da Ribbon | executa o comando; diz se está habilitado/ativo e o valor do dropdown (camada atual, cor…) | desenha o botão, manda o **nome** do comando |
-| Estrutura da Ribbon (abas → painéis → botões) | — | dado de interface em um lugar só (`ribbon.ts`), sub-abas como dados, para acrescentar aba sem tocar nas outras; menu do app deriva da mesma fonte |
 | Cursor / entrada dinâmica | recebe o ponto do mouse, devolve o **ponto já resolvido** (snap/ortho/polar/rastreio), as guias a desenhar e o **texto pronto** (`[10931.976 , -37074.202]`) | desenha a mira, as guias e as caixinhas com o texto recebido |
 | Interruptores do rodapé (Grade, Snap, Orto…) | guarda o estado e aplica no cálculo | botão liga/desliga = um comando; mostra o estado devolvido |
 | Linha de comando | interpreta o texto, mantém o comando ativo, devolve o prompt e o histórico | caixa de texto e lista; manda a linha digitada |
 | Seleção (janela, cruzamento, clique) | acha os ids sob o retângulo/ponto | traça o retângulo, manda os dois cantos |
-| Zoom / pan | — (é estado de vista, mora no TS e viaja como argumento) | guarda a janela de vista; o **quadro** é pedido para essa janela |
 | Camadas, blocos, propriedades | tudo | mostra as linhas do quadro |
 | Abas de arquivo / `*` sujo | sabe se está sujo | desenha a aba |
 | Abas Modelo/Pranchas | layouts e viewports | desenha as abas |
 | Cores, espessuras, tipos de linha na tela | resolve `PorCamada`/`PorBloco` para o valor final | pinta com o valor final |
-
-**Armadilha a evitar:** "é só uma continha, faço no TS" — distância entre
-pontos, ângulo do polar, arredondar coordenada para exibir. Nenhuma dessas é
-do TS; a coordenada aparece na tela **formatada pelo Rust**.
 
 ## 6. Ordem sugerida (proposta; confirmar antes de codar)
 

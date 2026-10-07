@@ -76,7 +76,6 @@ compensa.
 | OSNAP: interseção aparente, centro geométrico, `M2P` | **F2** | |
 | Rastreio (`OSTRACK`, F11) e polar (F10) | **F1** | polar e rastreio são cálculo de cursor: Rust (`cursor.rs`) |
 | Filtros `.X` / `.Y` | **F2** | pedido de coordenada parcial; interpretador da linha de comando |
-| `UCS` 2D | **F2** | o `Vista` e o cursor passam a ter uma matriz de eixo; nada de TS |
 
 ## 8. Referências externas e importação
 
