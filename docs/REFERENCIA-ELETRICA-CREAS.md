@@ -2,8 +2,8 @@
 
 Estudado em 04/10/2026 a pedido do usuário, para o MCP/Claude **saber como um projeto elétrico profissional
 brasileiro é feito** e repetir as convenções. Fonte: `~/Downloads/Projeto_Elétrico_CREAS-Model.pdf` (A1, 1:50,
-AutoCAD 2014). Uma cópia vetorial (só para conferência) está em `projeto_creas_copia.fcdz/.pdf/.dxf/.fct`
-na raiz do repositório. **O objetivo não é copiar vetores: é refazer com `cad_*`, seguindo isto.**
+AutoCAD 2014). Uma cópia vetorial (só para conferência) estava em `projeto_creas_copia.fcdz/.pdf/.dxf/.fct`
+na raiz do repositório (removida em 07/10/2026; recuperável no histórico do git). **O objetivo não é copiar vetores: é refazer com `cad_*`, seguindo isto.**
 
 ## 1. Composição da prancha (tudo numa A1)
 
