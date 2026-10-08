@@ -6,6 +6,8 @@
 //! `cursor_mover` devolve, de uma vez, o ponto resolvido, as guias, a prévia e
 //! o texto da entrada dinâmica.
 
+pub mod drawing_export;
+
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
