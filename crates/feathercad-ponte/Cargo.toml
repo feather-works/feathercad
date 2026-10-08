@@ -11,6 +11,8 @@ description = "A camada de comandos: o TypeScript pede, o motor no Rust responde
 # é do `src-tauri`, que entrega o documento pronto para cá).
 [dependencies]
 feathercad-core = { path = "../feathercad-core" }
+# Visualização vetorial somente na ponte: precisão f64 permanece no motor CAD.
+featheroffice-drawing = { path = "../../../featheroffice/crates/featheroffice-drawing" }
 # Ler/gravar DXF e .fcdz (só `zip` em Rust puro; compila também para o .wasm).
 feathercad-io = { path = "../feathercad-io" }
 serde = { version = "1", features = ["derive"] }
