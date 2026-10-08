@@ -18,6 +18,7 @@ ser conferida no código, sem presumir que os recursos já existem em Iced.
 ## Referência
 
 - `CLAUDE.md` — regras de trabalho e fila.
+- [Avaliação de precisão CAD × Drawing](../featheroffice/AVALIACAO-DRAWING-FEATHERCAD.md) (APP-013) — decisão de manter geometria, snap e persistência em `f64`; apenas projeção visual pode usar `f32` após `Vista::para_tela`. Contém matriz de compatibilidade, testes e critérios de integração. **Adoção da GUI não concluída.**
 - `docs/INTERFACE.md` — composição da tela e Ribbon com sub-abas.
 - `docs/DESDE-O-DIA-1.md` — língua em JSON e demais lições do FeatherSheet.
 - `docs/DXF-REFERENCIA.md` — estrutura do DXF extraída do ezdxf
