@@ -1,5 +1,15 @@
 # FeatherCAD
 
+> **Produto independente — repositório planejado:** `FeatherOffice/feathercad`.
+> O projeto ainda está nesta pasta do repositório de desenvolvimento; a separação Git não foi realizada.
+
+**CAD 2D:** formatos `.fcdz` e `.dxf`, com integração MCP planejada/desenvolvida conforme o estado do código; versões próprias.
+
+**Arquitetura compartilhada:** utiliza a base de motores Rust em [`featheroffice/`](../featheroffice/) e os componentes de interface Rust/Iced de [`feather-ui/`](../feather-ui/) quando aplicáveis. As dependências compartilhadas serão versionadas sem acoplar um produto ao código interno de outro.
+
+**Publicação prevista:** versão **alpha em 30/10/2026**. O produto terá distribuição própria e também poderá ser selecionado isoladamente ou junto aos demais em um **instalador geral planejado**. Isso não significa que a funcionalidade de instalação já esteja pronta.
+
+
 **Direção atual — 07/10/2026: motor e interface 100% Rust, com Iced.**
 Prioridade: **FeatherSlide → FeatherDocs → FeatherSheet**; FeatherCAD
 depois, se houver tempo. O inventário abaixo registra funcionalidades e
