@@ -12,7 +12,7 @@ description = "A camada de comandos: o TypeScript pede, o motor no Rust responde
 [dependencies]
 feathercad-core = { path = "../feathercad-core" }
 # Visualização vetorial somente na ponte: precisão f64 permanece no motor CAD.
-feather-draw = { git = "https://github.com/FeatherOffice/feather-draw", tag = "v0.1.0" }
+feather-draw = { git = "https://github.com/FeatherOffice/feather-draw", tag = "v0.1.1" }
 # Ler/gravar DXF e .fcdz (só `zip` em Rust puro; compila também para o .wasm).
 feathercad-io = { path = "../feathercad-io" }
 serde = { version = "1", features = ["derive"] }
@@ -29,7 +29,3 @@ opt-level = "s"
 too_many_lines = "deny"
 cognitive_complexity = "deny"
 
-# Provisório: até a tag v0.1.0 ser publicada em github.com/FeatherOffice/feather-draw,
-# usa a cópia local do repositório ao lado do monorepo.
-[patch."https://github.com/FeatherOffice/feather-draw"]
-feather-draw = { path = "../../../../feather-draw" }
