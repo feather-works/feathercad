@@ -7,7 +7,7 @@
 //! posterior; por enquanto o contrato limita-se às primitivas de contorno.
 
 use feathercad_core::{documento::Geometria, quadro, vista::Vista};
-use featheroffice_drawing::{Cena, Cor, Estilo, Figura, Ponto};
+use feather_draw::{Cena, Cor, Estilo, Figura, Ponto};
 
 const MAX_SEGMENTOS: usize = 20_000;
 // Pixels em que o espaçamento unitário ainda é representável por f32.

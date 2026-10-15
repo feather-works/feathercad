@@ -1,5 +1,5 @@
 //! APP-013: o motor CAD deve preservar f64 e apenas projetar para f32 na borda da GUI.
-//! Estes testes não importam featheroffice-drawing: Drawing é motor visual,
+//! Estes testes não importam feather-draw: Drawing é motor visual,
 //! não substitui operações geométricas, snapping nem serialização CAD.
 
 use feathercad_core::geom::{Ponto, Transf};
@@ -23,7 +23,7 @@ fn coordenadas_utm_com_detalhes_milimetricos_continuam_distintas() {
     assert_ne!(base.x, proximo.x);
     assert_ne!(base.y, proximo.y);
 
-    // Uma substituição por featheroffice-drawing::Ponto (f32) apagaria esses detalhes.
+    // Uma substituição por feather-draw::Ponto (f32) apagaria esses detalhes.
     assert_eq!(base.x as f32, proximo.x as f32);
     assert_eq!(base.y as f32, proximo.y as f32);
 }

@@ -4,7 +4,7 @@
 
 use feathercad_core::{documento::Geometria, geom::Ponto, vista::Vista};
 use feathercad_ponte::drawing_export::cena_das_primitivas;
-use featheroffice_drawing::exportar_svg;
+use feather_draw::exportar_svg;
 
 fn main() -> Result<(), String> {
     // Coordenadas grandes: convertidas para f32 apenas DEPOIS da câmera f64.
