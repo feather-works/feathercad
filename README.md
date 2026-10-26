@@ -1,6 +1,6 @@
 # FeatherCAD
 
-> **Produto independente — repositório planejado:** `FeatherOffice/feathercad`.
+> **Produto independente — repositório planejado:** `feather-works/feathercad`.
 > O projeto ainda está nesta pasta do repositório de desenvolvimento; a separação Git não foi realizada.
 
 **CAD 2D:** formatos `.fcdz` e `.dxf`, com integração MCP planejada/desenvolvida conforme o estado do código; versões próprias.
