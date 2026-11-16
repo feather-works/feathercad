@@ -2,7 +2,7 @@
 //! espelhar), esticar, descobrir o que o clique ou a janela pegou, matriz, e as formas
 //! prontas (retângulo, elipse). Aparar, concordância e hachura ficam em `aparar.rs`.
 
-use crate::documento::{Documento, Entidade, Geometria, Id, LinhaDePadrao, PROFUNDIDADE_MAXIMA};
+use crate::documento::{cantos_da_imagem, Documento, Entidade, Geometria, Id, LinhaDePadrao, PROFUNDIDADE_MAXIMA};
 use crate::geom::{amostrar_arco, normalizar_graus, segmento_com_bulge, varredura_graus, Ponto, Transf, Vertice};
 
 /// Aplica uma transformação de semelhança (deslocar, girar, escalar por igual, espelhar) a uma forma.
@@ -57,6 +57,11 @@ pub fn transformar(geo: &Geometria, t: &Transf) -> Geometria {
             p3: t.aplicar(*p3),
             p4: t.aplicar(*p4),
         },
+        Geometria::Imagem { origem, u, v, arquivo } => {
+            let [o, ou, _, ov] = cantos_da_imagem(*origem, *u, *v).map(|c| t.aplicar(c));
+            let menos = |a: Ponto, b: Ponto| Ponto::novo3d(a.x - b.x, a.y - b.y, a.z - b.z);
+            Geometria::Imagem { origem: o, u: menos(ou, o), v: menos(ov, o), arquivo: arquivo.clone() }
+        }
     }
 }
 
@@ -89,6 +94,7 @@ pub fn esticar(geo: &Geometria, janela: (Ponto, Ponto), dx: f64, dy: f64) -> Opt
             p3: mover(*p3),
             p4: mover(*p4),
         }),
+        Geometria::Imagem { origem, .. } => inteira(*origem),
     }
 }
 
@@ -190,6 +196,11 @@ fn distancia_no_nivel(doc: &Documento, geo: &Geometria, p: Ponto, nivel: u8) -> 
                 .min(distancia_ao_segmento(p, *p2, *p3))
                 .min(distancia_ao_segmento(p, *p3, *p4))
                 .min(distancia_ao_segmento(p, *p4, *p1))
+        }
+        // Como no AutoCAD, a imagem se escolhe pela moldura (senão roubaria o clique das linhas por cima).
+        Geometria::Imagem { origem, u, v, .. } => {
+            let c = cantos_da_imagem(*origem, *u, *v);
+            (0..4).map(|i| distancia_ao_segmento(p, c[i], c[(i + 1) % 4])).fold(f64::MAX, f64::min)
         }
     }
 }

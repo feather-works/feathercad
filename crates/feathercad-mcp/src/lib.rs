@@ -3,6 +3,7 @@
 
 pub mod agente;
 pub mod analise_ferramenta;
+pub mod arquitetura;
 pub mod ao_vivo;
 pub mod ao_longo;
 pub mod compacto;
@@ -29,6 +30,7 @@ pub mod leiaute;
 pub mod luminotecnico;
 pub mod lote;
 pub mod malha_norte;
+pub mod fiacao;
 pub mod medidas;
 pub mod modelos;
 pub mod notas;

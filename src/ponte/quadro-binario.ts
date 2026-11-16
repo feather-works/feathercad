@@ -3,7 +3,7 @@
  * roda na thread principal, num Worker e nos testes.
  */
 
-import type { MarcasDoFundo, Preenchimento, Quadro, TextoDoQuadro } from './tipos.ts';
+import type { ImagemDoQuadro, MarcasDoFundo, Preenchimento, Quadro, TextoDoQuadro } from './tipos.ts';
 
 const BYTES_POR_SEGMENTO = 24;
 const BYTES_POR_MARCA = 5;
@@ -67,6 +67,22 @@ function lerPreenchimentos(v: DataView, inicio: number): { preenchimentos: Preen
   return { preenchimentos, fim: o };
 }
 
+/** Lê a seção de imagens (a última do quadro; ausente num quadro mais antigo = nenhuma imagem). */
+function lerImagens(v: DataView, bytes: Uint8Array, inicio: number): ImagemDoQuadro[] {
+  if (inicio + 4 > v.byteLength) return [];
+  const n = v.getUint32(inicio, true);
+  const imagens: ImagemDoQuadro[] = [];
+  let o = inicio + 4;
+  for (let i = 0; i < n; i++) {
+    const f = (k: number): number => v.getFloat32(o + k * 4, true);
+    const tamanho = v.getUint16(o + 24, true);
+    const caminho = decodificador.decode(bytes.subarray(o + 26, o + 26 + tamanho));
+    imagens.push({ x: f(0), y: f(1), ux: f(2), uy: f(3), vx: f(4), vy: f(5), caminho });
+    o += 26 + tamanho;
+  }
+  return imagens;
+}
+
 /** Lê os bytes do quadro (formato em `crates/feathercad-core/src/quadro.rs`). */
 export function lerQuadro(bytes: Uint8Array): Quadro {
   const magia = String.fromCharCode(...bytes.subarray(0, 4));
@@ -91,5 +107,6 @@ export function lerQuadro(bytes: Uint8Array): Quadro {
   const ny = v.getUint32(fim + 4, true);
   const fundoX = lerMarcas(v, fim + 8, nx);
   const fundoY = lerMarcas(v, fim + 8 + nx * BYTES_POR_MARCA, ny);
-  return { tipo: 'novo', versao, xs, cores, espessuras, textos, preenchimentos, fundoX, fundoY };
+  const imagens = lerImagens(v, bytes, fim + 8 + (nx + ny) * BYTES_POR_MARCA);
+  return { tipo: 'novo', versao, xs, cores, espessuras, textos, preenchimentos, fundoX, fundoY, imagens };
 }

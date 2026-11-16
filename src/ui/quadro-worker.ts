@@ -7,12 +7,13 @@
 
 import type { Fundo, Vista } from '../ponte/tipos.ts';
 import { Nucleo, type Resumo } from './pintor-nucleo.ts';
-import type { CoresDaGrade } from './pintura.ts';
+import type { CoresDaGrade, ImagemCarregada } from './pintura.ts';
 
 export type PedidoAoWorker =
   | { t: 'tamanho'; largura: number; altura: number; dpr: number }
   | { t: 'pintar'; id: number; bytes: Uint8Array; vista: Vista; modo: Fundo; cores: CoresDaGrade; comTextos: boolean }
-  | { t: 'textos'; id: number; vista: Vista };
+  | { t: 'textos'; id: number; vista: Vista }
+  | { t: 'imagem'; caminho: string; imagem: ImagemCarregada };
 
 export type RespostaDoWorker =
   | { t: 'pronto'; id: number; resumo: Resumo | null; bitmapFundo: ImageBitmap | null; bitmapTextos: ImageBitmap | null }
@@ -30,6 +31,12 @@ escopo.onmessage = (e) => {
   const m = e.data;
   if (m.t === 'tamanho') {
     nucleo.tamanho(m.largura, m.altura, m.dpr);
+    return;
+  }
+  if (m.t === 'imagem') {
+    // Sem pedido esperando (id 0): a thread principal só instala a camada repintada.
+    const b = nucleo.instalarImagem(m.caminho, m.imagem);
+    if (b) escopo.postMessage({ t: 'pronto', id: 0, resumo: null, bitmapFundo: b, bitmapTextos: null }, [b]);
     return;
   }
   try {

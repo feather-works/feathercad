@@ -817,3 +817,18 @@ fn dxf_r12_avisa_que_a_espessura_de_linha_nao_e_gravada_e_o_fcdz_guarda() {
     limpo.adicionar_linha(feathercad_core::geom::Ponto::novo(0.0, 0.0), feathercad_core::geom::Ponto::novo(1.0, 0.0));
     assert!(!gravar(&limpo, Formato::Dxf).unwrap().avisos.iter().any(|m| m.chave == "aviso.espessuraNaoGravada"));
 }
+
+#[test]
+fn image_le_o_arquivo_do_imagedef_e_o_tamanho_inteiro_e_volta_pelo_fcdz() {
+    // 200 × 100 px, um pixel = 0,5 em U e 0,25 em V (inclinado); o IMAGEDEF (handle 2A) diz o arquivo.
+    let dxf = "0\nSECTION\n2\nENTITIES\n0\nIMAGE\n8\n0\n10\n3\n20\n4\n11\n0.5\n21\n0\n12\n0\n22\n0.25\n13\n200\n23\n100\n340\n2a\n0\nENDSEC\n0\nSECTION\n2\nOBJECTS\n0\nIMAGEDEF\n5\n2A\n1\n/tmp/planta.png\n10\n200\n20\n100\n0\nENDSEC\n0\nEOF\n";
+    let a = abrir(dxf.as_bytes()).unwrap();
+    assert!(a.avisos.is_empty(), "{:?}", a.avisos);
+    let esperada = Geometria::Imagem { origem: p(3.0, 4.0), u: p(100.0, 0.0), v: p(0.0, 25.0), arquivo: "/tmp/planta.png".into() };
+    assert_eq!(geometrias(&a.doc), std::slice::from_ref(&esperada));
+    let fcdz = gravar(&a.doc, Formato::Fcdz).unwrap();
+    assert_eq!(geometrias(&abrir(&fcdz.bytes).unwrap().doc), [esperada]);
+    // O DXF gravado é R12, que não tem IMAGE: avisa em vez de sumir calado.
+    let dxf = gravar(&a.doc, Formato::Dxf).unwrap();
+    assert!(dxf.avisos.iter().any(|m| m.chave == "aviso.imagemNaoGravada"), "{:?}", dxf.avisos);
+}

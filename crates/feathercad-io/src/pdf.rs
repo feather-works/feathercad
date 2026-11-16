@@ -163,6 +163,7 @@ fn caixa_do_desenho(doc: &Documento) -> Option<Caixa> {
             Geometria::Insercao { ponto, .. } => pts.push(*ponto),
             Geometria::Hachura { contornos, .. } => pts.extend(contornos.iter().flatten().map(|v| v.p)),
             Geometria::Face3D { p1, p2, p3, p4 } => pts.extend([*p1, *p2, *p3, *p4]),
+            Geometria::Imagem { origem, u, v, .. } => pts.extend(feathercad_core::documento::cantos_da_imagem(*origem, *u, *v)),
         }
     }
     if pts.is_empty() {
@@ -518,7 +519,33 @@ fn escrever_texto(t: &Texto, altura_pt: f64, papel: bool, o: &mut Vec<u8>) {
 }
 
 /// Uma página: o quadro da `janela` cabendo no papel (em pé ou deitado, conforme a janela).
-fn pagina(doc: &Documento, janela: Caixa, op: &Opcoes) -> Result<(f64, f64, Vec<u8>), String> {
+/// O conteúdo da página desenhado camada por camada, cada uma marcada como camada do PDF (`/OC /Ln BDC ... EMC`),
+/// para o leitor poder ligar e desligar; camada desligada ou congelada fica de fora (sem "Plotar" entra, mas começa
+/// desligada no leitor: ver `exportar`). Devolve também
+/// os índices das camadas que entraram.
+fn por_camadas(doc: &Documento, vista: &Vista, altura_pt: f64, papel: bool) -> Result<(Vec<u8>, Vec<usize>), String> {
+    let mut o = Vec::new();
+    let mut usadas = Vec::new();
+    for (i, c) in doc.camadas().iter().enumerate() {
+        if !c.visivel() || !doc.entidades().iter().any(|e| e.camada == i) {
+            continue;
+        }
+        let q = ler_quadro(&quadro::montar_fino_da_camada(doc, vista, true, TOLERANCIA_DO_ARCO_NO_PAPEL_PX, i))?;
+        if q.segmentos.is_empty() && q.preenchimentos.is_empty() && q.textos.is_empty() {
+            continue;
+        }
+        o.extend(format!("/OC /L{i} BDC\n").bytes());
+        o.extend(conteudo(&q, altura_pt, papel));
+        o.extend(b"EMC\n");
+        usadas.push(i);
+    }
+    Ok((o, usadas))
+}
+
+/// Uma página desenhada: largura, altura (pt), conteúdo e camadas usadas.
+type Pagina = (f64, f64, Vec<u8>, Vec<usize>);
+
+fn pagina(doc: &Documento, janela: Caixa, op: &Opcoes) -> Result<Pagina, String> {
     let (largura_u, altura_u) = (janela.1.x - janela.0.x, janela.1.y - janela.0.y);
     if largura_u <= 0.0 || altura_u <= 0.0 {
         return Err("folha sem tamanho".into());
@@ -530,8 +557,8 @@ fn pagina(doc: &Documento, janela: Caixa, op: &Opcoes) -> Result<(f64, f64, Vec<
             Some(f) => {
                 let (w, h) = (f.largura_mm * PT_POR_MM, f.altura_mm * PT_POR_MM);
                 let vista = Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala: (w / largura_u).min(h / altura_u), largura: w, altura: h, rotacao_x: 0.0, rotacao_z: 0.0 };
-                let bytes = quadro::montar_fino(doc, &vista, true, TOLERANCIA_DO_ARCO_NO_PAPEL_PX);
-                return Ok((w, h, conteudo(&ler_quadro(&bytes)?, h, op.modo_papel)));
+                let (c, usadas) = por_camadas(doc, &vista, h, op.modo_papel)?;
+                return Ok((w, h, c, usadas));
             }
             None => true,
         }
@@ -542,8 +569,8 @@ fn pagina(doc: &Documento, janela: Caixa, op: &Opcoes) -> Result<(f64, f64, Vec<
         let f = (14400.0 / PT_POR_MM / largura_u.max(altura_u)).min(1.0);
         let (w, h) = (largura_u * f * PT_POR_MM, altura_u * f * PT_POR_MM);
         let vista = Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala: w / largura_u, largura: w, altura: h, rotacao_x: 0.0, rotacao_z: 0.0 };
-        let bytes = quadro::montar_fino(doc, &vista, true, TOLERANCIA_DO_ARCO_NO_PAPEL_PX);
-        return Ok((w, h, conteudo(&ler_quadro(&bytes)?, h, op.modo_papel)));
+        let (c, usadas) = por_camadas(doc, &vista, h, op.modo_papel)?;
+        return Ok((w, h, c, usadas));
     }
     let (menor, maior) = (op.papel.largura_mm.min(op.papel.altura_mm) * PT_POR_MM, op.papel.largura_mm.max(op.papel.altura_mm) * PT_POR_MM);
     let deitado = match op.orientacao {
@@ -554,8 +581,8 @@ fn pagina(doc: &Documento, janela: Caixa, op: &Opcoes) -> Result<(f64, f64, Vec<
     let (w, h) = if deitado { (maior, menor) } else { (menor, maior) };
     let escala = (w / largura_u).min(h / altura_u);
     let vista = Vista { centro: Ponto::novo((janela.0.x + janela.1.x) / 2.0, (janela.0.y + janela.1.y) / 2.0), escala, largura: w, altura: h, rotacao_x: 0.0, rotacao_z: 0.0 };
-    let bytes = quadro::montar_fino(doc, &vista, true, TOLERANCIA_DO_ARCO_NO_PAPEL_PX);
-    Ok((w, h, conteudo(&ler_quadro(&bytes)?, h, op.modo_papel)))
+    let (c, usadas) = por_camadas(doc, &vista, h, op.modo_papel)?;
+    Ok((w, h, c, usadas))
 }
 
 /// O PDF com uma página por janela de `paginas` (em unidades do desenho).
@@ -569,7 +596,7 @@ pub fn exportar(doc: &Documento, paginas: &[Caixa], op: &Opcoes) -> Result<Vec<u
     }
     let mut pdf: Vec<u8> = Vec::new();
     let mut posicoes: Vec<usize> = Vec::new();
-    pdf.extend(b"%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+    pdf.extend(b"%PDF-1.5\n%\xE2\xE3\xCF\xD3\n");
     let mut objeto = |pdf: &mut Vec<u8>, id: usize, corpo: &[u8]| {
         if posicoes.len() < id {
             posicoes.resize(id, 0);
@@ -579,18 +606,34 @@ pub fn exportar(doc: &Documento, paginas: &[Caixa], op: &Opcoes) -> Result<Vec<u
         pdf.extend(corpo);
         pdf.extend(b"\nendobj\n");
     };
-    objeto(&mut pdf, 1, b"<< /Type /Catalog /Pages 2 0 R >>");
+    // camadas do PDF (Optional Content): um objeto por camada usada em alguma página, depois das páginas
+    let mut camadas: Vec<usize> = corpos.iter().flat_map(|c| c.3.iter().copied()).collect();
+    camadas.sort_unstable();
+    camadas.dedup();
+    let id_da_camada = |i: usize| 5 + 2 * corpos.len() + camadas.binary_search(&i).unwrap_or(0);
+    let lista = |filtro: &dyn Fn(usize) -> bool| camadas.iter().filter(|&&i| filtro(i)).map(|&i| format!("{} 0 R", id_da_camada(i))).collect::<Vec<_>>().join(" ");
+    let refs = lista(&|_| true);
+    // "Plotar" desligado = camada do PDF que começa desligada (não aparece nem imprime até ligar no leitor)
+    let ligadas = lista(&|i| doc.camadas()[i].plotar);
+    let desligadas = lista(&|i| !doc.camadas()[i].plotar);
+    objeto(&mut pdf, 1, format!("<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [{refs}] /D << /Order [{refs}] /ON [{ligadas}] /OFF [{desligadas}] >> >> >>").as_bytes());
     let filhas: Vec<String> = (0..corpos.len()).map(|i| format!("{} 0 R", 5 + 2 * i)).collect();
     objeto(&mut pdf, 2, format!("<< /Type /Pages /Kids [{}] /Count {} >>", filhas.join(" "), corpos.len()).as_bytes());
     objeto(&mut pdf, 3, b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
     objeto(&mut pdf, 4, b"<< /Type /Font /Subtype /Type1 /BaseFont /Symbol >>");
-    for (i, (w, h, c)) in corpos.iter().enumerate() {
+    for (i, (w, h, c, usadas)) in corpos.iter().enumerate() {
         let (pag, cont) = (5 + 2 * i, 6 + 2 * i);
-        objeto(&mut pdf, pag, format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {} {}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents {cont} 0 R >>", n(*w), n(*h)).as_bytes());
+        let props: String = usadas.iter().map(|&k| format!("/L{k} {} 0 R ", id_da_camada(k))).collect();
+        objeto(&mut pdf, pag, format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {} {}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /Properties << {props}>> >> /Contents {cont} 0 R >>", n(*w), n(*h)).as_bytes());
         let mut fluxo = format!("<< /Length {} >>\nstream\n", c.len()).into_bytes();
         fluxo.extend(c);
         fluxo.extend(b"\nendstream");
         objeto(&mut pdf, cont, &fluxo);
+    }
+    for &i in &camadas {
+        // nome em UTF-16BE com BOM: acento e cedilha aparecem certos no painel de camadas do leitor
+        let nome: String = doc.camadas()[i].nome.encode_utf16().map(|u| format!("{u:04X}")).collect();
+        objeto(&mut pdf, id_da_camada(i), format!("<< /Type /OCG /Name <FEFF{nome}> >>").as_bytes());
     }
     let inicio_xref = pdf.len();
     pdf.extend(format!("xref\n0 {}\n0000000000 65535 f \n", posicoes.len() + 1).bytes());

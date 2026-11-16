@@ -197,22 +197,29 @@ fn simbolos_e_eletroduto_da_nbr_5444() {
     assert!(erro);
     s.json("cad_novo", json!({ "unidade": "cm" }));
     // Tomada média: barra, haste, triângulo, metade cheia e rótulo. 1 mm de papel a 1:50 em cm = 5 cm.
-    let t = s.json("cad_simbolo", json!({ "nome": "tomada_media", "ponto": [100, 50], "parede": "norte", "circuito": 3 }));
+    let t = s.json("cad_simbolo", json!({ "nome": "tomada_media", "ponto": [100, 50], "parede": "norte", "circuito": 3, "bloco": false }));
     let ids = t["ids"].as_array().unwrap().len();
     assert_eq!(ids, 5, "{t}");
     let barra = s.json("cad_entidades", json!({ "tipo": "linha" }));
     let comprimentos: Vec<f64> = barra["entidades"].as_array().unwrap().iter().map(|e| e["comprimento"].as_f64().unwrap()).collect();
     assert!(comprimentos.iter().any(|c| (c - 25.0).abs() < 1e-6), "a barra tem 5 mm de papel = 25 cm: {comprimentos:?}");
     // O terceiro nível: dupla tem dois triângulos; o texto do circuito fica na horizontal.
-    let d = s.json("cad_simbolo", json!({ "nome": "tomada_alta", "ponto": [300, 50], "parede": "oeste", "quantidade": 2 }));
+    let d = s.json("cad_simbolo", json!({ "nome": "tomada_alta", "ponto": [300, 50], "parede": "oeste", "quantidade": 2, "bloco": false }));
     assert!(d["ids"].as_array().unwrap().len() >= 6);
-    let l = s.json("cad_simbolo", json!({ "nome": "ponto_luz_teto", "ponto": [500, 200], "comando": "a", "circuito": 4, "potencia": 100, "quantidade": 2 }));
+    let l = s.json("cad_simbolo", json!({ "nome": "ponto_luz_teto", "ponto": [500, 200], "comando": "a", "circuito": 4, "potencia": 100, "quantidade": 2, "bloco": false }));
     assert!(l["ids"].as_array().unwrap().len() >= 4);
     let textos = s.json("cad_entidades", json!({ "tipo": "texto" }));
     let conteudos: Vec<&str> = textos["entidades"].as_array().unwrap().iter().filter_map(|e| e["conteudo"].as_str()).collect();
     for esperado in ["-4-", "2x100W", "a"] {
         assert!(conteudos.contains(&esperado), "falta o texto {esperado}: {conteudos:?}");
     }
+    // Por padrão o símbolo é UM bloco, e a contagem para a lista de materiais vem pelo nome dele.
+    for x in [700, 800] {
+        let b = s.json("cad_simbolo", json!({ "nome": "tomada_baixa", "ponto": [x, 50], "parede": "norte", "circuito": 5 }));
+        assert_eq!(b["ids"].as_array().unwrap().len(), 1, "{b}");
+    }
+    let c = s.json("cad_contar", json!({ "simbolos": true }));
+    assert_eq!(c["por_simbolo"]["tomada_baixa"], 2, "{c}");
     // Eletroduto com condutores: 3 circuitos + terra; a bandeirinha traz o Ø automático.
     let e = s.json("cad_eletroduto", json!({ "pontos": [[0, 0], [400, 0], [400, 300]], "condutores": [
         { "circuito": 1, "tipo": "fase" }, { "circuito": 1, "tipo": "neutro" },

@@ -120,6 +120,9 @@ fn editar_ou_criar(ag: &mut Agente, nome: &str, args: &Value) -> Res<Value> {
         "cad_simbolo" => simbolo(&mut ag.doc, args),
         "cad_componente" => crate::componentes::componente(&mut ag.doc, args),
         "cad_eletroduto" => eletroduto(&mut ag.doc, args),
+        "cad_parede" => crate::arquitetura::parede(&mut ag.doc, args),
+        "cad_ambiente" => crate::arquitetura::ambiente(&mut ag.doc, args),
+        "cad_ramais" => crate::arquitetura::ramais(&mut ag.doc, args),
         "cad_carimbo" => crate::carimbo::carimbo(&mut ag.doc, args),
         "cad_notas_padrao" => crate::notas::notas(&mut ag.doc, args),
         "cad_luminotecnico" => crate::luminotecnico::luminotecnico(&mut ag.doc, args),
@@ -138,6 +141,7 @@ fn editar_ou_criar(ag: &mut Agente, nome: &str, args: &Value) -> Res<Value> {
         "cad_superelevacao" => crate::viario::superelevacao(ag, args),
         "cad_ao_longo" => crate::ao_longo::ao_longo(&mut ag.doc, args),
         "cad_malha_coordenadas" => crate::malha_norte::malha(&mut ag.doc, args),
+        "cad_fiacao" => crate::fiacao::fiacao(&mut ag.doc, args),
         "cad_norte" => crate::malha_norte::norte(&mut ag.doc, args),
         "cad_projetar" => crate::projecao::projetar_ferramenta(&mut ag.doc, args),
         "cad_detalhe" => crate::detalhe::detalhe(&mut ag.doc, args),
@@ -160,7 +164,13 @@ pub fn chamar(ag: &mut Agente, fonte: &Fonte, nome: &str, args: &Value) -> Res<C
         }
         "cad_novo" => ag.novo(texto_de(args, "unidade")?).map(|v| texto(&v)),
         "cad_abrir" => ag.abrir(texto_de(args, "caminho")?).map(|v| texto(&v)),
-        "cad_salvar" => ag.salvar(texto_opcional(args, "caminho"), args.get("sobrescrever").and_then(Value::as_bool).unwrap_or(false), args.get("verificar_checklist").and_then(Value::as_bool).unwrap_or(false), texto_opcional(args, "dominio")).map(|v| texto(&v)),
+        "cad_salvar" => ag.salvar(texto_opcional(args, "caminho"), args.get("sobrescrever").and_then(Value::as_bool).unwrap_or(false), args.get("verificar_checklist").and_then(Value::as_bool).unwrap_or(false), texto_opcional(args, "dominio")).map(|mut v| {
+            // o esquema promete `leiaute`; antes ele era aceito e ignorado, e texto sobre texto passava calado
+            if args.get("leiaute").and_then(Value::as_bool).unwrap_or(false) {
+                v["leiaute"] = crate::leiaute::verificar_leiaute_com(&ag.doc, args.get("limite").and_then(Value::as_u64).map_or(40, |n| n as usize));
+            }
+            texto(&v)
+        }),
         "cad_converter" => converter(texto_de(args, "origem")?, texto_de(args, "destino")?, args.get("sobrescrever").and_then(Value::as_bool).unwrap_or(false)).map(|v| texto(&v)),
         "cad_resumo" => Ok(texto(&resumo(ag))),
         "cad_projeto" => crate::receita::projeto(&ag.doc, args).map(|v| texto(&v)),

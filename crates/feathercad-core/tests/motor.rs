@@ -169,7 +169,7 @@ fn quadro_leva_so_o_que_cabe_e_diz_quando_nada_mudou() {
     assert_eq!(&q[..4], MAGIA_NOVO);
     let n = u32::from_le_bytes(q[12..16].try_into().unwrap());
     assert_eq!(n, 1, "a linha fora da janela não vai");
-    assert_eq!(q.len(), 16 + BYTES_POR_SEGMENTO + 4 + 4 + 8, "segmento + contador de textos + contador de preenchimentos + os dois contadores do fundo (vazio)");
+    assert_eq!(q.len(), 16 + BYTES_POR_SEGMENTO + 4 + 4 + 8 + 4, "segmento + contador de textos + contador de preenchimentos + os dois contadores do fundo (vazio) + contador de imagens");
     assert_eq!(montar(&d, &v, Some(d.versao()), None, false), MAGIA_IGUAL);
     let x1 = f32::from_le_bytes(q[16..20].try_into().unwrap());
     assert!((x1 - 400.0).abs() < 1e-3);

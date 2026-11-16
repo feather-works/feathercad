@@ -79,6 +79,13 @@ circuitos que passam ali; embaixo, a seção (só quando não é 1,5 mm²). Um e
 (ex.: circuitos 1, 3, 4 = fases e neutros de cada um + um terra). Diâmetro: deixe em automático (ocupação máx. 40 %) ou informe. Ao chegar num interruptor levam-se \
 retorno(s) e, no paralelo/intermediário, dois retornos entre os interruptores.
 
+4b. TRAÇADO QUE UM ELETRICISTA ACEITA (o que a planta precisa respeitar; errar aqui obriga a refazer o desenho):
+   - Arquitetura primeiro e de verdade: cad_parede desenha a parede cheia com espessura e os vãos (porta com folha e arco, porta de correr, janela, passagem); cad_ambiente escreve nome e área. Linha solta não é parede.
+   - Tomada e interruptor ficam na FACE da parede: cad_simbolo com `encostar: true` acha a parede mais próxima, encosta o símbolo e gira sozinho. Nunca no meio do ambiente, nunca dentro de vão de porta ou janela baixa.
+   - Interruptor ao lado da porta, do lado da fechadura (oposto à dobradiça), por dentro do ambiente que comanda, a 10–20 cm do batente.
+   - Ramal (tomada, interruptor) corre DENTRO da parede, encadeando os pontos daquela parede, e é interrompido em toda porta e passagem: não existe cabo passando por cima de porta. Do ponto de luz no teto desce-se perpendicular até a parede (uma descida por trecho de parede). cad_ramais {ambiente} faz exatamente isso a partir das paredes e dos símbolos já desenhados.
+   - Tronco que sai do quadro (vários circuitos num eletroduto) anda por parede ou forro de circulação, em trechos retos e ortogonais, sem diagonal atravessando ambientes e sem cruzar porta.
+
 5. CIRCUITOS E FASES. Numere os circuitos (1, 2, 3…), dê a cada ponto de luz a letra do seu comando e o número do circuito, e distribua as cargas entre as fases \
 (A/B/C ou F1/F2) para equilibrar. Bifásico = 2 fases + neutro + terra (127/220 V); chuveiro entre as duas fases, sem neutro. Calcule a corrente (P/V), escolha o \
 disjuntor e a seção, e verifique a queda de tensão no ponto mais distante de cada circuito (dV% = 2·ρ·L·I / (S·V), ρ = 0,0225 Ω·mm²/m; máx. 4 % no circuito terminal). \

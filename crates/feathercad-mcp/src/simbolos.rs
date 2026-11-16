@@ -106,12 +106,14 @@ fn tomada(nivel: Nivel, p: &Par) -> Peca {
             Nivel::Alta => c.cheio(&[(-1.8, base), (1.8, base), (0.0, ponta)]),
         }
     }
-    let h = p.altura_texto;
-    if let Some(t) = &p.circuito {
-        c.texto((3.0, -3.0), h, t);
-    }
-    if let Some(t) = p.potencia_formatada() {
-        c.texto((3.0, -3.0 - h * 1.4), h, &t);
+    // circuito e potência num texto só ("11 100W"): duas linhas empilhadas viravam "11100W" com o símbolo girado
+    let rotulo = match (&p.circuito, p.potencia_formatada()) {
+        (Some(c), Some(w)) => Some(format!("{c} {w}")),
+        (Some(c), None) => Some(c.clone()),
+        (None, w) => w,
+    };
+    if let Some(t) = rotulo {
+        c.texto((3.0, -3.0), p.altura_texto, &t);
     }
     c
 }
@@ -277,15 +279,16 @@ fn luminaria_3_celulas(p: &Par) -> Peca {
     c.retangulo((-6.0, -2.2), (6.0, 2.2));
     c.linha((0.6, -2.2), (0.6, 2.2));
     c.linha((3.6, -2.2), (3.6, 2.2));
-    let h = p.altura_texto;
-    if let Some(t) = p.potencia_formatada() {
-        c.texto((-5.6, -h * 0.35), h, &t);
-    }
-    if let Some(t) = &p.circuito {
-        c.texto((1.0, -h * 0.35), h, t);
-    }
-    if let Some(t) = &p.comando {
-        c.texto((4.1, -h * 0.35), h, t);
+    // cada texto cabe na sua célula: "1500W" a 1,8 mm passava da primeira e caía em cima do circuito
+    let cabe = |t: &str, largura: f64| {
+        let w = feathercad_io::pdf::largura_do_conteudo(t, p.altura_texto);
+        if w > largura { p.altura_texto * largura / w } else { p.altura_texto }
+    };
+    for (t, x, largura) in [(p.potencia_formatada(), -5.6, 5.8), (p.circuito.clone(), 1.0, 2.2), (p.comando.clone(), 4.0, 1.7)] {
+        if let Some(t) = t {
+            let h = cabe(&t, largura);
+            c.texto((x, -h * 0.35), h, &t);
+        }
     }
     c
 }
@@ -412,6 +415,8 @@ pub fn listar() -> Value {
         "simbolos": todos,
         "comuns": "ponto [x,y] (obrigatório), escala (denominador, padrão 50 = 1:50), rotacao (graus anti-horário), camada, cor, altura_texto (mm no papel, padrão 1,8)",
         "parede": "tomadas: `parede` diz onde está a parede em relação ao símbolo; ele aponta para o lado oposto (parede norte → aponta para baixo/sul). `rotacao` faz o mesmo em graus.",
+        "encostar": "`encostar: true` (tomadas, interruptores, arandela): acha a parede desenhada mais próxima (até 1 m), põe o símbolo na face dela e gira sozinho; prefira a `parede`",
+        "bloco": "cada símbolo vira UM bloco `SIMB-<nome>-<n>` (mover/apagar = uma entidade; cad_contar {simbolos:true} conta por nome; cad_ramais acha tomadas e luzes por ele). `bloco: false` = formas soltas, como antes",
         "so_para": "projeto elétrico (NBR 5444/5410)",
     })
 }
@@ -434,19 +439,86 @@ pub fn mm_de_papel(doc: &Documento, denominador: f64) -> Res<f64> {
 }
 
 /// Leva a peça (mm de papel) para o desenho: escala, giro e posição. Texto sempre na horizontal.
+///
+/// Sem giro, os rótulos ficam onde a peça os pôs. Com giro, girar cada texto em volta do símbolo desmancha o empilhamento
+/// (o circuito em cima da potência vira circuito AO LADO da potência: "11100W"). Então os rótulos andam juntos, como um
+/// bloco horizontal: o bloco vai para o lado em que estava (o centro dele girado) e encosta no desenho com uma folga.
 pub fn colocar(peca: &Peca, s: f64, giro: f64, alvo: Ponto) -> Vec<(Geometria, Option<TipoLinha>)> {
     let o = Ponto::novo(0.0, 0.0);
+    let sem_giro = giro.rem_euclid(360.0).min(360.0 - giro.rem_euclid(360.0)) < 1e-9;
+    let desloc = if sem_giro { (0.0, 0.0) } else { deslocamento_dos_rotulos(peca, s, giro) };
     peca.formas
         .iter()
         .map(|(g, t)| {
-            let g = transformar(&transformar(&transformar(g, &Transf::escalar(o, s)), &Transf::girar(o, giro)), &Transf::mover(alvo.x, alvo.y));
             let g = match g {
-                Geometria::Texto { ponto, altura, conteudo, h, v, .. } => Geometria::Texto { ponto, altura, rotacao: 0.0, conteudo, h, v },
-                outra => outra,
+                Geometria::Texto { ponto, altura, conteudo, h, v, .. } => Geometria::Texto {
+                    ponto: Ponto::novo(alvo.x + ponto.x * s + desloc.0, alvo.y + ponto.y * s + desloc.1),
+                    altura: altura * s,
+                    rotacao: 0.0,
+                    conteudo: conteudo.clone(),
+                    h: *h,
+                    v: *v,
+                },
+                outra => transformar(&transformar(&transformar(outra, &Transf::escalar(o, s)), &Transf::girar(o, giro)), &Transf::mover(alvo.x, alvo.y)),
             };
             (g, *t)
         })
         .collect()
+}
+
+/// A caixa (min, max) dos textos da peça, já na escala `s`, sem giro.
+fn caixa_dos_rotulos(peca: &Peca, s: f64) -> Option<(P, P)> {
+    let mut caixa: Option<(P, P)> = None;
+    for (g, _) in &peca.formas {
+        if let Geometria::Texto { ponto, altura, conteudo, h, v, .. } = g {
+            let c = crate::leiaute::caixa_do_texto(Ponto::novo(ponto.x * s, ponto.y * s), altura * s, 0.0, conteudo, *h, *v);
+            for p in c {
+                caixa = Some(match caixa {
+                    None => ((p.x, p.y), (p.x, p.y)),
+                    Some((a, b)) => ((a.0.min(p.x), a.1.min(p.y)), (b.0.max(p.x), b.1.max(p.y))),
+                });
+            }
+        }
+    }
+    caixa
+}
+
+/// A caixa do desenho (sem os textos) já escalado e girado, em volta da origem do símbolo.
+fn caixa_do_desenho(peca: &Peca, s: f64, giro: f64) -> Option<(P, P)> {
+    let o = Ponto::novo(0.0, 0.0);
+    let mut caixa: Option<(P, P)> = None;
+    for (g, _) in peca.formas.iter().filter(|(g, _)| !matches!(g, Geometria::Texto { .. })) {
+        transformar(&transformar(g, &Transf::escalar(o, s)), &Transf::girar(o, giro)).para_cada_ponto_de_caixa(&mut |p| {
+            caixa = Some(match caixa {
+                None => ((p.x, p.y), (p.x, p.y)),
+                Some((a, b)) => ((a.0.min(p.x), a.1.min(p.y)), (b.0.max(p.x), b.1.max(p.y))),
+            });
+        });
+    }
+    caixa
+}
+
+/// Quanto o bloco de rótulos anda (sem girar) para ficar do lado certo do símbolo girado, encostado com folga.
+fn deslocamento_dos_rotulos(peca: &Peca, s: f64, giro: f64) -> (f64, f64) {
+    let (Some((t0, t1)), Some((d0, d1))) = (caixa_dos_rotulos(peca, s), caixa_do_desenho(peca, s, giro)) else { return (0.0, 0.0) };
+    // rótulos em volta do símbolo (ponto de luz: comando em cima, circuito embaixo): o símbolo é redondo, deixa como está
+    if t0.0 <= 0.0 && t1.0 >= 0.0 && t0.1 <= 0.0 && t1.1 >= 0.0 {
+        return (0.0, 0.0);
+    }
+    let c = ((t0.0 + t1.0) / 2.0, (t0.1 + t1.1) / 2.0);
+    let (sn, cs) = giro.to_radians().sin_cos();
+    let cg = (c.0 * cs - c.1 * sn, c.0 * sn + c.1 * cs);
+    let n = cg.0.hypot(cg.1).max(1e-12);
+    let u = (cg.0 / n, cg.1 / n);
+    let (mw, mh) = ((t1.0 - t0.0) / 2.0, (t1.1 - t0.1) / 2.0);
+    let folga = 0.6 * s;
+    let livre = |p: (f64, f64)| p.0 + mw + folga <= d0.0 || p.0 - mw - folga >= d1.0 || p.1 + mh + folga <= d0.1 || p.1 - mh - folga >= d1.1;
+    let passo = 0.05 * s;
+    let mut t = 0.0;
+    while !livre((u.0 * t, u.1 * t)) && t < 200.0 * s {
+        t += passo;
+    }
+    (u.0 * t - c.0, u.1 * t - c.1)
 }
 
 /// Grava as formas no desenho, na camada e cor pedidas (um passo de desfazer).
@@ -471,6 +543,84 @@ pub fn simbolo(doc: &mut Documento, args: &Value) -> Res<Value> {
         Some(p) => giro_da_parede(p).ok_or_else(|| format!("{PAREDE}: `{p}` não vale"))?,
         None => numero_opcional(args, "rotacao").unwrap_or(0.0),
     };
-    let ids = gravar(doc, colocar(&peca, s, giro, alvo), args, None)?;
-    Ok(json!({ "simbolo": nome, "ids": ids, "ponto": [alvo.x, alvo.y] }))
+    let (alvo, giro) = if args.get("encostar").and_then(Value::as_bool).unwrap_or(false) { crate::arquitetura::encostar(doc, nome, alvo, s)? } else { (alvo, giro) };
+    if !args.get("bloco").and_then(Value::as_bool).unwrap_or(true) {
+        let ids = gravar(doc, colocar(&peca, s, giro, alvo), args, None)?;
+        return Ok(json!({ "simbolo": nome, "ids": ids, "ponto": [alvo.x, alvo.y], "giro": giro }));
+    }
+    // um bloco por símbolo (`SIMB-<nome>-<n>`): mover, apagar e trocar é UMA entidade, e contar/achar tomadas é por nome
+    let cor = texto_opcional(args, "cor").map(cor_hex).transpose()?;
+    let camada = match texto_opcional(args, "camada") {
+        Some(n) => camada_por_nome(doc, n)?,
+        None => doc.camada_atual(),
+    };
+    let mut n = doc.blocos().len() + 1;
+    while doc.bloco_por_nome(&format!("{}{nome}-{n}", crate::arquitetura::PREFIXO_SIMBOLO)).is_some() {
+        n += 1;
+    }
+    let nome_bloco = format!("{}{nome}-{n}", crate::arquitetura::PREFIXO_SIMBOLO);
+    // camada 0 dentro do bloco: as formas tomam a camada da inserção
+    let dentro = colocar(&peca, s, giro, Ponto::novo(0.0, 0.0)).into_iter().map(|(geometria, tipo)| NovaEntidade { camada: 0, cor, geometria, props: Propriedades { tipo_linha: tipo, ..Propriedades::default() }, espaco: Espaco::default() }).collect();
+    let id = doc.adicionar_bloco_inserido(&nome_bloco, dentro, alvo, 1.0, camada).ok_or("não consegui criar o bloco do símbolo")?;
+    Ok(json!({ "simbolo": nome, "ids": [id], "bloco": nome_bloco, "ponto": [alvo.x, alvo.y], "giro": giro }))
+}
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    fn caixas_de_texto(formas: &[(Geometria, Option<TipoLinha>)]) -> Vec<(String, [Ponto; 4])> {
+        formas
+            .iter()
+            .filter_map(|(g, _)| match g {
+                Geometria::Texto { ponto, altura, rotacao, conteudo, h, v } => Some((conteudo.clone(), crate::leiaute::caixa_do_texto(*ponto, *altura, *rotacao, conteudo, *h, *v))),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn faixa(c: &[Ponto; 4]) -> (P, P) {
+        let xs = c.iter().map(|p| p.x);
+        let ys = c.iter().map(|p| p.y);
+        ((xs.clone().fold(f64::MAX, f64::min), ys.clone().fold(f64::MAX, f64::min)), (xs.fold(f64::MIN, f64::max), ys.fold(f64::MIN, f64::max)))
+    }
+
+    fn cruzam(a: (P, P), b: (P, P)) -> bool {
+        let e = 1e-6;
+        a.0 .0 < b.1 .0 - e && b.0 .0 < a.1 .0 - e && a.0 .1 < b.1 .1 - e && b.0 .1 < a.1 .1 - e
+    }
+
+    /// Todo símbolo do catálogo, com todos os rótulos, nos quatro giros: nenhum texto em cima de outro. Tomadas e
+    /// interruptores (os que se giram de verdade) também não podem ter texto em cima do desenho.
+    #[test]
+    fn rotulos_nao_se_sobrepoem_em_nenhum_giro() {
+        let par = Par { circuito: Some("12".into()), comando: Some("ab".into()), potencia: Some("1500".into()), quantidade: 1, altura_texto: 1.8 };
+        for info in CATALOGO {
+            let peca = montar(info.nome, &par).expect(info.nome);
+            for giro in [0.0, 90.0, 180.0, 270.0] {
+                let formas = colocar(&peca, 1.0, giro, Ponto::novo(0.0, 0.0));
+                let textos = caixas_de_texto(&formas);
+                for i in 0..textos.len() {
+                    for j in i + 1..textos.len() {
+                        assert!(!cruzam(faixa(&textos[i].1), faixa(&textos[j].1)), "{} a {giro}°: `{}` em cima de `{}`", info.nome, textos[i].0, textos[j].0);
+                    }
+                }
+                if info.nome.starts_with("tomada") || info.nome.starts_with("interruptor") {
+                    let desenho = caixa_do_desenho(&peca, 1.0, giro).unwrap();
+                    for (t, c) in &textos {
+                        assert!(!cruzam(faixa(c), desenho), "{} a {giro}°: `{t}` em cima do símbolo", info.nome);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn tomada_na_parede_oeste_tem_rotulo_legivel() {
+        let par = Par { circuito: Some("11".into()), comando: None, potencia: Some("100".into()), quantidade: 1, altura_texto: 1.8 };
+        let formas = colocar(&tomada(Nivel::Baixa, &par), 1.0, 90.0, Ponto::novo(0.0, 0.0));
+        let textos = caixas_de_texto(&formas);
+        assert_eq!(textos.len(), 1);
+        assert_eq!(textos[0].0, "11 100W");
+    }
 }

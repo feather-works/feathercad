@@ -43,6 +43,13 @@ export async function ponteBinaria(comando: string, corpo: unknown): Promise<Uin
   return r instanceof Uint8Array ? r : new Uint8Array(r);
 }
 
+/** Os bytes do arquivo de uma imagem do desenho (o caminho vem do `IMAGE` do DXF). */
+export async function lerImagem(caminho: string): Promise<Uint8Array> {
+  const r = await chamar<ArrayBuffer | number[] | Uint8Array>('imagem_ler', { caminho });
+  if (r instanceof ArrayBuffer) return new Uint8Array(r);
+  return r instanceof Uint8Array ? r : new Uint8Array(r);
+}
+
 // ---------------------------------------------------------------------------
 // Arquivos e página inicial (`src-tauri/src/arquivos.rs`). O que abre e grava é o
 // Rust; aqui só o pedido. Cada um devolve o **estado novo** do motor, ou `null`

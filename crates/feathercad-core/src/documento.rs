@@ -96,6 +96,15 @@ pub enum Geometria {
     Insercao { bloco: usize, ponto: Ponto, escala_x: f64, escala_y: f64, rotacao: f64 },
     /// Texto de uma linha. `rotacao` em graus; `altura` em unidades do desenho.
     Texto { ponto: Ponto, altura: f64, rotacao: f64, conteudo: String, h: AlinhaH, v: AlinhaV },
+    /// Imagem raster (`IMAGE`) ligada a um arquivo: `origem` é o canto de baixo à esquerda, `u` o vetor da
+    /// largura inteira e `v` o da altura inteira (giro e inclinação vêm deles). O arquivo não entra no desenho.
+    Imagem { origem: Ponto, u: Ponto, v: Ponto, arquivo: String },
+}
+
+/// Os quatro cantos de uma imagem: baixo-esquerda, baixo-direita, cima-direita, cima-esquerda.
+pub fn cantos_da_imagem(origem: Ponto, u: Ponto, v: Ponto) -> [Ponto; 4] {
+    let s = |a: Ponto, b: Ponto| Ponto::novo3d(a.x + b.x, a.y + b.y, a.z + b.z);
+    [origem, s(origem, u), s(s(origem, u), v), s(origem, v)]
 }
 
 /// Largura aproximada de um caractere, em alturas (só para enquadrar e recortar).
@@ -115,6 +124,7 @@ impl Geometria {
                 f(*p3);
                 f(*p4);
             }
+            Geometria::Imagem { origem, u, v, .. } => cantos_da_imagem(*origem, *u, *v).into_iter().for_each(f),
             Geometria::Polilinha { vertices, .. } => vertices.iter().for_each(|v| f(v.p)),
             Geometria::Texto { ponto, .. } | Geometria::Insercao { ponto, .. } | Geometria::Ponto { p: ponto } => f(*ponto),
             // A hachura não é ponto de snap: o contorno já existe como entidade própria.

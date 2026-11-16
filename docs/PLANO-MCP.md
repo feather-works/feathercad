@@ -23,6 +23,38 @@ Legenda: ☐ a fazer · ◐ em andamento · ☑ feito.
 
 ---
 
+## Fase elétrica — lições do apartamento de 04/11/2026
+
+**Origem.** Projeto elétrico de um apartamento de ~300 m² a partir de uma imagem. O usuário reprovou três versões da
+planta: arquitetura de linhas soltas, tomadas "flutuando" longe da parede, ramais em estrela cruzando portas, rótulo
+"11100W" e marcas de condutor grudadas. Tudo foi consertado com scripts Python fora do MCP; esta fase traz isso para dentro.
+
+1. ☑ **Regras de traçado** no prompt `projeto_eletrico` (seção 4b) e nas `regras` da receita `eletrica_geral`: ramal
+   dentro da parede, tomada na face, interruptor do lado da fechadura, nada cruza vão de porta, tronco sem diagonal.
+2. ☑ **Rótulos de símbolo girado** (`simbolos::colocar`): os rótulos andam juntos como um bloco horizontal e encostam no
+   desenho do lado certo. Teste gira todo o catálogo nos 4 giros e exige zero sobreposição. Achou de quebra a
+   `luminaria_3_celulas` com "1500W" vazando da célula (agora o texto se ajusta à célula).
+3. ☑ **Armadilhas de parâmetro**: `cad_componente` recusa peça com menos de 1 cm real (`ampliacao: 0.001` em desenho em
+   metro); `receita::CAMADAS_ELETRODUTO` é a lista única de nomes de camada de eletroduto para a receita e o checklist.
+4. ☑ **Parede, porta e ambiente** (`arquitetura.rs`): `cad_parede` (parede cheia com vãos: porta com folha e arco,
+   correr, janela, passagem), `cad_ambiente` (nome + área), `cad_simbolo {encostar:true}` (face da parede mais
+   próxima, gira sozinho) e `cad_ramais {ambiente}` (ramal na parede, cortado nos vãos, descida perpendicular da luz).
+   As paredes são lidas do desenho (hachura cheia ou polilinha fechada em camada com PAREDE), então valem para DXF
+   importado. Limite: `cad_ramais` só trata parede em esquadro com os eixos.
+5. ☑ **Símbolo em bloco**: cada `cad_simbolo` vira um bloco `SIMB-<nome>-<n>` (uma entidade para mover/apagar);
+   `cad_contar {simbolos:true}` conta por nome para a lista de materiais. `bloco:false` mantém o jeito antigo.
+6. ☑ **Leiaute calado**: o `cad_salvar` anunciava `leiaute` e ignorava o parâmetro; agora roda. O verificador também
+   lê os rótulos de dentro dos blocos de símbolo.
+7. ☑ **Eletroduto mede o próprio bloco**: o Ø vai ao lado das marcas (nunca em cima) e `avisos` diz quando as marcas
+   não cabem no trecho. Marcas com passo de 1,8 mm e vão de 1 mm entre circuitos.
+8. ☑ **Fluxo**: o cliente roda `crates/feathercad-mcp/target/release/feathercad-mcp`; correção no crate só vale depois de
+   `cargo build --release` e de reiniciar o MCP (a sessão em curso segue com o binário antigo).
+
+**Desvio da regra 1:** a geometria de `arquitetura.rs` ficou no crate do MCP, como `simbolos.rs` e `eletroduto.rs` já
+estão; levar parede/ramal para o `feathercad-core` é o passo para o app ganhar as mesmas ferramentas.
+
+---
+
 ## Nível 0 — economia de contexto (só no **modo projeto**)
 
 **Por quê (medido em 01/10, `/usage`):** 85 requisições, 98 % do input vindo do cache, mas **76 % do

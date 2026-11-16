@@ -258,12 +258,12 @@ fn checklist_eletrica(d: &Documento) -> Vec<Value> {
 
     let tem_eletrodutos = d.entidades().iter().any(|e| {
         let cname = d.camadas().get(e.camada).map(|c| c.nome.to_uppercase()).unwrap_or_default();
-        cname.contains("ELETRODUTO") || cname.contains("ELE")
+        crate::receita::camada_de_eletroduto(&cname)
     });
     itens.push(json!({
         "item": "Traçado de Eletrodutos",
         "passou": tem_eletrodutos,
-        "detalhes": if tem_eletrodutos { "Eletrodutos e tubulações identificadas." } else { "Falta traçado de eletrodutos interligando os pontos." }
+        "detalhes": if tem_eletrodutos { "Eletrodutos e tubulações identificadas." } else { "Falta traçado de eletrodutos interligando os pontos (camada EL-Condutos, EL-Eletrodutos ou com ELETRODUTO no nome)." }
     }));
     itens
 }

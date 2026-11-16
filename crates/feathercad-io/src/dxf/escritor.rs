@@ -174,6 +174,8 @@ enum Hachurada {
     Decomposta,
     /// Não deu: área cheia com ilha, ou traços demais.
     Perdida,
+    /// Imagem: o R12 não tem `IMAGE`, fica de fora.
+    Imagem,
 }
 
 /// O que se conta ao gravar, para virar avisos.
@@ -182,6 +184,7 @@ struct Contas {
     aproximadas: usize,
     decompostas: usize,
     perdidas: usize,
+    imagens: usize,
 }
 
 impl Contas {
@@ -190,6 +193,7 @@ impl Contas {
             Hachurada::Nao => {}
             Hachurada::Decomposta => self.decompostas += 1,
             Hachurada::Perdida => self.perdidas += 1,
+            Hachurada::Imagem => self.imagens += 1,
         }
     }
 }
@@ -229,6 +233,9 @@ fn peca(doc: &Documento, e: &Peca, g: &Geometria, s: &mut String, aproximadas: &
     if let Geometria::Hachura { contornos, padrao, .. } = g {
         return hachura(doc, e, contornos, padrao, s, aproximadas);
     }
+    if let Geometria::Imagem { .. } = g {
+        return Hachurada::Imagem;
+    }
     forma(doc, e, g, s, aproximadas);
     Hachurada::Nao
 }
@@ -266,7 +273,7 @@ fn forma(doc: &Documento, e: &Peca, g: &Geometria, s: &mut String, aproximadas: 
             cabeca(doc, e, "POINT", s, aproximadas);
             ponto3d(s, 10, *p);
         }
-        Geometria::Hachura { .. } => {}
+        Geometria::Hachura { .. } | Geometria::Imagem { .. } => {}
         Geometria::Insercao { bloco, ponto, escala_x, escala_y, rotacao } => {
             // Bloco que não existe (índice solto) não gera INSERT: o arquivo ficaria inválido.
             let Some(b) = doc.blocos().get(*bloco) else { return };
@@ -329,6 +336,9 @@ pub fn gravar(doc: &Documento) -> (Vec<u8>, Vec<Mensagem>) {
     }
     if c.perdidas > 0 {
         avisos.push(Mensagem::nova("aviso.hachuraNaoGravada").com("n", &c.perdidas.to_string()));
+    }
+    if c.imagens > 0 {
+        avisos.push(Mensagem::nova("aviso.imagemNaoGravada").com("n", &c.imagens.to_string()));
     }
     if c.aproximadas > 0 {
         avisos.push(Mensagem::nova("aviso.corAproximada").com("n", &c.aproximadas.to_string()));

@@ -36,7 +36,7 @@ fn uma_pagina_por_folha_da_esquerda_para_a_direita() {
     assert_eq!(f.len(), 3, "a moldura de dentro não conta como folha");
     assert!(f.windows(2).all(|p| p[0].0.x < p[1].0.x));
     let pdf = exportar_folhas(&doc, &Opcoes::default()).unwrap();
-    assert!(pdf.starts_with(b"%PDF-1.4"));
+    assert!(pdf.starts_with(b"%PDF-1.5"));
     assert!(pdf.ends_with(b"%%EOF\n"));
     assert!(contem(&pdf, b"/Count 3"));
     // A3 deitado (folha mais larga que alta): 1190,551 x 841,89 pt.
@@ -66,7 +66,7 @@ fn a_tabela_de_referencias_aponta_para_os_objetos() {
     assert!(pdf[inicio..].starts_with(b"xref"));
     let tabela = &texto[texto.find("xref\n").unwrap()..];
     let linhas: Vec<&str> = tabela.lines().skip(3).take_while(|l| l.ends_with(" n ")).collect();
-    assert_eq!(linhas.len(), 4 + 2 * 2, "catálogo, páginas, duas fontes (Helvetica e Symbol) e (página + conteúdo) por folha");
+    assert_eq!(linhas.len(), 4 + 2 * 2 + 1, "catálogo, páginas, duas fontes (Helvetica e Symbol), (página + conteúdo) por folha e a camada FOLHA");
     for (i, l) in linhas.iter().enumerate() {
         let onde: usize = l[..10].parse().unwrap();
         assert!(pdf[onde..].starts_with(format!("{} 0 obj", i + 1).as_bytes()), "objeto {} fora do lugar", i + 1);
@@ -216,4 +216,23 @@ fn papel_auto_usa_o_papel_de_cada_folha_inserida() {
     let pdf = exportar_folhas(&doc, &Opcoes { papel: Papel::AUTO, ..Opcoes::default() }).unwrap();
     assert!(contem(&pdf, b"MediaBox [0 0 3370.394 2380.516]"), "A0 deitada (o tamanho da própria folha)");
     assert!(contem(&pdf, b"MediaBox [0 0 2383.937 1683.78]"), "A1 deitada, na mesma PDF");
+}
+
+#[test]
+fn camadas_viram_camadas_do_pdf_e_a_sem_plotar_comeca_desligada() {
+    let mut doc = com_folhas(1);
+    let fios = doc.nova_camada("Fiação", None).unwrap();
+    doc.definir_camada_atual(fios).unwrap();
+    doc.adicionar_geometria(Geometria::Linha { a: Ponto::novo(20.0, 20.0), b: Ponto::novo(80.0, 20.0) });
+    let rascunho = doc.nova_camada("Rascunho", None).unwrap();
+    doc.definir_camada_atual(rascunho).unwrap();
+    doc.adicionar_geometria(Geometria::Linha { a: Ponto::novo(20.0, 30.0), b: Ponto::novo(80.0, 30.0) });
+    doc.definir_propriedade_de_camadas(&[rascunho], feathercad_core::camadas::Propriedade::Plotar(false)).unwrap();
+    let pdf = exportar_folhas(&doc, &Opcoes::default()).unwrap();
+    assert!(contem(&pdf, b"/OCProperties"));
+    assert!(contem(&pdf, format!("/OC /L{fios} BDC").as_bytes()));
+    // "Fiação" em UTF-16BE: F i a ç ã o
+    assert!(contem(&pdf, b"/Name <FEFF00460069006100E700E3006F>"));
+    assert!(contem(&pdf, format!("/OC /L{rascunho} BDC").as_bytes()), "camada sem Plotar entra no PDF...");
+    assert!(!contem(&pdf, b"/OFF []"), "...mas começa desligada");
 }

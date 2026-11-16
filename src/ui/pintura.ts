@@ -5,7 +5,7 @@
  */
 
 import { etapa } from '../ponte/perfil.ts';
-import type { Fundo, MarcasDoFundo, Preenchimento, TextoDoQuadro, Vista } from '../ponte/tipos.ts';
+import type { Fundo, ImagemDoQuadro, MarcasDoFundo, Preenchimento, TextoDoQuadro, Vista } from '../ponte/tipos.ts';
 
 /** O que se pinta de um quadro: preenchimentos, segmentos e textos (sem o fundo). */
 export interface ObjetosDoQuadro {
@@ -67,6 +67,38 @@ export function pintarTracos(ctx: CanvasRenderingContext2D | OffscreenCanvasRend
       ctx.stroke();
     }
   });
+}
+
+/** Uma imagem já decodificada e quantos pixels ela tem na largura no arquivo original. */
+export interface ImagemCarregada {
+  bitmap: ImageBitmap;
+  larguraOriginal: number;
+}
+
+/** Imagem que precisa ser (re)carregada: `larguraDesejada` = quantos pixels ela ocupa na tela agora. */
+export interface ImagemFaltando {
+  caminho: string;
+  larguraDesejada: number;
+}
+
+/**
+ * As imagens do quadro (por baixo de tudo), cada uma esticada no paralelogramo que o motor mandou. Devolve as que ainda
+ * não estão carregadas ou estão com menos resolução do que a tela pede (`dpr` = pixels do aparelho por pixel CSS).
+ */
+export function pintarImagens(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, imagens: ImagemDoQuadro[], carregadas: Map<string, ImagemCarregada>, dpr: number): ImagemFaltando[] {
+  const faltando: ImagemFaltando[] = [];
+  for (const im of imagens) {
+    const larguraDesejada = Math.ceil(Math.hypot(im.ux, im.uy) * dpr);
+    const c = carregadas.get(im.caminho);
+    if (!c || (c.bitmap.width < c.larguraOriginal && c.bitmap.width < larguraDesejada * 0.75)) faltando.push({ caminho: im.caminho, larguraDesejada });
+    if (!c) continue;
+    const { width: w, height: h } = c.bitmap;
+    ctx.save();
+    ctx.transform(im.ux / w, im.uy / w, im.vx / h, im.vy / h, im.x, im.y);
+    ctx.drawImage(c.bitmap, 0, 0);
+    ctx.restore();
+  }
+  return faltando;
 }
 
 /**

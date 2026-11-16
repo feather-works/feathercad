@@ -715,6 +715,7 @@
     "pdfGravado": "PDF saved: {caminho}",
     "entidadesIgnoradas": "{n} object(s) were left out of the drawing (not supported yet): {tipos}.",
     "dentroDeBlocos": "{n} object(s) inside blocks were left out (not supported yet): {tipos}.",
+    "imagemNaoGravada": "{n} image(s) were not saved to the DXF (DXF R12 has no images). Save as .fcdz to keep them.",
     "hachuraNaoGravada": "{n} hatch(es) were not saved to the DXF (area with an island, or too much detail). Save as .fcdz to keep them.",
     "espacoPapelIgnorado": "{n} paper space object(s) were ignored.",
     "corAproximada": "{n} color(s) were approximated to the DXF color table (ACI).",

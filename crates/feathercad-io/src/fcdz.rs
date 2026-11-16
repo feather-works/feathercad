@@ -60,6 +60,7 @@ enum GeometriaJson {
     Arco { centro: Ponto, raio: f64, inicio: f64, fim: f64 },
     Texto { ponto: Ponto, altura: f64, rotacao: f64, conteudo: String, h: AlinhaH, v: AlinhaV },
     Face3D { p1: Ponto, p2: Ponto, p3: Ponto, p4: Ponto },
+    Imagem { origem: Ponto, u: Ponto, v: Ponto, arquivo: String },
 }
 
 impl From<&Geometria> for GeometriaJson {
@@ -74,6 +75,7 @@ impl From<&Geometria> for GeometriaJson {
             Geometria::Arco { centro, raio, inicio, fim } => GeometriaJson::Arco { centro, raio, inicio, fim },
             Geometria::Texto { ponto, altura, rotacao, conteudo, h, v } => GeometriaJson::Texto { ponto, altura, rotacao, conteudo, h, v },
             Geometria::Face3D { p1, p2, p3, p4 } => GeometriaJson::Face3D { p1, p2, p3, p4 },
+            Geometria::Imagem { origem, u, v, arquivo } => GeometriaJson::Imagem { origem, u, v, arquivo },
         }
     }
 }
@@ -90,6 +92,7 @@ impl From<GeometriaJson> for Geometria {
             GeometriaJson::Arco { centro, raio, inicio, fim } => Geometria::Arco { centro, raio, inicio, fim },
             GeometriaJson::Texto { ponto, altura, rotacao, conteudo, h, v } => Geometria::Texto { ponto, altura, rotacao, conteudo, h, v },
             GeometriaJson::Face3D { p1, p2, p3, p4 } => Geometria::Face3D { p1, p2, p3, p4 },
+            GeometriaJson::Imagem { origem, u, v, arquivo } => Geometria::Imagem { origem, u, v, arquivo },
         }
     }
 }

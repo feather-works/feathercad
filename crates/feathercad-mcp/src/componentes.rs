@@ -133,6 +133,9 @@ fn valores_finais(c: &Componente, args: &Value) -> Res<Vec<(String, String)>> {
     Ok(v)
 }
 
+/// Menor peça aceita, em mm reais (1 cm): abaixo disso é quase certo um engano de unidade.
+const MENOR_PECA_MM: f64 = 10.0;
+
 /// `cad_componente`: põe o componente `nome` com o canto inferior esquerdo em `ponto`.
 pub fn componente(doc: &mut Documento, args: &Value) -> Res<Value> {
     let c = achar(texto_de(args, "nome")?)?;
@@ -148,6 +151,23 @@ pub fn componente(doc: &mut Documento, args: &Value) -> Res<Value> {
     let o = Ponto::novo(0.0, 0.0);
     for f in &mut lido.formas {
         f.2 = transformar(&transformar(&transformar(&f.2, &Transf::escalar(o, s)), &Transf::girar(o, giro)), &Transf::mover(alvo.x, alvo.y));
+    }
+    // a peça já vem em mm reais e é convertida para a unidade do desenho: `ampliacao: 0.001` (dividir por 1000 "para metro")
+    // encolhia a louça para 0,4 mm e ela sumia; recusar abaixo de 1 cm real pega esse engano
+    let (mut lo, mut hi) = (Ponto::novo(f64::MAX, f64::MAX), Ponto::novo(f64::MIN, f64::MIN));
+    for f in &lido.formas {
+        f.2.para_cada_ponto_de_caixa(&mut |p| {
+            lo = Ponto::novo(lo.x.min(p.x), lo.y.min(p.y));
+            hi = Ponto::novo(hi.x.max(p.x), hi.y.max(p.y));
+        });
+    }
+    let maior_mm = (hi.x - lo.x).max(hi.y - lo.y) * un.em_milimetros();
+    if lo.x <= hi.x && maior_mm < MENOR_PECA_MM {
+        return Err(format!(
+            "`{}` ficaria com {maior_mm:.2} mm reais: a biblioteca já está em mm reais e cad_componente converte para a unidade do desenho ({}); use `ampliacao` 1 (ou a razão de tamanho real, ex. 0,9 para porta de 72 cm)",
+            c.nome,
+            un.nome()
+        ));
     }
     if let Some(camada) = texto_opcional(args, "camada") {
         lido.camadas.clear();
@@ -174,5 +194,13 @@ mod testes {
         let (txt, _) = crate::compacto::exportar(&d, None, false);
         assert!(txt.contains("C25"), "{txt}");
         assert!(componente(&mut d, &json!({ "nome": "disjuntor_modular_2p", "ponto": [0, 0], "valores": { "xis": 1 } })).is_err());
+    }
+
+    #[test]
+    fn recusa_ampliacao_que_some_com_a_peca() {
+        let mut d = Documento::default().com_unidade(Some(Unidade::Metro));
+        let e = componente(&mut d, &json!({ "nome": "disjuntor_modular_2p", "ponto": [1.0, 1.0], "ampliacao": 0.001 })).unwrap_err();
+        assert!(e.contains("mm reais"), "{e}");
+        assert!(componente(&mut d, &json!({ "nome": "disjuntor_modular_2p", "ponto": [1.0, 1.0] })).is_ok());
     }
 }

@@ -162,7 +162,7 @@ fn linha_da_forma(g: &Geometria) -> Option<String> {
         Geometria::Ponto { p } => format!(". {}", pt(*p)),
         Geometria::Hachura { contornos, padrao, nome } => format!("H {} {}", if padrao.is_empty() { "solida".to_string() } else if feathercad_core::padroes::reconhecer(nome).is_some() { nome.to_lowercase() } else { "padrao".to_string() }, contornos.iter().map(|c| como_laco(c)).collect::<Vec<_>>().join(" | ")),
         Geometria::Face3D { p1, p2, p3, p4 } => format!("F3D {} {} {} {}", pt(*p1), pt(*p2), pt(*p3), pt(*p4)),
-        Geometria::Insercao { .. } => return None,
+        Geometria::Insercao { .. } | Geometria::Imagem { .. } => return None,
     })
 }
 

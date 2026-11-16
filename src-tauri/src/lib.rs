@@ -80,6 +80,14 @@ async fn ponte_binaria(app: tauri::AppHandle, comando: String, corpo: String) ->
         .map_err(|e| format!("o comando {e}"))?
 }
 
+/// Os bytes de uma imagem do desenho (`IMAGE` do DXF aponta para um arquivo), crus como o `ponte_binaria`.
+#[tauri::command]
+async fn imagem_ler(caminho: String) -> Result<tauri::ipc::Response, String> {
+    tauri::async_runtime::spawn_blocking(move || std::fs::read(&caminho).map(tauri::ipc::Response::new).map_err(|e| format!("Não consegui ler a imagem \"{caminho}\": {e}")))
+        .await
+        .map_err(|e| format!("a leitura da imagem {e}"))?
+}
+
 /// Memória residente da árvore inteira do aplicativo (o principal e os
 /// processos de WebView, onde a interface mora). Só no Linux.
 #[tauri::command]
@@ -173,6 +181,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             uso_memoria_arvore,
             ponte_binaria,
+            imagem_ler,
             log_mensagem,
             abrir_janela_monitor,
             arquivos::desenho_abrir,

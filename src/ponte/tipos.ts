@@ -305,6 +305,17 @@ export interface TextoDoQuadro {
 }
 
 /** Uma área cheia (hachura sólida): laços em pixels, preenchidos par-ímpar. */
+/** Uma imagem raster na tela: canto de cima à esquerda, vetor da largura e da altura (para baixo), em pixels. */
+export interface ImagemDoQuadro {
+  x: number;
+  y: number;
+  ux: number;
+  uy: number;
+  vx: number;
+  vy: number;
+  caminho: string;
+}
+
 export interface Preenchimento {
   cor: number;
   /** Cada laço: x, y, x, y… */
@@ -319,7 +330,7 @@ export interface MarcasDoFundo {
 
 export type Quadro =
   | { tipo: 'igual' }
-  | { tipo: 'novo'; versao: number; xs: Float32Array; cores: Uint32Array; espessuras: Float32Array; textos: TextoDoQuadro[]; preenchimentos: Preenchimento[]; fundoX: MarcasDoFundo; fundoY: MarcasDoFundo };
+  | { tipo: 'novo'; versao: number; xs: Float32Array; cores: Uint32Array; espessuras: Float32Array; textos: TextoDoQuadro[]; preenchimentos: Preenchimento[]; fundoX: MarcasDoFundo; fundoY: MarcasDoFundo; imagens: ImagemDoQuadro[] };
 
 /** Uma folha (prancheta) do desenho, como o motor a descreve. */
 export interface InfoFolha {

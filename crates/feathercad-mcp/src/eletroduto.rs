@@ -88,14 +88,23 @@ fn trecho_mais_longo(pts: &[Ponto]) -> usize {
     (0..pts.len() - 1).max_by(|&i, &j| pts[i].distancia(pts[i + 1]).total_cmp(&pts[j].distancia(pts[j + 1]))).unwrap_or(0)
 }
 
-/// Os traços dos condutores, centrados em `m`, num trecho de direção `u` (unitário).
-fn tracos(peca: &mut Peca, cs: &[Condutor], m: (f64, f64), u: (f64, f64)) {
+/// Os traços dos condutores, centrados em `m`, num trecho de direção `u` (unitário). Devolve a largura do bloco (mm de papel).
+fn tracos(peca: &mut Peca, cs: &[Condutor], m: (f64, f64), u: (f64, f64)) -> f64 {
     let n = (-u.1, u.0);
-    let (passo, meio, tampa, bandeira) = (1.2, 1.5, 0.9, 1.0);
+    // passo de 1,8 mm e vão extra entre circuitos: com 1,2 mm a bandeira do neutro e o T do terra encostavam na marca vizinha
+    let (passo, vao, meio, tampa, bandeira) = (1.8, 1.0, 1.5, 0.6, 0.8);
     let ponto = |t: f64, k: f64| (m.0 + u.0 * t + n.0 * k, m.1 + u.1 * t + n.1 * k);
-    let k = cs.len() as f64;
+    let mut pos = Vec::with_capacity(cs.len());
+    let mut t = 0.0;
     for (i, c) in cs.iter().enumerate() {
-        let t = (i as f64 - (k - 1.0) / 2.0) * passo;
+        if i > 0 {
+            t += passo + if c.circuito != cs[i - 1].circuito { vao } else { 0.0 };
+        }
+        pos.push(t);
+    }
+    let largura = pos.last().copied().unwrap_or(0.0);
+    for (i, c) in cs.iter().enumerate() {
+        let t = pos[i] - largura / 2.0;
         match c.tipo {
             Tipo::Fase => peca.linha(ponto(t, -meio), ponto(t, meio)),
             Tipo::Neutro => {
@@ -109,10 +118,11 @@ fn tracos(peca: &mut Peca, cs: &[Condutor], m: (f64, f64), u: (f64, f64)) {
             }
         }
     }
+    largura + 2.0 * tampa.max(bandeira)
 }
 
 /// Os textos: circuitos em cima, seções embaixo (na horizontal; ao lado do bloco se o trecho é vertical).
-fn rotulos(peca: &mut Peca, cs: &[Condutor], m: (f64, f64), horizontal: bool, altura: f64) {
+fn rotulos(peca: &mut Peca, cs: &[Condutor], m: (f64, f64), horizontal: bool, altura: f64) -> f64 {
     let mut circuitos: Vec<&str> = Vec::new();
     for c in cs {
         if let Some(t) = c.circuito.as_deref() {
@@ -141,6 +151,7 @@ fn rotulos(peca: &mut Peca, cs: &[Condutor], m: (f64, f64), horizontal: bool, al
     if !embaixo.is_empty() {
         peca.texto((x_baixo, y_baixo), altura, &embaixo);
     }
+    if horizontal { largura(&em_cima).max(largura(&embaixo)) } else { 0.0 }
 }
 
 /// A bandeirinha do eletroduto (NBR 5444, 5.1/5.2) com o diâmetro embaixo.
@@ -204,17 +215,65 @@ pub fn eletroduto(doc: &mut Documento, args: &Value) -> Res<Value> {
     // Tudo o que é símbolo é montado em milímetros de papel, com a origem no ponto médio (`m`), e depois ampliado.
     let m = ponto_em(pos);
     let mut peca = Peca::default();
-    tracos(&mut peca, &cs, (0.0, 0.0), u);
+    let mut ocupado = tracos(&mut peca, &cs, (0.0, 0.0), u);
+    let mut avisos: Vec<String> = Vec::new();
     if rotulo {
-        rotulos(&mut peca, &cs, (0.0, 0.0), u.0.abs() >= u.1.abs(), altura);
-        let afastado = if pos < 0.5 { pos + 0.3 } else { pos - 0.3 };
-        let q = ponto_em(afastado.clamp(0.05, 0.95));
+        ocupado = ocupado.max(rotulos(&mut peca, &cs, (0.0, 0.0), u.0.abs() >= u.1.abs(), altura));
+        // o Ø vai ao lado do bloco de marcas, nunca em cima dele: do lado que tem espaço no trecho
+        let bandeira_mm = 2.0 + feathercad_io::pdf::largura_do_conteudo(&format!("Ø{diametro}"), altura) + 0.3;
+        let d = (ocupado / 2.0 + 1.5) * s / comprimento;
+        let ponta = bandeira_mm * s / comprimento;
+        let (frente, tras) = (pos + d, pos - d);
+        let t_q = if frente + ponta <= 1.0 { Some(frente) } else if tras >= 0.0 { Some(tras) } else { None };
+        let q = ponto_em(t_q.unwrap_or_else(|| (pos + d).min(1.0)));
+        if t_q.is_none() {
+            avisos.push(format!("o Ø não coube ao lado das marcas no trecho de {comprimento:.2}: ficou na ponta; use um trecho mais longo ou `posicao`"));
+        }
         bandeirinha(&mut peca, ((q.0 - m.0) / s, (q.1 - m.1) / s), diametro, altura);
+    }
+    let precisa = ocupado * s;
+    let livre = comprimento * pos.min(1.0 - pos) * 2.0;
+    if precisa > livre {
+        avisos.push(format!("as marcas ocupam {precisa:.2} e o trecho só tem {livre:.2} em volta da `posicao`: elas passam da ponta do trecho; use um trecho mais longo, outra `posicao` ou divida o eletroduto"));
     }
     let mut formas = crate::simbolos::colocar(&peca, s, 0.0, Ponto::novo(m.0, m.1));
     let linha = Geometria::Polilinha { vertices: pts.iter().map(|p| feathercad_core::geom::Vertice { p: *p, bulge: 0.0 }).collect(), fechada: false };
     formas.insert(0, (linha, piso.then_some(TipoLinha::Tracejada)));
     let espessura = numero_opcional(args, "espessura").filter(|e| *e > 0.0).map(|e| e as f32);
     let ids = gravar(doc, formas, args, espessura)?;
-    Ok(json!({ "eletroduto": ids.first(), "ids": ids, "diametro_mm": diametro, "condutores": cs.len(), "tipo": if piso { "piso" } else { "teto/parede" } }))
+    let mut r = json!({ "eletroduto": ids.first(), "ids": ids, "diametro_mm": diametro, "condutores": cs.len(), "tipo": if piso { "piso" } else { "teto/parede" } });
+    if !avisos.is_empty() {
+        r["avisos"] = json!(avisos);
+    }
+    Ok(r)
+}
+
+#[cfg(test)]
+mod testes {
+    use super::*;
+    use feathercad_core::documento::Unidade;
+
+    fn condutores(n: usize) -> Value {
+        json!((1..=n).flat_map(|c| [json!({"tipo": "fase", "circuito": c, "secao": 2.5}), json!({"tipo": "neutro", "circuito": c, "secao": 2.5})]).collect::<Vec<_>>())
+    }
+
+    #[test]
+    fn o_diametro_fica_fora_do_bloco_de_marcas() {
+        let mut d = Documento::default().com_unidade(Some(Unidade::Metro));
+        let r = eletroduto(&mut d, &json!({ "pontos": [[0.0, 0.0], [6.0, 0.0]], "condutores": condutores(4) })).unwrap();
+        assert!(r.get("avisos").is_none(), "{r}");
+        // o traço da bandeirinha é a única linha diagonal; o bloco de marcas fica em volta de x = 3
+        let (txt, _) = crate::compacto::exportar(&d, None, false);
+        let diagonal = txt.lines().filter(|l| l.starts_with("L ")).map(|l| l.split(' ').skip(1).map(|v| v.parse::<f64>().unwrap()).collect::<Vec<_>>()).find(|v| (v[0] - v[2]).abs() > 1e-6 && (v[1] - v[3]).abs() > 1e-6).expect("bandeirinha");
+        let meia_largura = 0.05 * (2.0 * 4.0 * 1.8 + 3.0 * 1.0) / 2.0;
+        assert!((diagonal[0] - 3.0).abs() > meia_largura, "Ø em cima das marcas: {diagonal:?}");
+    }
+
+    #[test]
+    fn avisa_quando_as_marcas_nao_cabem_no_trecho() {
+        let mut d = Documento::default().com_unidade(Some(Unidade::Metro));
+        let r = eletroduto(&mut d, &json!({ "pontos": [[0.0, 0.0], [0.3, 0.0]], "condutores": condutores(6) })).unwrap();
+        let avisos = r["avisos"].to_string();
+        assert!(avisos.contains("não coube") || avisos.contains("passam da ponta"), "{r}");
+    }
 }

@@ -110,6 +110,16 @@ pub fn pdf(ag: &Agente, args: &Value) -> Res<Value> {
 
 /// `cad_contar`: quantos objetos são iguais a `id` (mesmo tipo e medida) ou têm a medida pedida.
 pub fn contar(doc: &Documento, args: &Value) -> Res<Value> {
+    if args.get("simbolos").and_then(Value::as_bool).unwrap_or(false) {
+        // a lista de materiais conta tomadas, interruptores e luzes pelo nome do bloco de cad_simbolo
+        let mut por_nome = std::collections::BTreeMap::<String, usize>::new();
+        for e in doc.entidades().iter().filter(|e| doc.visivel(e)) {
+            if let Some((nome, _)) = crate::arquitetura::nome_do_simbolo(doc, &e.geometria) {
+                *por_nome.entry(nome).or_insert(0) += 1;
+            }
+        }
+        return Ok(json!({ "total": por_nome.values().sum::<usize>(), "por_simbolo": por_nome, "nota": "só símbolos de cad_simbolo em bloco (SIMB-); símbolo com `bloco:false` não entra" }));
+    }
     let tolerancia = numero_opcional(args, "tolerancia").unwrap_or(0.01).clamp(0.0, 0.5);
     let c = if let Some(id) = args.get("igual_a").and_then(Value::as_u64) {
         iguais_a(doc, id).ok_or_else(|| format!("não existe a entidade {id}"))?

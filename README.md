@@ -5,7 +5,7 @@
 
 **CAD 2D:** formatos `.fcdz` e `.dxf`, com integração MCP planejada/desenvolvida conforme o estado do código; versões próprias.
 
-**Arquitetura compartilhada:** utiliza a base de motores Rust em [`featheroffice/`](../featheroffice/) e os componentes de interface Rust/Iced de [`feather-ui/`](../feather-ui/) quando aplicáveis. As dependências compartilhadas serão versionadas sem acoplar um produto ao código interno de outro.
+**Arquitetura compartilhada:** utiliza a base de motores Rust em [`featheroffice/`](https://github.com/M4R4G0N/FeatherOffice/tree/main/featheroffice) e os componentes de interface Rust/Iced de [`feather-ui`](https://github.com/feather-works/feather-ui) quando aplicáveis. As dependências compartilhadas serão versionadas sem acoplar um produto ao código interno de outro.
 
 **Publicação prevista:** versão **alpha em 30/10/2026**. O produto terá distribuição própria e também poderá ser selecionado isoladamente ou junto aos demais em um **instalador geral planejado**. Isso não significa que a funcionalidade de instalação já esteja pronta.
 
@@ -28,7 +28,7 @@ ser conferida no código, sem presumir que os recursos já existem em Iced.
 ## Referência
 
 - `CLAUDE.md` — regras de trabalho e fila.
-- [Avaliação de precisão CAD × Drawing](../featheroffice/AVALIACAO-DRAWING-FEATHERCAD.md) (APP-013) — decisão de manter geometria, snap e persistência em `f64`; apenas projeção visual pode usar `f32` após `Vista::para_tela`. Contém matriz de compatibilidade, testes e critérios de integração. **Adoção da GUI não concluída.**
+- [Avaliação de precisão CAD × Drawing](https://github.com/M4R4G0N/FeatherOffice/blob/main/featheroffice/AVALIACAO-DRAWING-FEATHERCAD.md) (APP-013) — decisão de manter geometria, snap e persistência em `f64`; apenas projeção visual pode usar `f32` após `Vista::para_tela`. Contém matriz de compatibilidade, testes e critérios de integração. **Adoção da GUI não concluída.**
 - `docs/INTERFACE.md` — composição da tela e Ribbon com sub-abas.
 - `docs/DESDE-O-DIA-1.md` — língua em JSON e demais lições do FeatherSheet.
 - `docs/DXF-REFERENCIA.md` — estrutura do DXF extraída do ezdxf

@@ -95,7 +95,7 @@ const ELETRICA_LUMINOTECNICO: Receita = Receita {
         it("arquitetura", F3, "Paredes, pilares/pórticos, esquadrias e eixos", "cad_criar / cad_lote", true, Detecta::Camada(&["ARQ-Paredes", "PAREDE"])),
         it("cotas", F3, "Cotas gerais, vãos e posição das luminárias", "cad_criar / cad_lote", true, Detecta::Camada(&["ARQ-Cotas", "COTA"])),
         it("luminarias", F3, "Luminárias com tag (L01…) e circuito, nas posições calculadas", "cad_simbolo luminaria_led", true, Detecta::Camada(&["EL-Luminarias"])),
-        it("eletrodutos", F3, "Eletrodutos com as marcas de condutor, circuito e seção", "cad_eletroduto", true, Detecta::Camada(&["EL-Condutos"])),
+        it("eletrodutos", F3, "Eletrodutos com as marcas de condutor, circuito e seção", "cad_eletroduto", true, Detecta::Camada(CAMADAS_ELETRODUTO)),
         it("quadro_luz", F3, "Quadro de distribuição de luz (QDL) na planta", "cad_criar / cad_simbolo", true, Detecta::Texto(&["QDL"])),
         it("emergencia", F3, "Iluminação de emergência e sinalização de saída em circuito próprio (uso público/industrial)", "cad_simbolo bloco_emergencia, saida_emergencia", true, Detecta::Camada(&["EL-Emergencia"])),
         it("claraboias", F3, "Claraboias e fotocélulas, se há luz natural/dimerização", "cad_criar, cad_simbolo fotocelula", false, Detecta::Camada(&["EL-Claraboias"])),
@@ -128,26 +128,42 @@ const ELETRICA_GERAL: Receita = Receita {
         "Pontos com circuito e potência; interruptor com a letra do ponto; tomada com a altura na legenda",
         "Eletroduto não cotado e fiação não cotada vão em NOTA (PVC flexível Ø3/4\", #2,5 mm²)",
         "Quadro de cargas, demanda e unifilar da MESMA lista de circuitos (cad_circuitos)",
+        "Arquitetura com cad_parede (parede cheia com vãos de porta/janela) e cad_ambiente (nome e área); nunca só linhas soltas",
+        "Tomada e interruptor ENCOSTADOS na face da parede (cad_simbolo com `encostar: true`), nunca soltos no ambiente nem dentro de vão de porta",
+        "Interruptor a 10–20 cm do batente, do lado da fechadura (oposto à dobradiça), por dentro do ambiente que ele comanda",
+        "Ramal de tomada e interruptor corre DENTRO da parede e é cortado em cada porta/passagem; ligação teto→parede por descida perpendicular (cad_ramais faz isso)",
+        "Nada cruza vão de porta: nem ramal nem tronco; tronco do quadro passa por parede ou forro de circulação, sem diagonal pela planta",
     ],
     itens: &[
         BASE[0], BASE[1], BASE[2], BASE[3], BASE[4],
         it("circuitos", F2, "Lista de circuitos: corrente, disjuntor, DR, seção, queda de tensão, fases", "cad_circuitos", true, Detecta::Texto(&["QUADRO DE CARGAS"])),
-        it("arquitetura", F3, "Arquitetura em linha fina e cinza atrás da elétrica (paredes, esquadrias, cotas)", "cad_abrir / cad_criar", true, Detecta::Camada(&["ARQ-Paredes", "PAREDE"])),
+        it("arquitetura", F3, "Arquitetura em linha fina e cinza atrás da elétrica (paredes, esquadrias, cotas)", "cad_parede, cad_ambiente (ou cad_abrir de um DXF)", true, Detecta::Camada(&["ARQ-Paredes", "PAREDE"])),
         it("luminarias", F3, "Pontos de luz com circuito, potência e comando", "cad_simbolo ponto_luz_teto", true, Detecta::Camada(&["EL-Luminarias", "EL-Lampada"])),
-        it("tomadas", F3, "Tomadas baixa/média/alta com circuito e potência", "cad_simbolo tomada_*", true, Detecta::Camada(&["EL-Tomadas"])),
-        it("interruptores", F3, "Interruptores com a letra do ponto que comandam", "cad_simbolo interruptor_*", true, Detecta::Camada(&["EL-Interruptor"])),
-        it("eletrodutos", F3, "Eletrodutos com marcas de condutor, circuito e seção", "cad_eletroduto", true, Detecta::Camada(&["EL-Condutos"])),
+        it("tomadas", F3, "Tomadas baixa/média/alta com circuito e potência", "cad_simbolo tomada_* {encostar:true}", true, Detecta::Camada(&["EL-Tomadas"])),
+        it("interruptores", F3, "Interruptores com a letra do ponto que comandam", "cad_simbolo interruptor_* {encostar:true}", true, Detecta::Camada(&["EL-Interruptor"])),
+        it("eletrodutos", F3, "Eletrodutos com marcas de condutor, circuito e seção", "cad_eletroduto (troncos) + cad_ramais (ramais por ambiente)", true, Detecta::Camada(CAMADAS_ELETRODUTO)),
         it("quadro", F3, "Quadro de distribuição e caixas de passagem", "cad_simbolo quadro_*, caixa_passagem_piso", true, Detecta::Texto(&["QD"])),
         it("quadro_demanda", F4, "Quadro de demanda", "cad_circuitos desenhar.demanda", true, Detecta::Texto(&["QUADRO DE DEMANDA"])),
         it("unifilar", F4, "Diagrama unifilar com disjuntores, DR, DPS e seções", "cad_circuitos desenhar.unifilar", true, Detecta::Camada(&["DI-Linhas do diagrama"])),
         it("legenda", F4, "Legenda dos símbolos com a altura de instalação", "cad_carimbo + cad_simbolo", true, Detecta::Camada(&["F-Legenda"])),
         it("notas", F4, "Notas normativas", "cad_notas_padrao", true, Detecta::Camada(&["F-Notas"])),
         it("detalhes", F4, "Entrada de energia, caixa de medição e aterramento", "cad_componente / cad_criar", true, Detecta::Texto(&["ATERRAMENTO", "ENTRADA"])),
-        it("lista_materiais", F4, "Lista de materiais", "cad_tabela + cad_contar", true, Detecta::Texto(&["LISTA DE MATERIAIS"])),
+        it("lista_materiais", F4, "Lista de materiais", "cad_tabela + cad_contar {simbolos:true}", true, Detecta::Texto(&["LISTA DE MATERIAIS"])),
         it("verificar", F5, "Conferir leiaute e duplicadas e olhar cada folha", "cad_verificar {leiaute:true}, cad_ver", true, Detecta::Manual),
         it("exportar", F5, "Salvar e exportar o PDF", "cad_salvar, cad_pdf", true, Detecta::Manual),
     ],
 };
+
+/// Os nomes de camada de eletroduto que a receita e o checklist de `cad_salvar` reconhecem (prefixo, sem diferenciar
+/// maiúscula). Antes a receita queria `EL-Condutos` e o checklist exigia "ELETRODUTO" no nome: era preciso uma camada
+/// com os dois. Uma lista só para os dois.
+pub const CAMADAS_ELETRODUTO: &[&str] = &["EL-Condutos", "EL-Eletrodutos", "ELE-Eletrodutos", "ELETRODUTO"];
+
+/// A camada `nome` é de eletroduto?
+pub fn camada_de_eletroduto(nome: &str) -> bool {
+    let n = nome.to_uppercase();
+    CAMADAS_ELETRODUTO.iter().any(|p| n.starts_with(&p.to_uppercase())) || n.contains("ELETRODUTO")
+}
 
 const CIVIL_PLANTA: Receita = Receita {
     nome: "Civil — planta baixa de arquitetura",
@@ -313,7 +329,15 @@ fn equilibrio(d: &Documento) -> Vec<Value> {
             let mut celulas = vec![false; COLUNAS * LINHAS_GRADE];
             let (mut notas, mut legenda) = (0usize, 0usize);
             for e in d.entidades().iter().filter(|e| d.visivel(e)) {
-                for p in amostras(&e.geometria) {
+                // os símbolos de cad_simbolo são blocos: entram pela caixa (as folhas, também blocos, continuam de fora)
+                let mut pontos = amostras(&e.geometria);
+                if let (Geometria::Insercao { bloco, ponto, .. }, Some(_)) = (&e.geometria, crate::arquitetura::nome_do_simbolo(d, &e.geometria)) {
+                    if let (Some((lo, hi)), Some(b)) = (d.caixa_guardada_do_bloco(*bloco), d.blocos().get(*bloco)) {
+                        let (dx, dy) = (ponto.x - b.base.x, ponto.y - b.base.y);
+                        pontos.extend([Ponto::novo(lo.x + dx, lo.y + dy), Ponto::novo(hi.x + dx, hi.y + dy), Ponto::novo(ponto.x, ponto.y)]);
+                    }
+                }
+                for p in pontos {
                     let dentro = |p0: Ponto, p1: Ponto| p.x >= p0.x && p.x <= p1.x && p.y >= p0.y && p.y <= p1.y;
                     if dentro(a, b) {
                         let (cx, cy) = (((p.x - a.x) / (b.x - a.x) * COLUNAS as f64) as usize, ((p.y - a.y) / (b.y - a.y) * LINHAS_GRADE as f64) as usize);

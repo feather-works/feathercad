@@ -1,5 +1,7 @@
 # FeatherCAD — instruções de trabalho
 
+**Repositório próprio desde 16/11/2026:** `feather-works/feathercad` (pasta `GitHub/feathercad`). Saiu do FeatherOffice; a pasta `FeatherOffice/feathercad` não existe mais. Não há `Cargo.toml` na raiz: cada crate em `crates/` e o `src-tauri/` compilam em separado.
+
 **Direção atual — 07/10/2026: motor e interface 100% Rust, com Iced.**
 Prioridade: **FeatherSlide → FeatherDocs → FeatherSheet**; FeatherCAD
 depois, se houver tempo. O inventário abaixo registra funcionalidades e
@@ -73,6 +75,10 @@ ser conferida no código, sem presumir que os recursos já existem em Iced.
   calibrado nos A1 de referência: 89–98 %). Receitas: `eletrica/luminotecnico` (completa), `eletrica/eletrica_geral` (básica), `civil/planta_baixa` (esboço),
   `ferroviario/tracado_nuvem` (aponta a cadeia viária existente); `outra` = projeto sem receita. Receita nova = entrada em `receita.rs` (itens com `Detecta`).
   As `INSTRUCOES` do MCP (`rpc.rs`) mandam usar o funil só em pedido de projeto. O v3 do galpão passa nos itens (23/26) mas **reprova no equilíbrio** (31–50 % de ocupação).
+- **MCP elétrico: lições do apartamento (04/11/2026, feito e testado, não commitado):** `cad_parede`, `cad_ambiente`,
+  `cad_ramais`, `cad_simbolo {encostar, bloco}`, `cad_contar {simbolos}`, leiaute ligado no `cad_salvar`; detalhes na
+  "Fase elétrica" de `docs/PLANO-MCP.md`. **Para testar uma correção do MCP**: `cargo build --release` no
+  `crates/feathercad-mcp` e reiniciar o MCP; a sessão em curso continua com o binário antigo.
 - Botão e atalho usam o **nome interno** do comando (`executar`); o texto
   digitado só vale pela tabela da língua (no en-US `LINHA` não existe).
 

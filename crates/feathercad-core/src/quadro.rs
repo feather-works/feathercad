@@ -12,6 +12,9 @@
 //!            u8 alinha V (0 base, 1 baixo, 2 meio, 3 topo) · u32 cor · u16 n · n bytes UTF-8
 //! Preenchimento = u32 cor 0xRRGGBB · u32 nl · nl × (u32 nv · nv × (f32 x, y) pixels); par-ímpar
 //! Marca    = f32 posição (pixels) · u8 principal
+//!        u32 ni  ni × Imagem                      imagens raster, desenhadas por baixo de tudo
+//! Imagem   = f32 x, y (pixels, canto de cima à esquerda) · f32 ux, uy (largura inteira, pixels) ·
+//!            f32 vx, vy (altura inteira, de cima para baixo, pixels) · u16 n · n bytes UTF-8 (caminho do arquivo)
 //!
 //! Polilinha: cada segmento vira um `Segmento`; os arcos (bulge) já vêm em cordas que
 //! não se afastam mais que meio pixel da curva.
@@ -21,7 +24,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::documento::{AlinhaH, AlinhaV, Documento, Geometria, Id, LinhaDePadrao, Propriedades, TipoLinha, PROFUNDIDADE_MAXIMA};
+use crate::documento::{cantos_da_imagem, AlinhaH, AlinhaV, Documento, Geometria, Id, LinhaDePadrao, Propriedades, TipoLinha, PROFUNDIDADE_MAXIMA};
 use crate::fundo::{marcas, Marca};
 use crate::geom::{amostrar_arco, segmento_com_bulge, varredura_graus, Ponto, Transf};
 use crate::vista::Vista;
@@ -102,6 +105,10 @@ fn segmentos_da(geo: &Geometria, area: (Ponto, Ponto), tolerancia: f64, fora: &m
             if toca(area, *a, *b) {
                 fora.push((*a, *b));
             }
+        }
+        Geometria::Imagem { origem, u, v, .. } => {
+            let c = cantos_da_imagem(*origem, *u, *v);
+            fora.extend((0..4).map(|i| (c[i], c[(i + 1) % 4])).filter(|(a, b)| toca(area, *a, *b)));
         }
         Geometria::Face3D { p1, p2, p3, p4 } => {
             if toca(area, *p1, *p2) { fora.push((*p1, *p2)); }
@@ -212,6 +219,8 @@ struct Saida {
     nt: u32,
     preenchimentos: Vec<u8>,
     np: u32,
+    imagens: Vec<u8>,
+    ni: u32,
     /// LOD da tela: um traço que cabe num pixel só é escrito uma vez por pixel e cor (senão um mapa denso, com o
     /// desenho todo na tela, manda centenas de milhares de riscos que se sobrepõem no mesmo pixel).
     lod: bool,
@@ -709,6 +718,28 @@ fn desenhar(ctx: &Contexto<'_>, peca: &Peca<'_>, nivel: &Nivel, saida: &mut Said
             }
         }
         Geometria::Hachura { contornos, padrao, .. } => desenhar_hachura(ctx, contornos, padrao, t, cor_na_tela, saida),
+        Geometria::Imagem { origem, u, v, arquivo } => {
+            let c = cantos_da_imagem(*origem, *u, *v).map(|p| t.aplicar(p));
+            let (min, max) = c.iter().fold((c[0], c[0]), |(a, b), p| (Ponto::novo(a.x.min(p.x), a.y.min(p.y)), Ponto::novo(b.x.max(p.x), b.y.max(p.y))));
+            if !toca(ctx.area, min, max) {
+                return;
+            }
+            // c[3] = canto de cima à esquerda; largura até c[2], altura (para baixo) até c[0]
+            let [base, _, cima_dir, cima_esq] = c.map(|p| ctx.vista.para_tela(p));
+            for v in [cima_esq.0, cima_esq.1, cima_dir.0 - cima_esq.0, cima_dir.1 - cima_esq.1, base.0 - cima_esq.0, base.1 - cima_esq.1] {
+                escrever_f32(&mut saida.imagens, v);
+            }
+            let bytes = arquivo.as_bytes();
+            let n = bytes.len().min(usize::from(u16::MAX));
+            saida.imagens.extend_from_slice(&(n as u16).to_le_bytes());
+            saida.imagens.extend_from_slice(&bytes[..n]);
+            saida.ni += 1;
+            if destaque {
+                for i in 0..4 {
+                    escrever_segmento(saida, ctx.vista, c[i], c[(i + 1) % 4], cor_na_tela);
+                }
+            }
+        }
         Geometria::Face3D { p1, p2, p3, p4 } => {
             escrever_segmento(saida, ctx.vista, t.aplicar(*p1), t.aplicar(*p2), cor_na_tela);
             escrever_segmento(saida, ctx.vista, t.aplicar(*p2), t.aplicar(*p3), cor_na_tela);
@@ -748,10 +779,20 @@ fn area_de_corte(vista: &Vista) -> (Ponto, Ponto) {
 /// Como `montar`, para impressão: arcos e círculos com `tolerancia_px` de erro (a tela usa 0,5 px; o papel pede bem menos,
 /// senão um círculo pequeno sai como um octógono). Sempre é um quadro novo, sem fundo.
 pub fn montar_fino(doc: &Documento, vista: &Vista, fundo_claro: bool, tolerancia_px: f64) -> Vec<u8> {
+    montar_fino_filtrado(doc, vista, fundo_claro, tolerancia_px, None)
+}
+
+/// Como `montar_fino`, só com as entidades da `camada` (um bloco vai inteiro com a camada da sua inserção):
+/// o PDF desenha camada por camada para o leitor poder ligar e desligar cada uma.
+pub fn montar_fino_da_camada(doc: &Documento, vista: &Vista, fundo_claro: bool, tolerancia_px: f64, camada: usize) -> Vec<u8> {
+    montar_fino_filtrado(doc, vista, fundo_claro, tolerancia_px, Some(camada))
+}
+
+fn montar_fino_filtrado(doc: &Documento, vista: &Vista, fundo_claro: bool, tolerancia_px: f64, camada: Option<usize>) -> Vec<u8> {
     let ctx = Contexto { doc, vista, area: area_de_corte(vista), tolerancia: tolerancia_px / vista.escala, fundo_claro, simplificar: false };
     let mut dentro = Saida::default();
     let raiz = Nivel { t: Transf::IDENTIDADE, herdada: None, profundidade: 0, destaque: false };
-    for e in doc.entidades() {
+    for e in doc.entidades().iter().filter(|e| camada.is_none() || camada == Some(e.camada)) {
         desenhar(&ctx, &Peca { camada: e.camada, cor: e.cor, geo: &e.geometria, destaque: false, props: &e.props }, &raiz, &mut dentro);
     }
     escrever_quadro(0, &dentro, vista, None)
@@ -811,6 +852,8 @@ fn escrever_quadro(versao: u64, dentro: &Saida, vista: &Vista, fundo: Option<f64
     saida.extend_from_slice(&(ys.len() as u32).to_le_bytes());
     escrever_marcas(&mut saida, &xs);
     escrever_marcas(&mut saida, &ys);
+    saida.extend_from_slice(&dentro.ni.to_le_bytes());
+    saida.extend_from_slice(&dentro.imagens);
     saida
 }
 

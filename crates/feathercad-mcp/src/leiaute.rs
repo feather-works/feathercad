@@ -38,17 +38,30 @@ pub fn caixa_do_texto(ponto: Ponto, altura: f64, rotacao: f64, conteudo: &str, h
 }
 
 fn caixas(d: &Documento) -> Vec<Caixa> {
-    d.entidades()
-        .iter()
-        .filter_map(|e| {
-            let Geometria::Texto { ponto, altura, rotacao, conteudo, h, v } = &e.geometria else { return None };
-            let cantos = caixa_do_texto(*ponto, *altura, *rotacao, conteudo, *h, *v);
-            let (xs, ys): (Vec<f64>, Vec<f64>) = cantos.iter().map(|p| (p.x, p.y)).unzip();
-            let min = Ponto::novo(xs.iter().copied().fold(f64::MAX, f64::min), ys.iter().copied().fold(f64::MAX, f64::min));
-            let max = Ponto::novo(xs.iter().copied().fold(f64::MIN, f64::max), ys.iter().copied().fold(f64::MIN, f64::max));
-            Some(Caixa { id: e.id, cantos, min, max, rotacao: *rotacao })
-        })
-        .collect()
+    let caixa = |id: Id, ponto: Ponto, altura: f64, rotacao: f64, conteudo: &str, h: AlinhaH, v: AlinhaV| {
+        let cantos = caixa_do_texto(ponto, altura, rotacao, conteudo, h, v);
+        let (xs, ys): (Vec<f64>, Vec<f64>) = cantos.iter().map(|p| (p.x, p.y)).unzip();
+        let min = Ponto::novo(xs.iter().copied().fold(f64::MAX, f64::min), ys.iter().copied().fold(f64::MAX, f64::min));
+        let max = Ponto::novo(xs.iter().copied().fold(f64::MIN, f64::max), ys.iter().copied().fold(f64::MIN, f64::max));
+        Caixa { id, cantos, min, max, rotacao }
+    };
+    let mut v = Vec::new();
+    for e in d.entidades() {
+        match &e.geometria {
+            Geometria::Texto { ponto, altura, rotacao, conteudo, h, v: va } => v.push(caixa(e.id, *ponto, *altura, *rotacao, conteudo, *h, *va)),
+            // os rótulos dos símbolos de cad_simbolo moram dentro do bloco: sem isto, tomada sobre tomada passava calada
+            Geometria::Insercao { bloco, ponto, escala_x, escala_y, rotacao } if (*escala_x - 1.0).abs() < 1e-9 && (*escala_y - 1.0).abs() < 1e-9 && rotacao.abs() < 1e-9 => {
+                let Some(b) = d.blocos().get(*bloco).filter(|b| b.nome.starts_with(crate::arquitetura::PREFIXO_SIMBOLO)) else { continue };
+                for n in &b.entidades {
+                    if let Geometria::Texto { ponto: p, altura, rotacao, conteudo, h, v: va } = &n.geometria {
+                        v.push(caixa(e.id, Ponto::novo(p.x - b.base.x + ponto.x, p.y - b.base.y + ponto.y), *altura, *rotacao, conteudo, *h, *va));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    v
 }
 
 /// Encolhe o retângulo 10 % para o lado (texto que só encosta não conta como sobreposto).
@@ -136,6 +149,9 @@ pub fn verificar_leiaute_com(d: &Documento, limite: usize) -> Value {
     for i in 0..textos.len() {
         for j in i + 1..textos.len() {
             let (a, b) = (&textos[i], &textos[j]);
+            if a.id == b.id {
+                continue;
+            }
             if a.max.x <= b.min.x || b.max.x <= a.min.x || a.max.y <= b.min.y || b.max.y <= a.min.y {
                 continue;
             }

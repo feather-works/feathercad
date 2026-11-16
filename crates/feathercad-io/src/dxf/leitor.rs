@@ -277,6 +277,35 @@ fn solido(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
 }
 
 /// Um `3DFACE`: polígono plano no espaço 3D.
+/// Uma `IMAGE`: canto (10), vetor de um pixel em U (11) e em V (12), tamanho em pixels (13) e o `IMAGEDEF` (340)
+/// que diz o arquivo. Os vetores de um pixel × o tamanho dão a largura e a altura inteiras.
+/// shortcut: caminho relativo fica como está (relativo à pasta de onde o app foi aberto); resolver pela pasta do DXF se aparecer.
+fn imagem(o: &Objeto<'_>, arquivos: &BTreeMap<String, String>, camadas: &mut Camadas) -> Option<NovaEntidade> {
+    let arquivo = arquivos.get(&o.primeiro(340)?.trim().to_uppercase())?.clone();
+    let (largura, altura) = (o.numero(13)?, o.numero(23)?);
+    let (pu, pv) = (ponto(o, 11, 21)?, ponto(o, 12, 22)?);
+    Some(NovaEntidade {
+        camada: camada_da(o, camadas),
+        cor: cor_da_entidade(o),
+        geometria: Geometria::Imagem {
+            origem: ponto(o, 10, 20)?,
+            u: Ponto::novo3d(pu.x * largura, pu.y * largura, pu.z * largura),
+            v: Ponto::novo3d(pv.x * altura, pv.y * altura, pv.z * altura),
+            arquivo,
+        },
+        props: props_da(o),
+        espaco: espaco_do(o),
+    })
+}
+
+/// Handle (maiúsculo) de cada `IMAGEDEF` → o arquivo da imagem.
+fn arquivos_de_imagem(objs: &[Objeto<'_>]) -> BTreeMap<String, String> {
+    objs.iter()
+        .filter(|o| o.tipo == "IMAGEDEF")
+        .filter_map(|o| Some((o.primeiro(5)?.trim().to_uppercase(), decodificar_u(o.primeiro(1)?.trim()))))
+        .collect()
+}
+
 fn face3d(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
     let c = cantos(o);
     if c.len() < 3 {
@@ -725,6 +754,8 @@ struct Leitura {
     camadas: Camadas,
     /// Nome do bloco (minúsculo) → índice em `Documento::blocos()`.
     blocos: BTreeMap<String, usize>,
+    /// Handle do `IMAGEDEF` → arquivo (`IMAGE` aponta para ele pelo código 340).
+    imagens: BTreeMap<String, String>,
     ignorados: Ignorados,
     /// O que foi ignorado **dentro** de definições de bloco (aviso à parte).
     ignorados_de_blocos: Ignorados,
@@ -903,6 +934,7 @@ fn entidade(objs: &[Objeto<'_>], i: usize, l: &mut Leitura, saida: &mut Vec<Nova
         "POINT" => (ponto_solto(o, camadas), 0),
         "SOLID" | "TRACE" => (solido(o, camadas), 0),
         "3DFACE" => (face3d(o, camadas), 0),
+        "IMAGE" => (imagem(o, &l.imagens, camadas), 0),
         "ELLIPSE" => (elipse(o, camadas), 0),
         "SPLINE" => (spline(o, camadas), 0),
         "MULTILEADER" => {
@@ -951,6 +983,7 @@ pub fn ler(bytes: &[u8]) -> Result<Aberto, String> {
     let mut l = Leitura {
         camadas: Camadas { lista: Vec::new(), por_nome: BTreeMap::new() },
         blocos: numerar_blocos(&objs),
+        imagens: arquivos_de_imagem(&objs),
         ignorados: Ignorados::default(),
         ignorados_de_blocos: Ignorados::default(),
     };

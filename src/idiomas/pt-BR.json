@@ -715,6 +715,7 @@
     "pdfGravado": "PDF gravado: {caminho}",
     "entidadesIgnoradas": "{n} objeto(s) ficaram de fora do desenho (ainda não suportados): {tipos}.",
     "dentroDeBlocos": "{n} objeto(s) dentro de blocos ficaram de fora (ainda não suportados): {tipos}.",
+    "imagemNaoGravada": "{n} imagem(ns) não foram gravadas no DXF (o DXF R12 não tem imagem). Salve como .fcdz para não perdê-las.",
     "hachuraNaoGravada": "{n} hachura(s) não foram gravadas no DXF (área com ilha, ou detalhe demais). Salve como .fcdz para não perdê-las.",
     "espacoPapelIgnorado": "{n} objeto(s) do espaço do papel foram ignorados.",
     "corAproximada": "{n} cor(es) foram aproximadas para a tabela de cores do DXF (ACI).",
