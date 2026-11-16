@@ -1,13 +1,19 @@
 # FeatherCAD
 
-> **Produto independente — repositório planejado:** `feather-works/feathercad`.
-> O projeto ainda está nesta pasta do repositório de desenvolvimento; a separação Git não foi realizada.
+> **Produto independente**, em repositório próprio desde 16/11/2026 (`feather-works/feathercad`). Versão **alpha**: ainda em desenvolvimento.
+
+## Baixar
+
+| Sistema | Arquivo | Como instalar |
+|---|---|---|
+| **Windows 10/11** | [FeatherCAD-windows-x64.exe](https://github.com/feather-works/feathercad/releases/latest/download/FeatherCAD-windows-x64.exe) | rode o instalador |
+| **Linux** (Ubuntu, Debian, Mint…) | [feathercad-linux-amd64.deb](https://github.com/feather-works/feathercad/releases/latest/download/feathercad-linux-amd64.deb) | `sudo apt install ./feathercad-linux-amd64.deb` |
 
 **CAD 2D:** formatos `.fcdz` e `.dxf`, com integração MCP planejada/desenvolvida conforme o estado do código; versões próprias.
 
 **Arquitetura compartilhada:** utiliza a base de motores Rust em [`featheroffice/`](https://github.com/M4R4G0N/FeatherOffice/tree/main/featheroffice) e os componentes de interface Rust/Iced de [`feather-ui`](https://github.com/feather-works/feather-ui) quando aplicáveis. As dependências compartilhadas serão versionadas sem acoplar um produto ao código interno de outro.
 
-**Publicação prevista:** versão **alpha em 30/10/2026**. O produto terá distribuição própria e também poderá ser selecionado isoladamente ou junto aos demais em um **instalador geral planejado**. Isso não significa que a funcionalidade de instalação já esteja pronta.
+**Publicação:** primeira versão alpha (`0.1.0`) em 16/11/2026. O produto terá distribuição própria e também poderá ser selecionado isoladamente ou junto aos demais em um **instalador geral planejado**. Isso não significa que a funcionalidade de instalação já esteja pronta.
 
 
 **Direção atual — 07/10/2026: motor e interface 100% Rust, com Iced.**
