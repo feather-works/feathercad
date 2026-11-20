@@ -41,4 +41,4 @@ cd crates/feathercad && cargo run --release       # new native interface
 
 Internal notes (in Portuguese) live in `docs/`: interface, shortcuts, DXF reference and feature plan.
 
-License: see `LICENSE`.
+License: GPL-3.0.
