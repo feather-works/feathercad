@@ -8,7 +8,8 @@
   },
   "app": {
     "nome": "FeatherCAD",
-    "semTitulo": "Sem título"
+    "semTitulo": "Sem título",
+    "iaTerminou": "A IA mexeu no desenho."
   },
   "titulo": {
     "desfazer": "Desfazer (Ctrl+Z)",
@@ -186,11 +187,10 @@
         "dica": "Gira os objetos em torno de um ponto (GI)"
       },
       "estender": {
-    "clique": "ESTENDER Clique perto da ponta a estender (Enter termina):",
-    "semLimite": "Não há nenhuma forma no caminho desta ponta.",
-    "naoSuporta": "Só se estende linha, arco e polilinha aberta de trechos retos."
-  },
-  "aparar": {
+        "rotulo": "Estender",
+        "dica": "Estende a ponta clicada até a próxima forma (EX)"
+      },
+      "aparar": {
         "rotulo": "Aparar",
         "dica": "Apara o trecho clicado entre os cortes (PA)"
       },
@@ -205,10 +205,6 @@
       "deslocar": {
         "rotulo": "Deslocar",
         "dica": "Cópia paralela à distância dada (O)"
-      },
-      "estender": {
-        "rotulo": "Estender",
-        "dica": "Estende a ponta clicada até a próxima forma (EX)"
       },
       "concordancia": {
         "rotulo": "Concordância",
@@ -519,7 +515,10 @@
       "tangente": "Tangente",
       "no": "Ponto / inserção",
       "proximo": "Mais próximo"
-    }
+    },
+    "novoLayout": "Novo layout (espaço do papel)",
+    "layout": "Layout {n}",
+    "modeloAba": "Modelo"
   },
   "entrada": {
     "distancia": "Dist",
@@ -726,7 +725,8 @@
   "navegacao": {
     "maisZoom": "Aproximar",
     "menosZoom": "Afastar",
-    "ajustar": "Enquadrar o desenho (duplo clique na roda)"
+    "ajustar": "Enquadrar o desenho (duplo clique na roda)",
+    "orbita": "Órbita 3D (Shift + roda apertada)"
   },
   "tema": {
     "dica": "Tema: {modo} (clique para trocar)",
@@ -763,7 +763,15 @@
     "sul": "S",
     "oeste": "O",
     "leste": "L",
-    "topo": "TOPO"
+    "topo": "TOPO",
+    "frente": "FRENTE",
+    "tras": "TRÁS",
+    "direita": "DIREITA",
+    "esquerda": "ESQUERDA",
+    "baixo": "BAIXO",
+    "iso": "ISO",
+    "dicaFace": "Olhar desta face",
+    "dicaIso": "Vista isométrica (de cima, frente e direita)"
   },
   "edicao": {
     "selecionar": "Selecione os objetos (clique, ou dois cliques para uma janela) e pressione Enter:",
@@ -1289,7 +1297,8 @@
       "inserir": "Inserir",
       "cancelar": "Cancelar",
       "divisoria": "Linha divisória no meio da folha (duas vistas)",
-      "numeroDaFolha": "Nº da folha (vazio = automático)"
+      "numeroDaFolha": "Nº da folha (vazio = automático)",
+      "cobrirSelecao": "Cobrir / enquadrar apenas a seleção atual"
     },
     "escala": {
       "titulo": "Escala da folha",
@@ -1313,5 +1322,10 @@
     "clique": "CONTAR Clique num objeto para contar os iguais a ele (Enter termina):",
     "resultado": "{n} objeto(s) iguais a este (mesmo tipo e medida, folga de 1 %) — por camada: {camadas}. Estão selecionados.",
     "nenhum": "Não há objeto neste ponto."
+  },
+  "estender": {
+    "clique": "ESTENDER Clique perto da ponta a estender (Enter termina):",
+    "semLimite": "Não há nenhuma forma no caminho desta ponta.",
+    "naoSuporta": "Só se estende linha, arco e polilinha aberta de trechos retos."
   }
 }

@@ -2,11 +2,41 @@
 
 **Repositório próprio desde 16/11/2026:** `feather-works/feathercad` (pasta `GitHub/feathercad`). Saiu do FeatherOffice; a pasta `FeatherOffice/feathercad` não existe mais. Não há `Cargo.toml` na raiz: cada crate em `crates/` e o `src-tauri/` compilam em separado.
 
-**Direção atual — 07/10/2026: motor e interface 100% Rust, com Iced.**
-Prioridade: **FeatherSlide → FeatherDocs → FeatherSheet**; FeatherCAD
-depois, se houver tempo. O inventário abaixo registra funcionalidades e
-decisões anteriores; a migração da interface deste aplicativo ainda deve
-ser conferida no código, sem presumir que os recursos já existem em Iced.
+**Direção atual — 17/11/2026: interface em Rust no pelicano** (o Iced foi apagado da suíte em 02/11/2026).
+
+## ⚠ EM ANDAMENTO (17/11/2026): interface no pelicano — `crates/feathercad` — RETOMAR DAQUI
+
+Pedido do usuário: "passa tudo para Rust usando pelicano". O app Tauri (`src/` TypeScript + `src-tauri/`) **continua
+existindo até o novo ter tudo**; só então apagar os dois (e mover `src/idiomas/*.json` para dentro do crate, hoje lidos
+por `include_str!("../../../src/idiomas/…")`).
+- Arquitetura: a casca fala com o motor **só pela `Ponte`** (`motor.rs`, mesmo contrato JSON do `src/ponte/index.ts`);
+  o desenho vem do `quadro` FCQ1 (`quadro.rs`, decodificador com teste contra o motor) e é pintado em `area.rs` (um
+  `pelicano::Program`: caminhos montados uma vez por quadro, um por cor/espessura; contornos dos textos guardados na
+  1ª pintura). MCP ao vivo em `mcp_vivo.rs` (pedido chega ao `update` por subscription, documento troca de lugar com o
+  do `Agente`); segundo FeatherCAD entrega os arquivos ao primeiro (`main.rs`, `pedir_foco`).
+- **Feito (17/11/2026, 10 testes, clippy limpo, compila para Windows; conferido por vídeo com `PELICANO_ROTEIRO`+`PELICANO_GRAVAR`):**
+  todas as janelas do TS. Abas de desenho (`doc.rs`: **cada aba tem o próprio motor e o próprio Ctrl+Z**; no TS trocar de
+  aba regravava o desenho e perdia o histórico), "Alterações não salvas" ao fechar aba e ao sair (um desenho por vez),
+  página inicial (`inicio.rs`: Recentes/Projetos, lista/miniaturas em segundo plano), unidade, camadas (`camadas.rs`),
+  paleta de propriedades (`propriedades.rs`, Ctrl+1; só os campos que o motor tem — os 3D que o TS listava davam erro),
+  Configurações (`configuracoes.rs`: tema/destaque, fundo, Snap/Orto/OSNAP, cota, ângulo do Orto, formato, idioma,
+  apelidos, MCP com Testar, Sobre/FPS), hachura, folha (inserir/escala/carimbo) e exportar PDF (`caixas.rs`), faixa
+  completa com camada atual e cor/espessura/tipo (`faixa.rs`; ícones SVG do TS em `icones.rs`), cubo de vista de verdade (`cubo.rs`: faces, arestas,
+  quinas, arrastar = órbita, bússola, ⌂) e barra de navegação, grade 3D girada, imagens do quadro, abas de layout,
+  menu de tipos de snap, avisos flutuantes, Monitor F12 (`feather_ui::monitor`, janela à parte), recarregar quando o
+  arquivo muda no disco, MCP ao vivo (testado ponta a ponta com o `feathercad-mcp` real). Preferências em
+  `<dados>/br.feathercad.app/config.json` (`config.rs`).
+- Consertos de JSON junto: `estender.clique/semLimite/naoSuporta` estavam dentro de `ribbon.botoes` (prompt do Estender
+  saía como chave crua); textos fixos do TS ("FRENTE", "Modelo", "Novo layout", cobrir seleção) viraram chaves.
+- **Ainda não feito / diferente do TS:** fonte e corpo da interface, "pintar em segundo plano", "texto no movimento" e
+  zoom suave (eram da webview); data da página inicial em UTC (sem fuso). **Defeito visto 2×, intermitente:** o pelicano
+  desenhou texto errado num campo ("drag", "> e L") com DXF cheio de textos — o valor real estava certo; suspeita no
+  cache/atlas de glifos do pelicano; não reproduziu ao repetir.
+- **Para trocar de vez:** testar no uso real (Linux e Windows), depois apagar `src/`, `src-tauri/`, `index.html`,
+  `package*.json`, `vite.config.ts`, `test/` e mover `src/idiomas/*.json` para o crate.
+- Rodar: `cargo run --release --manifest-path crates/feathercad/Cargo.toml [desenho.dxf]`.
+
+Inventário anterior (abaixo) registra funcionalidades do app Tauri; não presumir que já existem no pelicano.
 
 ## Onde está cada coisa
 

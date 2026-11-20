@@ -8,7 +8,8 @@
   },
   "app": {
     "nome": "FeatherCAD",
-    "semTitulo": "Untitled"
+    "semTitulo": "Untitled",
+    "iaTerminou": "The AI changed the drawing."
   },
   "titulo": {
     "desfazer": "Undo (Ctrl+Z)",
@@ -186,11 +187,10 @@
         "dica": "Rotates objects about a point (RO)"
       },
       "estender": {
-    "clique": "EXTEND Click near the end to extend (Enter ends):",
-    "semLimite": "There is no shape in the way of this end.",
-    "naoSuporta": "Only lines, arcs and open straight-segment polylines can be extended."
-  },
-  "aparar": {
+        "rotulo": "Extend",
+        "dica": "Extends the clicked end to the next shape (EX)"
+      },
+      "aparar": {
         "rotulo": "Trim",
         "dica": "Trims the clicked part between cuts (TR)"
       },
@@ -205,10 +205,6 @@
       "deslocar": {
         "rotulo": "Offset",
         "dica": "Parallel copy at the given distance (O)"
-      },
-      "estender": {
-        "rotulo": "Extend",
-        "dica": "Extends the clicked end to the next shape (EX)"
       },
       "concordancia": {
         "rotulo": "Fillet",
@@ -519,7 +515,10 @@
       "tangente": "Tangent",
       "no": "Node / insertion",
       "proximo": "Nearest"
-    }
+    },
+    "novoLayout": "New layout (paper space)",
+    "layout": "Layout {n}",
+    "modeloAba": "Model"
   },
   "entrada": {
     "distancia": "Dist",
@@ -726,7 +725,8 @@
   "navegacao": {
     "maisZoom": "Zoom in",
     "menosZoom": "Zoom out",
-    "ajustar": "Zoom to fit the drawing (double-click the wheel)"
+    "ajustar": "Zoom to fit the drawing (double-click the wheel)",
+    "orbita": "3D orbit (Shift + wheel button)"
   },
   "tema": {
     "dica": "Theme: {modo} (click to change)",
@@ -763,7 +763,15 @@
     "sul": "S",
     "oeste": "W",
     "leste": "E",
-    "topo": "TOP"
+    "topo": "TOP",
+    "frente": "FRONT",
+    "tras": "BACK",
+    "direita": "RIGHT",
+    "esquerda": "LEFT",
+    "baixo": "BOTTOM",
+    "iso": "ISO",
+    "dicaFace": "Look from this face",
+    "dicaIso": "Isometric view (top, front and right)"
   },
   "edicao": {
     "selecionar": "Select objects (click, or two clicks for a window) and press Enter:",
@@ -1289,7 +1297,8 @@
       "inserir": "Insert",
       "cancelar": "Cancel",
       "divisoria": "Dividing line across the middle (two views)",
-      "numeroDaFolha": "Sheet no. (empty = automatic)"
+      "numeroDaFolha": "Sheet no. (empty = automatic)",
+      "cobrirSelecao": "Cover / frame only the current selection"
     },
     "escala": {
       "titulo": "Sheet scale",
@@ -1313,5 +1322,10 @@
     "clique": "COUNT Click an object to count the ones equal to it (Enter ends):",
     "resultado": "{n} object(s) equal to this one (same type and size, 1 % tolerance) — by layer: {camadas}. They are selected.",
     "nenhum": "There is no object at this point."
+  },
+  "estender": {
+    "clique": "EXTEND Click near the end to extend (Enter ends):",
+    "semLimite": "There is no shape in the way of this end.",
+    "naoSuporta": "Only lines, arcs and open straight-segment polylines can be extended."
   }
 }
