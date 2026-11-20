@@ -89,10 +89,17 @@ pub fn gravar_bytes(doc: &Documento, caminho: &Path) -> Res<(Vec<u8>, Vec<String
 /// meio não deixam o arquivo da pessoa cortado (o app já gravava assim).
 pub(crate) fn gravar_seguro(destino: &std::path::Path, bytes: &[u8]) -> Res<()> {
     use std::io::Write;
+    // Um atalho (symlink) é seguido: o renomear trocava o atalho por um arquivo e o original ficava velho.
+    let real = std::fs::canonicalize(destino).ok();
+    let destino = real.as_deref().unwrap_or(destino);
+    let permissoes = std::fs::metadata(destino).map(|m| m.permissions()).ok();
     let mut nome = destino.as_os_str().to_owned();
     nome.push(".parcial");
     let tmp = PathBuf::from(nome);
     let r = std::fs::File::create(&tmp).and_then(|mut f| {
+        if let Some(p) = permissoes {
+            f.set_permissions(p)?;
+        }
         f.write_all(bytes)?;
         f.sync_all()
     });
@@ -200,6 +207,24 @@ mod testes_ao_vivo {
         assert!(ag.pode_trocar_o_desenho(&json!({ "descartar": true })).is_ok());
         ag.tema_claro = None;
         assert!(ag.pode_trocar_o_desenho(&json!({})).is_ok(), "fora do modo ao vivo o desenho é só do MCP");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn gravar_seguro_por_um_atalho_grava_no_original_e_mantem_permissoes() {
+        use std::os::unix::fs::PermissionsExt;
+        let pasta = std::env::temp_dir().join(format!("fcad-atalho-{}", std::process::id()));
+        std::fs::create_dir_all(&pasta).unwrap();
+        let (real, atalho) = (pasta.join("real.fcdz"), pasta.join("atalho.fcdz"));
+        std::fs::write(&real, b"velho").unwrap();
+        std::fs::set_permissions(&real, std::fs::Permissions::from_mode(0o600)).unwrap();
+        std::os::unix::fs::symlink(&real, &atalho).unwrap();
+        gravar_seguro(&atalho, b"novo").unwrap();
+        let conteudo = std::fs::read(&real).unwrap();
+        let link = std::fs::symlink_metadata(&atalho).unwrap().file_type().is_symlink();
+        let modo = std::fs::metadata(&real).unwrap().permissions().mode() & 0o777;
+        let _ = std::fs::remove_dir_all(&pasta);
+        assert_eq!((conteudo.as_slice(), link, modo), (&b"novo"[..], true, 0o600));
     }
 
     #[test]

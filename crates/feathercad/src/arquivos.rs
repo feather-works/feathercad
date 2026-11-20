@@ -188,13 +188,20 @@ pub fn dxf_mais_novo_que_r12(caminho: &Path) -> bool {
 /// Grava o desenho em `caminho` (num `.parcial` e renomeia: uma falha no meio não estraga o arquivo que já existia).
 pub fn gravar(motor: &mut Motor, caminho: &Path, formato: Formato) -> Result<Estado, String> {
     let bytes = motor.gravar(formato.extensao())?;
-    let parcial = caminho.with_extension("parcial");
+    // Um atalho (symlink) é seguido: o renomear trocava o atalho por um arquivo e o original ficava velho.
+    let real = std::fs::canonicalize(caminho).ok();
+    let destino = real.as_deref().unwrap_or(caminho);
+    let parcial = destino.with_extension("parcial");
+    let permissoes = std::fs::metadata(destino).map(|m| m.permissions()).ok();
     // Força para o disco antes de trocar: sem isso uma queda de energia logo depois pode deixar o arquivo vazio.
     let r = std::fs::File::create(&parcial).and_then(|mut f| {
+        if let Some(p) = permissoes {
+            f.set_permissions(p)?;
+        }
         std::io::Write::write_all(&mut f, &bytes)?;
         f.sync_all()
     });
-    if let Err(e) = r.and_then(|()| std::fs::rename(&parcial, caminho)) {
+    if let Err(e) = r.and_then(|()| std::fs::rename(&parcial, destino)) {
         let _ = std::fs::remove_file(&parcial);
         return Err(format!("Não consegui gravar \"{}\": {e}", caminho.display()));
     }
