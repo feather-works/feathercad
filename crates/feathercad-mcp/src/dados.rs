@@ -27,7 +27,9 @@ fn pasta(ag: &Agente) -> PathBuf {
 pub fn gravar(ag: &Agente, nome: &str, valor: &Value) -> Res<String> {
     let dir = pasta(ag);
     std::fs::create_dir_all(&dir).map_err(|e| format!("não consegui criar `{}`: {e}", dir.display()))?;
-    let caminho = dir.join(format!("{nome}.json"));
+    // O nome vem do agente (`nome`, `nuvem`): barra e `..` não tiram o arquivo da pasta de dados.
+    let nome: String = nome.chars().map(|c| if matches!(c, '/' | '\\' | ':') { '_' } else { c }).collect();
+    let caminho = dir.join(format!("{}.json", nome.trim_start_matches('.')));
     std::fs::write(&caminho, serde_json::to_vec(valor).map_err(|e| e.to_string())?).map_err(|e| format!("não consegui gravar `{}`: {e}", caminho.display()))?;
     Ok(caminho.display().to_string())
 }
