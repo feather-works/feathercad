@@ -8,6 +8,7 @@
 |---|---|---|
 | **Windows 10/11** | [FeatherCAD-windows-x64.exe](https://github.com/feather-works/feathercad/releases/latest/download/FeatherCAD-windows-x64.exe) | rode o instalador |
 | **Linux** (Ubuntu, Debian, Mint…) | [feathercad-linux-amd64.deb](https://github.com/feather-works/feathercad/releases/latest/download/feathercad-linux-amd64.deb) | `sudo apt install ./feathercad-linux-amd64.deb` |
+| **Linux** (qualquer distribuição, sem administrador) | [feathercad-linux-x86_64.tar.gz](https://github.com/feather-works/feathercad/releases/latest/download/feathercad-linux-x86_64.tar.gz) | extraia e rode `sh instalar.sh` (vai para `~/.local`; é o pacote que o FeatherWorks Launcher usa). Gerado do `.deb` por `scripts/tar-linux.sh`. |
 
 **CAD 2D:** formatos `.fcdz` e `.dxf`, com integração MCP planejada/desenvolvida conforme o estado do código; versões próprias.
 
