@@ -97,6 +97,8 @@ pub fn cor_de(args: &Value, nome: &str) -> Res<Option<u32>> {
 
 /// Número para tabela/rótulo: `decimais` casas, vírgula decimal se `virgula`.
 pub fn formatar(v: f64, decimais: usize, virgula: bool) -> String {
+    // `decimais` vem do pedido: 10 bilhões de casas eram uma string de 10 GB.
+    let decimais = decimais.min(12);
     let s = format!("{v:.decimais$}");
     let s = if s == "-0" || s.starts_with("-0.") && s[1..].chars().all(|c| c == '0' || c == '.') { s[1..].to_string() } else { s };
     if virgula { s.replace('.', ",") } else { s }

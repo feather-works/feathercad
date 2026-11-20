@@ -14,20 +14,11 @@ const BINARIO: &str = "AutoCAD Binary DXF";
 /// Tipos que acompanham outra entidade e não contam como entidade solta. `ATTDEF` é só o molde
 /// do atributo (não aparece no desenho); o texto que se vê é o `ATTRIB` do INSERT, lido como `TEXT`.
 const FILHAS: [&str; 3] = ["VERTEX", "SEQEND", "ATTDEF"];
-/// `POLYLINE` de 3D (8), malha (16, 64): não são polilinhas 2D.
-const POLYLINE_NAO_2D: i32 = 8 | 16 | 64;
+/// `POLYLINE` de malha (16, 64): não é polilinha. A 3D (8) entra com o Z dos vértices (curvas de nível que o próprio app grava).
+const POLYLINE_NAO_2D: i32 = 16 | 64;
 /// Vértice de controle de spline numa `POLYLINE` ajustada: não faz parte do traçado.
 const VERTICE_DE_CONTROLE: i32 = 16;
 
-/// Bytes → texto. R2007+ é UTF-8; as versões antigas usam a página de código do
-/// arquivo (`$DWGCODEPAGE`), e aqui se assume ANSI_1252 (Latin-1 na prática).
-fn decodificar(bytes: &[u8]) -> String {
-    let sem_bom = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
-    match std::str::from_utf8(sem_bom) {
-        Ok(t) => t.to_string(),
-        Err(_) => sem_bom.iter().map(|b| char::from(*b)).collect(),
-    }
-}
 
 /// Divide o texto em objetos (cada um começa numa tag `0`). Comentários (`999`)
 /// somem aqui. Erro de formato diz a linha.
@@ -619,7 +610,9 @@ fn hachura(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
         }
         // Objetos de origem (`97` + `330`…): não usados.
         r.pegar(97);
-        while r.pegar(330).is_some() {}
+        while r.espiar() == Some(330) {
+            r.i += 1;
+        }
         laco.dedup_by(|b, a| (a.p.x - b.p.x).abs() < 1e-12 && (a.p.y - b.p.y).abs() < 1e-12 && a.bulge == 0.0);
         // Dois vértices com bulge formam um círculo (duas meias-voltas).
         if laco.len() >= 3 || (laco.len() == 2 && laco.iter().any(|v| v.bulge != 0.0)) {
@@ -639,7 +632,8 @@ fn hachura(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
             let (dx, dy) = (r.pegar(45)?, r.pegar(46)?);
             let mut tracos = Vec::new();
             for _ in 0..r.pegar(79)? as usize {
-                tracos.extend(r.pegar(49));
+                let Some(t) = r.pegar(49) else { break };
+                tracos.push(t);
             }
             padrao.push(LinhaDePadrao { angulo, base, dx, dy, tracos });
         }
@@ -649,6 +643,8 @@ fn hachura(o: &Objeto<'_>, camadas: &mut Camadas) -> Option<NovaEntidade> {
 
 /// Uma matriz de INSERT (`MINSERT`) tem no máximo tantas cópias (proteção contra arquivo absurdo).
 const MATRIZ_MAXIMA: i64 = 5000;
+/// Teto de inserções no arquivo inteiro (mil MINSERTs de 5000 não viram 5 milhões de cópias).
+const INSERCOES_MAXIMAS: usize = 200_000;
 
 /// Espaço entre linhas de um `MTEXT`, em alturas de texto (o "espaçamento simples" do AutoCAD).
 const ENTRELINHA_MTEXT: f64 = 5.0 / 3.0;
@@ -759,6 +755,8 @@ struct Leitura {
     ignorados: Ignorados,
     /// O que foi ignorado **dentro** de definições de bloco (aviso à parte).
     ignorados_de_blocos: Ignorados,
+    /// Inserções já criadas (para `INSERCOES_MAXIMAS`).
+    insercoes: usize,
 }
 
 /// Blocos do próprio espaço modelo/papel: suas entidades já vêm em ENTITIES.
@@ -818,9 +816,10 @@ fn insercoes(o: &Objeto<'_>, l: &mut Leitura, nome: &str, cota: bool) -> Option<
     let mut v = Vec::new();
     'matriz: for r in 0..linhas {
         for c in 0..colunas {
-            if v.len() as i64 >= MATRIZ_MAXIMA {
+            if v.len() as i64 >= MATRIZ_MAXIMA || l.insercoes >= INSERCOES_MAXIMAS {
                 break 'matriz;
             }
+            l.insercoes += 1;
             // O deslocamento acompanha o giro do próprio INSERT.
             let (dx, dy) = (c as f64 * espaco_c, r as f64 * espaco_l);
             let ponto = Ponto::novo(base.x + dx * cosseno - dy * seno, base.y + dx * seno + dy * cosseno);
@@ -975,7 +974,7 @@ pub fn ler(bytes: &[u8]) -> Result<Aberto, String> {
     if bytes.starts_with(BINARIO.as_bytes()) {
         return Err("Este é um DXF binário; por enquanto só abro DXF de texto. Salve-o como DXF ASCII no programa de origem.".into());
     }
-    let texto = decodificar(bytes);
+    let texto = crate::decodificar_bytes(bytes);
     let objs = objetos(&texto)?;
     if objs.is_empty() {
         return Err("O arquivo não parece um DXF (nenhuma seção encontrada).".into());
@@ -986,6 +985,7 @@ pub fn ler(bytes: &[u8]) -> Result<Aberto, String> {
         imagens: arquivos_de_imagem(&objs),
         ignorados: Ignorados::default(),
         ignorados_de_blocos: Ignorados::default(),
+        insercoes: 0,
     };
     let mut entidades = Vec::new();
     let mut blocos: Vec<Bloco> = Vec::new();

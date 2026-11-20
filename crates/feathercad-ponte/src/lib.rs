@@ -36,7 +36,7 @@ const ALCANCE_OSNAP_PX: f64 = 12.0;
 const ALCANCE_DA_ESCOLHA_PX: f64 = 6.0;
 
 /// Os nomes de comando que a ponte atende (o teste confere contra o TypeScript).
-pub const COMANDOS_DA_PONTE: [&str; 54] = [
+pub const COMANDOS_DA_PONTE: [&str; 53] = [
     "estado",
     "comandos",
     "comandos_da_ponte",
@@ -90,7 +90,6 @@ pub const COMANDOS_DA_PONTE: [&str; 54] = [
     "quadro_arrasto",
     "layout_criar",
     "layout_alternar",
-    "viewport_inserir",
 ];
 
 /// O documento vivo + a sessão de trabalho.
@@ -183,13 +182,6 @@ struct PedidoLayoutCriar {
 #[derive(Deserialize)]
 struct PedidoLayoutAlternar {
     nome: String,
-}
-
-#[derive(Deserialize)]
-struct PedidoViewportInserir {
-    layout: String,
-    largura_papel: f64,
-    altura_papel: f64,
 }
 
 #[derive(Serialize)]
@@ -601,7 +593,6 @@ impl Ponte {
             "quadro_arrasto" => self.quadro_arrasto(corpo),
             "layout_criar" => self.layout_criar(corpo),
             "layout_alternar" => self.layout_alternar(corpo),
-            "viewport_inserir" => self.viewport_inserir(corpo),
             _ => Err(format!("comando desconhecido na ponte: `{comando}`")),
         }
     }
@@ -1141,26 +1132,6 @@ impl Ponte {
             feathercad_core::documento::Espaco::Layout(p.nome)
         };
         self.doc.definir_espaco_ativo(espaco);
-        self.estado()
-    }
-
-    fn viewport_inserir(&mut self, corpo: &[u8]) -> Result<Vec<u8>, String> {
-        let p: PedidoViewportInserir = ler("viewport_inserir", corpo)?;
-        if let Some(l) = self.doc.layouts_mut().iter_mut().find(|l| l.nome == p.layout) {
-            let id = (l.viewports.len() as u64) + 1;
-            let vp = feathercad_core::documento::Viewport {
-                id,
-                centro_papel: Ponto::novo(l.largura_mm / 2.0, l.altura_mm / 2.0),
-                largura_papel: p.largura_papel,
-                altura_papel: p.altura_papel,
-                centro_modelo: Ponto::novo(0.0, 0.0),
-                escala_modelo: 1.0,
-                ativa: true,
-                bloqueada: false,
-            };
-            l.viewports.push(vp);
-            l.viewport_ativa = Some(id);
-        }
         self.estado()
     }
 

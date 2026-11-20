@@ -452,6 +452,6 @@ fn importar_do_disco_e_modo_projeto_com_ver_em_arquivo() {
     let (c, _) = s.ferramenta("cad_ver", json!({}));
     assert_eq!(c[0]["type"], "image", "sem `arquivo` a imagem segue na conversa");
     s.json("cad_modo", json!({ "projeto": false }));
-    assert_eq!(s.json("cad_ver", json!({ "arquivo": png.to_str().unwrap() }))["pixels"][0], 1000);
+    assert_eq!(s.json("cad_ver", json!({ "arquivo": png.to_str().unwrap(), "sobrescrever": true }))["pixels"][0], 1000);
     let _ = std::fs::remove_dir_all(&pasta);
 }

@@ -58,7 +58,10 @@ fn ver(ag: &Agente, fonte: &Fonte, args: &Value) -> Res<Conteudo> {
         if !caminho.to_lowercase().ends_with(".png") {
             return Err("`arquivo` precisa terminar em `.png`".into());
         }
-        std::fs::write(caminho, &img.png).map_err(|e| format!("não consegui gravar `{caminho}`: {e}"))?;
+        if std::path::Path::new(caminho).exists() && !args.get("sobrescrever").and_then(Value::as_bool).unwrap_or(false) {
+            return Err(format!("`{caminho}` já existe; passe `sobrescrever: true` se é isso mesmo"));
+        }
+        crate::agente::gravar_seguro(std::path::Path::new(caminho), &img.png)?;
         let mut l = legenda;
         l["arquivo"] = json!(caminho);
         l["bytes"] = json!(img.png.len());
@@ -93,6 +96,7 @@ fn importar_texto(ag: &mut Agente, args: &Value) -> Res<Conteudo> {
     };
     let lido = importar(fonte)?;
     if args.get("substituir").and_then(Value::as_bool).unwrap_or(false) {
+        ag.pode_trocar_o_desenho(args)?;
         let un = lido.unidade.as_deref().and_then(feathercad_core::documento::Unidade::de_nome).or(ag.doc.unidade());
         ag.doc = feathercad_core::documento::Documento::default().com_unidade(un);
         ag.arquivo = None;
@@ -162,8 +166,8 @@ pub fn chamar(ag: &mut Agente, fonte: &Fonte, nome: &str, args: &Value) -> Res<C
             ag.doc.adicionar_linha(feathercad_core::geom::Ponto::novo(0.0, 0.0), feathercad_core::geom::Ponto::novo(1.0, 1.0));
             panic!("pânico de teste");
         }
-        "cad_novo" => ag.novo(texto_de(args, "unidade")?).map(|v| texto(&v)),
-        "cad_abrir" => ag.abrir(texto_de(args, "caminho")?).map(|v| texto(&v)),
+        "cad_novo" => ag.pode_trocar_o_desenho(args).and_then(|()| ag.novo(texto_de(args, "unidade")?)).map(|v| texto(&v)),
+        "cad_abrir" => ag.pode_trocar_o_desenho(args).and_then(|()| ag.abrir(texto_de(args, "caminho")?)).map(|v| texto(&v)),
         "cad_salvar" => ag.salvar(texto_opcional(args, "caminho"), args.get("sobrescrever").and_then(Value::as_bool).unwrap_or(false), args.get("verificar_checklist").and_then(Value::as_bool).unwrap_or(false), texto_opcional(args, "dominio")).map(|mut v| {
             // o esquema promete `leiaute`; antes ele era aceito e ignorado, e texto sobre texto passava calado
             if args.get("leiaute").and_then(Value::as_bool).unwrap_or(false) {

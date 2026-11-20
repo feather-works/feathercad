@@ -6,7 +6,7 @@
 
 use std::io::{Cursor, Read, Write};
 
-use feathercad_core::documento::{AlinhaH, AlinhaV, Bloco, Camada, Documento, Geometria, LinhaDePadrao, NovaEntidade, Propriedades, TipoLinha, Unidade};
+use feathercad_core::documento::{AlinhaH, AlinhaV, Bloco, Camada, Documento, Espaco, Geometria, InfoLayout, LinhaDePadrao, NovaEntidade, Propriedades, TipoLinha, Unidade};
 use feathercad_core::geom::{Ponto, Vertice};
 use serde::{Deserialize, Serialize};
 use zip::write::SimpleFileOptions;
@@ -103,6 +103,8 @@ struct EntidadeJson {
     cor: Option<u32>,
     #[serde(default)]
     props: Propriedades,
+    #[serde(default, skip_serializing_if = "eh_modelo")]
+    espaco: Espaco,
     #[serde(flatten)]
     geometria: GeometriaJson,
 }
@@ -123,11 +125,18 @@ struct DesenhoJson {
     unidade: Option<String>,
     #[serde(default)]
     blocos: Vec<BlocoJson>,
+    /// Ausente nos arquivos antigos: ficam os layouts padrão do documento.
+    #[serde(default)]
+    layouts: Option<Vec<InfoLayout>>,
     entidades: Vec<EntidadeJson>,
 }
 
+fn eh_modelo(e: &Espaco) -> bool {
+    *e == Espaco::Modelo
+}
+
 fn nova_para_json(n: &NovaEntidade) -> EntidadeJson {
-    EntidadeJson { camada: n.camada, cor: n.cor, props: n.props.clone(), geometria: (&n.geometria).into() }
+    EntidadeJson { camada: n.camada, cor: n.cor, props: n.props.clone(), espaco: n.espaco.clone(), geometria: (&n.geometria).into() }
 }
 
 fn para_json(doc: &Documento) -> DesenhoJson {
@@ -136,10 +145,11 @@ fn para_json(doc: &Documento) -> DesenhoJson {
         blocos: doc.blocos().iter().map(|b| BlocoJson { nome: b.nome.clone(), base: b.base, entidades: b.entidades.iter().map(nova_para_json).collect() }).collect(),
         camadas: doc.camadas().iter().map(|c| CamadaJson { nome: c.nome.clone(), cor: c.cor, ligada: c.ligada, congelada: c.congelada, bloqueada: c.bloqueada, plotar: c.plotar, tipo_linha: c.tipo_linha, espessura: c.espessura, transparencia: c.transparencia }).collect(),
         camada_atual: doc.camada_atual(),
+        layouts: Some(doc.layouts().to_vec()),
         entidades: doc
             .entidades()
             .iter()
-            .map(|e| EntidadeJson { camada: e.camada, cor: e.cor, props: e.props.clone(), geometria: (&e.geometria).into() })
+            .map(|e| EntidadeJson { camada: e.camada, cor: e.cor, props: e.props.clone(), espaco: e.espaco.clone(), geometria: (&e.geometria).into() })
             .collect(),
     }
 }
@@ -158,10 +168,16 @@ pub fn gravar(doc: &Documento) -> Result<Vec<u8>, String> {
     Ok(zip.finish().map_err(|e| erro(&e))?.into_inner())
 }
 
+/// Teto do que um arquivo de dentro do `.fcdz` pode ter descompactado (um zip de poucos MB pode virar dezenas de GB).
+const LIMITE_DESCOMPACTADO: u64 = 1 << 30;
+
 fn ler_arquivo(zip: &mut zip::ZipArchive<Cursor<&[u8]>>, nome: &str) -> Result<Vec<u8>, String> {
-    let mut f = zip.by_name(nome).map_err(|_| format!("O .fcdz está incompleto: falta \"{nome}\"."))?;
+    let f = zip.by_name(nome).map_err(|_| format!("O .fcdz está incompleto: falta \"{nome}\"."))?;
     let mut dados = Vec::new();
-    f.read_to_end(&mut dados).map_err(|e| format!("Não consegui ler \"{nome}\" do .fcdz: {e}"))?;
+    f.take(LIMITE_DESCOMPACTADO + 1).read_to_end(&mut dados).map_err(|e| format!("Não consegui ler \"{nome}\" do .fcdz: {e}"))?;
+    if dados.len() as u64 > LIMITE_DESCOMPACTADO {
+        return Err(format!("\"{nome}\" passa de 1 GB descompactado; não abro (arquivo danificado ou feito para esgotar a memória)."));
+    }
     Ok(dados)
 }
 
@@ -174,8 +190,12 @@ pub fn ler(bytes: &[u8]) -> Result<Aberto, String> {
     }
     let d: DesenhoJson = serde_json::from_slice(&ler_arquivo(&mut zip, "data/desenho.json")?).map_err(|e| format!("desenho.json ilegível: {e}"))?;
     let camadas = d.camadas.into_iter().map(|c| Camada { ligada: c.ligada, congelada: c.congelada, bloqueada: c.bloqueada, plotar: c.plotar, tipo_linha: c.tipo_linha, espessura: c.espessura, transparencia: c.transparencia.min(90), ..Camada::nova(c.nome, c.cor) }).collect();
-    let nova = |e: EntidadeJson| NovaEntidade { camada: e.camada, cor: e.cor, geometria: e.geometria.into(), props: e.props, espaco: feathercad_core::documento::Espaco::Modelo };
+    let nova = |e: EntidadeJson| NovaEntidade { camada: e.camada, cor: e.cor, geometria: e.geometria.into(), props: e.props, espaco: e.espaco };
     let blocos = d.blocos.into_iter().map(|b| Bloco { nome: b.nome, base: b.base, entidades: b.entidades.into_iter().map(nova).collect() }).collect();
     let entidades = d.entidades.into_iter().map(nova).collect();
-    Ok(Aberto { doc: Documento::de_partes_com_blocos(camadas, d.camada_atual, blocos, entidades).com_unidade(d.unidade.as_deref().and_then(Unidade::de_nome)), avisos: Vec::new(), versao_dxf: None })
+    let mut doc = Documento::de_partes_com_blocos(camadas, d.camada_atual, blocos, entidades).com_unidade(d.unidade.as_deref().and_then(Unidade::de_nome));
+    if let Some(layouts) = d.layouts {
+        *doc.layouts_mut() = layouts;
+    }
+    Ok(Aberto { doc, avisos: Vec::new(), versao_dxf: None })
 }

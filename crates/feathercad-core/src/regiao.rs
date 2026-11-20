@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::documento::{Documento, Geometria};
 use crate::edicao::pontos_da_polilinha;
-use crate::geom::{amostrar_arco, varredura_graus, Ponto};
+use crate::geom::{amostrar_arco, dentro_do_laco, varredura_graus, Ponto};
 
 /// Mais segmentos que isto e a busca desiste (proteção; a hachura por ponto não é para desenhos gigantes).
 const SEGMENTOS_MAXIMOS: usize = 20_000;
@@ -67,16 +67,6 @@ fn area_com_sinal(l: &[Ponto]) -> f64 {
     (0..l.len()).map(|i| (l[i].x * l[(i + 1) % l.len()].y - l[(i + 1) % l.len()].x * l[i].y) / 2.0).sum()
 }
 
-fn contem(laco: &[Ponto], p: Ponto) -> bool {
-    let mut dentro = false;
-    for i in 0..laco.len() {
-        let (a, b) = (laco[i], laco[(i + 1) % laco.len()]);
-        if (a.y > p.y) != (b.y > p.y) && p.x < a.x + (p.y - a.y) / (b.y - a.y) * (b.x - a.x) {
-            dentro = !dentro;
-        }
-    }
-    dentro
-}
 
 /// Onde cada segmento é cortado (parâmetros t em 0..1): cruzamentos, encostos em T e pontas de colineares.
 /// Varre por x, para não comparar tudo com tudo.
@@ -219,7 +209,7 @@ fn preparar(doc: &Documento) -> Option<(Vec<Ponto>, Vec<Vec<usize>>, f64)> {
 /// A menor região fechada, feita de traços soltos, que contém `p`: o contorno em pontos (sentido anti-horário).
 pub fn regiao_em(doc: &Documento, p: Ponto) -> Option<Vec<Ponto>> {
     let (nos, vizinhos, minima) = preparar(doc)?;
-    faces_de_dentro(&nos, &vizinhos, minima).into_iter().filter(|(_, pts)| contem(pts, p)).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(_, pts)| pts)
+    faces_de_dentro(&nos, &vizinhos, minima).into_iter().filter(|(_, pts)| dentro_do_laco(p, pts)).min_by(|a, b| a.0.total_cmp(&b.0)).map(|(_, pts)| pts)
 }
 
 /// Todas as regiões fechadas do desenho (cada volta do grafo de traços), da menor para a maior, com a área.

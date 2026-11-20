@@ -879,7 +879,8 @@ impl Sessao {
         // Separador de coordenadas: 2D (x;y ou x,y) ou 3D (x;y;z ou x,y,z).
         let sep = self.regional.separador_de_coordenadas;
         let mut partes: Vec<&str> = resto.split(sep).collect();
-        if partes.len() == 1 && resto.contains(',') {
+        // Com vírgula decimal (pt-BR) `2,5` é a distância 2,5, não o ponto (2;5).
+        if partes.len() == 1 && resto.contains(',') && self.regional.decimal != ',' {
             partes = resto.split(',').collect();
         } else if partes.len() == 1 && resto.contains(';') {
             partes = resto.split(';').collect();

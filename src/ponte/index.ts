@@ -75,7 +75,6 @@ export const COMANDOS_DA_PONTE_ESPERADOS: readonly string[] = [
   'quadro_arrasto',
   'layout_criar',
   'layout_alternar',
-  'viewport_inserir',
 ];
 
 /** O motor de um documento. */
@@ -338,11 +337,6 @@ export class Motor {
   /** Alterna o espaço ativo ('modelo' ou nome do layout). */
   layoutAlternar(nome: string): Estado {
     return this.json('layout_alternar', { nome });
-  }
-
-  /** Insere uma nova Viewport (MVIEW) no layout especificado. */
-  viewportInserir(layout: string, largura_papel: number, altura_papel: number): Estado {
-    return this.json('viewport_inserir', { layout, largura_papel, altura_papel });
   }
 
   /** Durante o "grab": só os objetos arrastados, desenhados onde o cursor os põe. */

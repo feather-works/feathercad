@@ -127,6 +127,18 @@ fn linha_de_comando_desenha_com_coordenadas_digitadas() {
 }
 
 #[test]
+fn linha_com_distancia_de_virgula_decimal_em_pt_br() {
+    let mut d = Documento::default();
+    let mut s = sessao_com_comandos();
+    s.digitar(&mut d, "l");
+    s.digitar(&mut d, "100;100");
+    s.cursor = Some(p(200.0, 100.0));
+    s.digitar(&mut d, "2,5");
+    let g = &d.entidades().last().expect("a linha").geometria;
+    assert_eq!(*g, feathercad_core::documento::Geometria::Linha { a: p(100.0, 100.0), b: p(102.5, 100.0) }, "2,5 é distância, não o ponto (2;5)");
+}
+
+#[test]
 fn comando_desconhecido_vira_mensagem_com_o_nome() {
     let mut d = Documento::default();
     let mut s = sessao_com_comandos();

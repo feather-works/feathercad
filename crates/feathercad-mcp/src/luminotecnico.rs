@@ -245,6 +245,9 @@ fn arred(v: f64, c: i32) -> f64 {
 }
 
 /// `cad_luminotecnico`: calcula e, com `desenhar_mapa: {origem, camada}`, desenha o mapa de lux (origem = canto inferior esquerdo do ambiente).
+/// Linhas ou colunas de luminárias num `arranjo` informado (100 mil × 100 mil esgotava a memória).
+const ARRANJO_MAXIMO: u64 = 200;
+
 pub fn luminotecnico(doc: &mut Documento, args: &Value) -> Res<Value> {
     let p = pedido_de(args)?;
     let k = indice_do_local(&p);
@@ -253,13 +256,15 @@ pub fn luminotecnico(doc: &mut Documento, args: &Value) -> Res<Value> {
     let fluxo_total = p.e_alvo * area / (u * p.d);
     let n_min = (fluxo_total / p.lum.fluxo).ceil().max(1.0) as usize;
     let a = match (args.pointer("/arranjo/linhas").and_then(Value::as_u64), args.pointer("/arranjo/colunas").and_then(Value::as_u64)) {
-        (Some(l), Some(c)) if l > 0 && c > 0 => Arranjo { linhas: l as usize, colunas: c as usize },
+        (Some(l), Some(c)) if l > 0 && c > 0 => Arranjo { linhas: l.min(ARRANJO_MAXIMO) as usize, colunas: c.min(ARRANJO_MAXIMO) as usize },
         _ => arranjar(&p, n_min).ok_or("não achei arranjo que respeite o espaçamento máximo: aumente `espacamento_max_hm` ou informe `arranjo`")?,
     };
     let lista = posicoes(&p, &a);
     let n = lista.len();
     let e_metodo = n as f64 * p.lum.fluxo * u * p.d / area;
-    let passo = numero_opcional(args, "grade_passo").filter(|s| *s > 0.0).unwrap_or(1.0);
+    // Cada ponto da grade soma todas as luminárias: o passo não desce de onde a conta passaria de ~5·10⁷ (travava o app).
+    let passo_minimo = (area * n.max(1) as f64 / 5.0e7).sqrt();
+    let passo = numero_opcional(args, "grade_passo").filter(|s| *s > 0.0).unwrap_or(1.0).max(passo_minimo);
     let g_dir = grade(&p, &fontes(&p, &lista, false), passo);
     let g = grade(&p, &fontes(&p, &lista, true), passo);
     let borda = numero_opcional(args, "borda_m").filter(|b| *b >= 0.0).unwrap_or(0.5);

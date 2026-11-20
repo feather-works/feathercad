@@ -3,7 +3,7 @@
 
 use std::fmt::Write;
 
-use feathercad_core::documento::{AlinhaH, AlinhaV, Documento, Geometria, TipoLinha};
+use feathercad_core::documento::{AlinhaH, AlinhaV, Documento, Espaco, Geometria, TipoLinha};
 use feathercad_core::geom::{triangular, Ponto, Vertice};
 use feathercad_core::quadro::{lacos_da_hachura, tracos_do_padrao};
 use feathercad_core::sessao::Mensagem;
@@ -91,6 +91,8 @@ struct Peca {
     camada: usize,
     cor: Option<u32>,
     tipo_linha: Option<TipoLinha>,
+    /// No espaço de papel (`67 1`); sem isso o carimbo do layout voltava em cima do modelo.
+    papel: bool,
 }
 
 /// O começo comum de toda entidade: tipo, camada e cor própria (se houver).
@@ -102,6 +104,9 @@ fn cabeca(doc: &Documento, e: &Peca, tipo: &str, s: &mut String, aproximadas: &m
     }
     if let Some(cor) = e.cor {
         tag(s, 62, aci_de(cor, aproximadas));
+    }
+    if e.papel {
+        tag(s, 67, 1);
     }
 }
 
@@ -303,7 +308,7 @@ fn blocos(doc: &Documento, s: &mut String, c: &mut Contas) {
         ponto3(s, 10, b.base.x, b.base.y);
         tag(s, 3, &nome);
         for n in &b.entidades {
-            let h = peca(doc, &Peca { camada: n.camada, cor: n.cor, tipo_linha: n.props.tipo_linha }, &n.geometria, s, &mut c.aproximadas);
+            let h = peca(doc, &Peca { camada: n.camada, cor: n.cor, tipo_linha: n.props.tipo_linha, papel: false }, &n.geometria, s, &mut c.aproximadas);
             c.somar(h);
         }
         tag(s, 0, "ENDBLK");
@@ -316,7 +321,7 @@ fn entidades(doc: &Documento, s: &mut String, c: &mut Contas) {
     tag(s, 0, "SECTION");
     tag(s, 2, "ENTITIES");
     for e in doc.entidades() {
-        let h = peca(doc, &Peca { camada: e.camada, cor: e.cor, tipo_linha: e.props.tipo_linha }, &e.geometria, s, &mut c.aproximadas);
+        let h = peca(doc, &Peca { camada: e.camada, cor: e.cor, tipo_linha: e.props.tipo_linha, papel: matches!(e.espaco, Espaco::Layout(_)) }, &e.geometria, s, &mut c.aproximadas);
         c.somar(h);
     }
     tag(s, 0, "ENDSEC");

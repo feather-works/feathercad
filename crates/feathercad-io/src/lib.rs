@@ -51,7 +51,9 @@ pub struct Gravado {
     pub avisos: Vec<Mensagem>,
 }
 
-fn decodificar_texto(bytes: &[u8]) -> String {
+/// Bytes → texto. R2007+ é UTF-8; as versões antigas usam a página de código do
+/// arquivo (`$DWGCODEPAGE`), e aqui se assume ANSI_1252 (Latin-1 na prática).
+pub(crate) fn decodificar_bytes(bytes: &[u8]) -> String {
     let sem_bom = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
     match std::str::from_utf8(sem_bom) {
         Ok(t) => t.to_string(),
@@ -60,7 +62,7 @@ fn decodificar_texto(bytes: &[u8]) -> String {
 }
 
 fn tentar_abrir_nuvem(bytes: &[u8]) -> Option<Result<Aberto, String>> {
-    let texto = decodificar_texto(bytes);
+    let texto = decodificar_bytes(bytes);
     let inicio = texto.trim_start();
     if inicio.starts_with("0\n") || inicio.starts_with("0\r\n") || inicio.starts_with("999\n") || inicio.starts_with("999\r\n") {
         return None;

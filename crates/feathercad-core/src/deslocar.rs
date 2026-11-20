@@ -7,7 +7,7 @@
 
 use crate::aparar::Recusa;
 use crate::documento::Geometria;
-use crate::geom::{Ponto, Vertice};
+use crate::geom::{distancia_ao_segmento, Ponto, Vertice};
 
 const EPS: f64 = 1e-9;
 
@@ -21,15 +21,6 @@ fn lado_do_segmento(a: Ponto, b: Ponto, p: Ponto) -> f64 {
     }
 }
 
-fn distancia_ao_segmento(p: Ponto, a: Ponto, b: Ponto) -> f64 {
-    let (dx, dy) = (b.x - a.x, b.y - a.y);
-    let c2 = dx * dx + dy * dy;
-    if c2 < EPS * EPS {
-        return p.distancia(a);
-    }
-    let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / c2).clamp(0.0, 1.0);
-    p.distancia(Ponto::novo(a.x + t * dx, a.y + t * dy))
-}
 
 /// O deslocamento perpendicular de `distancia` para o lado `s` (`+1` esquerda) do segmento `a→b`.
 fn normal(a: Ponto, b: Ponto, s: f64, distancia: f64) -> Option<(f64, f64)> {

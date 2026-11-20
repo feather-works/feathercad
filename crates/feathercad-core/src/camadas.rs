@@ -227,8 +227,6 @@ impl Documento {
         let escolhidas: Vec<_> = self.entidades.iter().filter(|e| ids.contains(&e.id) && !self.bloqueada(e)).cloned().collect();
         let Some(primeira) = escolhidas.first() else { return Err(ErroBloco::SemObjetos) };
         let (camada, cor) = (primeira.camada, primeira.cor);
-        self.desfazer.push(Passo::Tudo(Box::new(Captura { camadas: self.camadas.clone(), atual: self.camada_atual, entidades: self.entidades.clone(), blocos: self.blocos.clone() })));
-        self.refazer.clear();
         let entidades = escolhidas.iter().map(|e| crate::documento::NovaEntidade { camada: e.camada, cor: e.cor, geometria: e.geometria.clone(), props: e.props.clone(), espaco: e.espaco.clone() }).collect();
         self.blocos.push(crate::documento::Bloco { nome: nome.to_string(), base, entidades });
         let indice = self.blocos.len() - 1;
@@ -238,6 +236,11 @@ impl Documento {
         let id = self.proximo_id;
         self.proximo_id += 1;
         self.entidades.push(crate::documento::Entidade { id, camada, cor, geometria: crate::documento::Geometria::Insercao { bloco: indice, ponto: base, escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default(), espaco: self.espaco_ativo.clone() });
+        let mut passos = vec![Passo::Adicionou(id)];
+        passos.extend(escolhidas.into_iter().map(Passo::Removeu));
+        passos.push(Passo::AdicionouBloco);
+        self.desfazer.push(Passo::Lote(passos));
+        self.refazer.clear();
         self.mudou();
         Ok(indice)
     }
@@ -250,8 +253,6 @@ impl Documento {
         if formas.is_empty() {
             return None;
         }
-        self.desfazer.push(Passo::Tudo(Box::new(Captura { camadas: self.camadas.clone(), atual: self.camada_atual, entidades: self.entidades.clone(), blocos: self.blocos.clone() })));
-        self.refazer.clear();
         let mut n = 1;
         while self.bloco_por_nome(&format!("*D{n}")).is_some() {
             n += 1;
@@ -265,6 +266,8 @@ impl Documento {
         self.proximo_id += 1;
         let camada = self.camada_atual;
         self.entidades.push(crate::documento::Entidade { id, camada, cor: None, geometria: crate::documento::Geometria::Insercao { bloco: indice, ponto: base, escala_x: 1.0, escala_y: 1.0, rotacao: 0.0 }, props: Default::default(), espaco: self.espaco_ativo.clone() });
+        self.desfazer.push(Passo::Lote(vec![Passo::Adicionou(id), Passo::AdicionouBloco]));
+        self.refazer.clear();
         self.mudou();
         Some(id)
     }
@@ -275,14 +278,14 @@ impl Documento {
         if entidades.is_empty() || self.bloco_por_nome(nome).is_some() {
             return None;
         }
-        self.desfazer.push(Passo::Tudo(Box::new(Captura { camadas: self.camadas.clone(), atual: self.camada_atual, entidades: self.entidades.clone(), blocos: self.blocos.clone() })));
-        self.refazer.clear();
         self.blocos.push(crate::documento::Bloco { nome: nome.to_string(), base: crate::geom::Ponto::novo(0.0, 0.0), entidades });
         let indice = self.blocos.len() - 1;
         self.caixas_dos_blocos.push(self.caixa_do_bloco(indice, 0));
         let id = self.proximo_id;
         self.proximo_id += 1;
         self.entidades.push(crate::documento::Entidade { id, camada, cor: None, geometria: crate::documento::Geometria::Insercao { bloco: indice, ponto, escala_x: escala, escala_y: escala, rotacao: 0.0 }, props: Default::default(), espaco: self.espaco_ativo.clone() });
+        self.desfazer.push(Passo::Lote(vec![Passo::Adicionou(id), Passo::AdicionouBloco]));
+        self.refazer.clear();
         self.mudou();
         Some(id)
     }

@@ -228,8 +228,11 @@ fn aparar_polilinha(doc: &Documento, alvo: Id, vertices: &[Vertice], fechada: bo
         let (lo, hi) = match (lo, hi) {
             (None, None) => return Err(Recusa::SemCorte),
             (Some(l), Some(h)) => (l, h),
-            (Some(l), None) => (l, cortes.iter().copied().fold(f64::MAX, f64::min)),
-            (None, Some(h)) => (cortes.iter().copied().fold(f64::MIN, f64::max), h),
+            // O trecho clicado passa pelo vértice 0: fica só o que vai do primeiro ao último corte.
+            _ => {
+                let (min, max) = cortes.iter().copied().fold((f64::MAX, f64::MIN), |(a, b), c| (a.min(c), b.max(c)));
+                return Ok(vec![Mudanca::Trocar(alvo, como_polilinha(trecho(min, max)))]);
+            }
         };
         let mut pts = trecho(hi, trechos as f64);
         pts.pop();
@@ -476,6 +479,14 @@ mod testes {
         assert!(!fechada);
         let pts: Vec<(f64, f64)> = vertices.iter().map(|v| (v.p.x, v.p.y)).collect();
         assert_eq!(pts, [(2.0, 4.0), (0.0, 4.0), (0.0, 0.0), (2.0, 0.0)], "sobra a metade esquerda em U");
+        // A lateral esquerda passa pelo vértice 0 (o trecho clicado dá a volta): sobra o U da direita, sem repetir nada.
+        let mut d = Documento::default();
+        let ret = d.adicionar_polilinha(vec![Vertice { p: p(0.0, 0.0), bulge: 0.0 }, Vertice { p: p(4.0, 0.0), bulge: 0.0 }, Vertice { p: p(4.0, 4.0), bulge: 0.0 }, Vertice { p: p(0.0, 4.0), bulge: 0.0 }], true).unwrap();
+        d.adicionar_linha(p(2.0, -1.0), p(2.0, 5.0));
+        d.aplicar_mudancas(aparar(&d, ret, p(0.0, 2.0)).unwrap());
+        let Geometria::Polilinha { vertices, .. } = &d.entidade(ret).unwrap().geometria else { panic!() };
+        let pts: Vec<(f64, f64)> = vertices.iter().map(|v| (v.p.x, v.p.y)).collect();
+        assert_eq!(pts, [(2.0, 0.0), (4.0, 0.0), (4.0, 4.0), (2.0, 4.0)], "sobra a metade direita em U");
     }
 
     #[test]

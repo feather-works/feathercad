@@ -182,23 +182,13 @@ fn descrever_regiao(d: &Documento, area: f64, pts: &[Ponto]) -> Value {
         .entidades()
         .iter()
         .filter_map(|e| match &e.geometria {
-            feathercad_core::documento::Geometria::Texto { ponto: p, conteudo, .. } if dentro(pts, *p) => Some(json!(conteudo)),
+            feathercad_core::documento::Geometria::Texto { ponto: p, conteudo, .. } if feathercad_core::geom::dentro_do_laco(*p, pts) => Some(json!(conteudo)),
             _ => None,
         })
         .collect();
     json!({ "area": arred(area), "perimetro": arred(perimetro), "centro": par(c), "caixa": caixa_json(Some((min, max))), "vertices": pts.len(), "contorno": if pts.len() <= 24 { json!(pts.iter().map(|p| par(*p)).collect::<Vec<_>>()) } else { Value::Null }, "textos_dentro": textos })
 }
 
-fn dentro(laco: &[Ponto], p: Ponto) -> bool {
-    let mut d = false;
-    for i in 0..laco.len() {
-        let (a, b) = (laco[i], laco[(i + 1) % laco.len()]);
-        if (a.y > p.y) != (b.y > p.y) && p.x < a.x + (p.y - a.y) / (b.y - a.y) * (b.x - a.x) {
-            d = !d;
-        }
-    }
-    d
-}
 
 /// As regiões fechadas que os traços formam. Com `ponto`, só a menor que o contém (o que uma hachura preencheria).
 /// Sem ele, todas (da menor para a maior); `area_util` já desconta as regiões que ficam dentro (vãos).
@@ -218,7 +208,7 @@ pub fn regioes(d: &Documento, args: &Value) -> Res<Value> {
         .enumerate()
         .take(limite)
         .map(|(i, (area, pts))| {
-            let filhas: f64 = todas.iter().enumerate().filter(|(j, (a2, _))| *j != i && a2 < area && dentro(pts, centros[*j])).map(|(_, (a2, _))| a2).sum();
+            let filhas: f64 = todas.iter().enumerate().filter(|(j, (a2, _))| *j != i && a2 < area && feathercad_core::geom::dentro_do_laco(centros[*j], pts)).map(|(_, (a2, _))| a2).sum();
             let mut v = descrever_regiao(d, *area, pts);
             v["area_util"] = json!(arred((area - filhas).max(0.0)));
             v

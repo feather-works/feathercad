@@ -14,6 +14,8 @@ use crate::quadro;
 pub const FATOR_DO_ZOOM: f32 = 1.25;
 /// Dois cliques da roda em menos que isto enquadram o desenho (como no AutoCAD).
 const DUPLO_CLIQUE: Duration = Duration::from_millis(350);
+/// Um quadro de tela (60 Hz): um mouse de 1000 Hz não refaz o desenho inteiro mil vezes por segundo.
+pub const QUADRO_DO_ARRASTO: Duration = Duration::from_millis(16);
 /// Quanto o mouse precisa andar para o "grab" (ou a janela) valer como arrasto e não como clique.
 const LIMIAR_DO_ARRASTO_PX: f32 = 4.0;
 
@@ -43,8 +45,16 @@ pub struct Doc {
     pub ms_quadro: f32,
     /// A data do arquivo no disco quando foi lido ou gravado aqui: se mudar por fora, o desenho é recarregado.
     pub visto: Option<std::time::SystemTime>,
-    /// Já avisou que o arquivo mudou no disco com alterações pendentes aqui (avisa uma vez).
+    /// Já avisou que o arquivo mudou no disco com alterações pendentes aqui (avisa uma vez por mudança de fora).
     pub avisou_conflito: bool,
+    /// Identifica a aba enquanto uma caixa está aberta (o índice muda se outra aba fecha nesse meio-tempo).
+    pub id: u64,
+    /// Aberto de um DXF que não é R12 ou que perdeu algo na leitura: o Ctrl+S pergunta onde gravar em vez de
+    /// regravar por cima em R12 (o que o app não lê sumiria do arquivo original).
+    pub dxf_perderia: bool,
+    /// Arrastando a vista, o quadro sai no máximo a cada `QUADRO_DO_ARRASTO`; o que ficou para trás sai em `em_dia`.
+    pub pan_pendente: bool,
+    ultimo_quadro_do_pan: Option<Instant>,
 }
 
 /// O que o botão direito pediu: abrir o menu em `canto` (posição na janela).
@@ -94,6 +104,13 @@ impl Doc {
             ms_quadro: 0.0,
             visto: None,
             avisou_conflito: false,
+            dxf_perderia: false,
+            pan_pendente: false,
+            ultimo_quadro_do_pan: None,
+            id: {
+                static PROXIMO: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+                PROXIMO.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            },
         }
     }
 
@@ -139,6 +156,14 @@ impl Doc {
             Err(e) => self.erro = Some(e),
         }
         self.ms_quadro = inicio.elapsed().as_secs_f32() * 1000.0;
+    }
+
+    /// Desenha o quadro que o arrasto da vista deixou para trás.
+    pub fn em_dia(&mut self) {
+        if self.pan_pendente {
+            self.pan_pendente = false;
+            self.redesenhar();
+        }
     }
 
     pub fn tamanho(&self) -> Size {
@@ -205,10 +230,19 @@ impl Doc {
                     self.pan = Some(p);
                     let v = self.motor.vista("vista_deslocar", json!({ "vista": self.vista, "dx": p.x - antes.x, "dy": p.y - antes.y }));
                     self.vista = v.unwrap_or(self.vista);
-                    self.redesenhar();
+                    if self.ultimo_quadro_do_pan.map_or(true, |t| t.elapsed() >= QUADRO_DO_ARRASTO) {
+                        self.ultimo_quadro_do_pan = Some(Instant::now());
+                        self.pan_pendente = false;
+                        self.redesenhar();
+                    } else {
+                        self.pan_pendente = true;
+                    }
                 }
                 self.mouse = Some(p);
-                self.mover_cursor();
+                // Arrastando a vista o snap não serve: não consulta o motor a cada evento.
+                if self.pan.is_none() {
+                    self.mover_cursor();
+                }
             }
             EventoArea::Saiu => {
                 self.mouse = None;
@@ -272,6 +306,8 @@ impl Doc {
         if botao == MouseButton::Middle {
             self.pan = None;
             self.orbita = None;
+            self.em_dia();
+            self.mover_cursor();
             return;
         }
         if botao != MouseButton::Left {

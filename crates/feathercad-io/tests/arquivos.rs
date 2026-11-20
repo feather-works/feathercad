@@ -312,16 +312,17 @@ fn le_lwpolilinha_com_bulge_e_fechada() {
 }
 
 #[test]
-fn le_polilinha_pesada_do_r12_e_pula_vertice_de_controle_e_3d() {
+fn le_polilinha_pesada_do_r12_e_pula_vertice_de_controle_e_le_a_3d() {
     let dxf = "0\nSECTION\n2\nENTITIES\n\
 0\nPOLYLINE\n8\n0\n66\n1\n70\n0\n0\nVERTEX\n8\n0\n10\n0\n20\n0\n0\nVERTEX\n8\n0\n10\n5\n20\n0\n42\n1\n0\nVERTEX\n8\n0\n10\n99\n20\n99\n70\n16\n0\nVERTEX\n8\n0\n10\n5\n20\n5\n0\nSEQEND\n8\n0\n\
 0\nPOLYLINE\n8\n0\n66\n1\n70\n8\n0\nVERTEX\n8\n0\n10\n0\n20\n0\n30\n1\n0\nVERTEX\n8\n0\n10\n1\n20\n1\n30\n2\n0\nSEQEND\n8\n0\n\
 0\nLINE\n8\n0\n10\n0\n20\n0\n11\n1\n21\n1\n0\nENDSEC\n0\nEOF\n";
     let a = abrir(dxf.as_bytes()).unwrap();
-    assert_eq!(geometrias(&a.doc).len(), 2, "a 2D e a linha; a 3D fica de fora");
+    assert_eq!(geometrias(&a.doc).len(), 3, "a 2D, a 3D (com o Z, como as curvas de nível que o app grava) e a linha");
     assert_eq!(geometrias(&a.doc)[0], Geometria::Polilinha { vertices: vec![v(0.0, 0.0, 0.0), v(5.0, 0.0, 1.0), v(5.0, 5.0, 0.0)], fechada: false });
-    assert_eq!(a.avisos.len(), 1);
-    assert_eq!(a.avisos[0].vars["tipos"], "1 POLYLINE (3D ou malha)", "vértice e seqend não contam como entidade");
+    let Geometria::Polilinha { vertices, .. } = &geometrias(&a.doc)[1] else { panic!("a 3D vira polilinha") };
+    assert_eq!((vertices[0].p.z, vertices[1].p.z), (1.0, 2.0));
+    assert!(a.avisos.is_empty(), "vértice e seqend não contam como entidade");
 }
 
 #[test]
@@ -547,6 +548,16 @@ fn dxf_hachura(solido: bool) -> String {
         i32::from(solido),
         padrao
     )
+}
+
+#[test]
+fn hachura_associativa_com_handles_e_contagem_absurda_de_tracos() {
+    // Handles de origem (330) têm letras; a contagem 79 vem do arquivo e não pode girar sem dados (travava a abertura).
+    let dxf = dxf_hachura(false).replacen("97\n0\n", "97\n2\n330\n2F\n330\n3A\n", 1).replace("79\n0\n", "79\n1000000000000\n");
+    let a = abrir(dxf.as_bytes()).unwrap();
+    let Geometria::Hachura { contornos, padrao, .. } = &a.doc.entidades()[0].geometria else { panic!("{:?}", a.avisos) };
+    assert_eq!(contornos.len(), 2, "a ilha depois dos handles não se perde");
+    assert!(padrao[0].tracos.is_empty());
 }
 
 #[test]

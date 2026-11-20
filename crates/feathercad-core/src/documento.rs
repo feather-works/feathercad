@@ -317,6 +317,10 @@ pub(crate) enum Passo {
     Camadas { camadas: Vec<Camada>, atual: usize },
     /// Camadas, entidades e blocos como estavam (excluir camada remapeia índices por todo o desenho).
     Tudo(Box<Captura>),
+    /// Um bloco entrou no fim da lista: desfazer o tira (cota e símbolo não copiam o desenho inteiro para o histórico).
+    AdicionouBloco,
+    /// O último bloco saiu: refazer o põe de volta.
+    RemoveuBloco(Bloco),
 }
 
 /// Uma captura das partes do desenho que a exclusão de camada mexe.
@@ -727,7 +731,12 @@ impl Documento {
     pub fn definir_espaco_ativo(&mut self, espaco: Espaco) {
         if self.espaco_ativo != espaco {
             self.espaco_ativo = espaco;
+            // A versão sobe (o quadro precisa refazer), mas olhar outro layout não é alteração a salvar.
+            let limpo = !self.sujo();
             self.mudou();
+            if limpo {
+                self.marcar_salvo();
+            }
         }
     }
 
@@ -918,8 +927,10 @@ impl Documento {
                 }
             }
             Passo::Removeu(e) => {
+                // Volta no lugar de antes (a lista fica em ordem de id), não por cima de tudo.
                 let id = e.id;
-                self.entidades.push(e);
+                let i = self.entidades.partition_point(|x| x.id < id);
+                self.entidades.insert(i, e);
                 Passo::Adicionou(id)
             }
             Passo::Trocou(nova) => match self.entidades.iter_mut().find(|e| e.id == nova.id) {
@@ -942,18 +953,136 @@ impl Documento {
                 self.caixas_dos_blocos = (0..self.blocos.len()).map(|i| self.caixa_do_bloco(i, 0)).collect();
                 Passo::Tudo(Box::new(antes))
             }
+            Passo::AdicionouBloco => match self.blocos.pop() {
+                Some(b) => {
+                    self.caixas_dos_blocos.pop();
+                    Passo::RemoveuBloco(b)
+                }
+                None => Passo::AdicionouBloco,
+            },
+            Passo::RemoveuBloco(b) => {
+                self.blocos.push(b);
+                self.caixas_dos_blocos.push(self.caixa_do_bloco(self.blocos.len() - 1, 0));
+                Passo::AdicionouBloco
+            }
             Passo::Lote(passos) => {
-                let mut inversos: Vec<Passo> = passos.into_iter().map(|p| self.aplicar(p)).collect();
+                // Os trechos seguidos de adicionar/remover/trocar vão numa passada só (ver `aplicar_lote_simples`).
+                let simples = |p: &Passo| matches!(p, Passo::Adicionou(_) | Passo::Removeu(_) | Passo::Trocou(_));
+                let mut inversos = Vec::new();
+                let mut corrida = Vec::new();
+                for p in passos {
+                    if simples(&p) {
+                        corrida.push(p);
+                        continue;
+                    }
+                    if !corrida.is_empty() {
+                        inversos.push(self.aplicar_lote_simples(std::mem::take(&mut corrida)));
+                    }
+                    inversos.push(self.aplicar(p));
+                }
+                if !corrida.is_empty() {
+                    inversos.push(self.aplicar_lote_simples(corrida));
+                }
+                // Um só inverso não ganha outra camada de lote (senão cada desfazer/refazer aninharia mais um).
+                if inversos.len() == 1 {
+                    return inversos.pop().unwrap_or(Passo::Lote(Vec::new()));
+                }
                 inversos.reverse();
                 Passo::Lote(inversos)
             }
         }
+    }
+
+    /// Um lote só de adicionar/remover/trocar numa passada: O(n + passos), não O(n × passos)
+    /// (desfazer "mover 50 mil objetos" levava segundos). Mesmo resultado de aplicar um por um.
+    fn aplicar_lote_simples(&mut self, passos: Vec<Passo>) -> Passo {
+        let pos: HashMap<Id, usize> = self.entidades.iter().enumerate().map(|(i, e)| (e.id, i)).collect();
+        // `fora`: das que estão na lista, as que saem no fim; `voltam`: as que entram no fim.
+        let mut fora: HashSet<Id> = HashSet::new();
+        let mut voltam: HashMap<Id, Entidade> = HashMap::new();
+        let mut inversos = Vec::with_capacity(passos.len());
+        for p in passos {
+            inversos.push(match p {
+                Passo::Adicionou(id) => {
+                    if let Some(e) = voltam.remove(&id) {
+                        Passo::Removeu(e)
+                    } else if let Some(&i) = pos.get(&id).filter(|_| !fora.contains(&id)) {
+                        fora.insert(id);
+                        Passo::Removeu(self.entidades[i].clone())
+                    } else {
+                        Passo::Adicionou(id)
+                    }
+                }
+                Passo::Removeu(e) => {
+                    let id = e.id;
+                    match pos.get(&id) {
+                        Some(&i) if fora.remove(&id) => self.entidades[i] = e,
+                        _ => {
+                            voltam.insert(id, e);
+                        }
+                    }
+                    Passo::Adicionou(id)
+                }
+                Passo::Trocou(nova) => {
+                    let id = nova.id;
+                    if let Some(e) = voltam.get_mut(&id) {
+                        Passo::Trocou(std::mem::replace(e, nova))
+                    } else if let Some(&i) = pos.get(&id).filter(|_| !fora.contains(&id)) {
+                        Passo::Trocou(std::mem::replace(&mut self.entidades[i], nova))
+                    } else {
+                        Passo::Trocou(nova)
+                    }
+                }
+                outro => outro,
+            });
+        }
+        if !fora.is_empty() {
+            self.entidades.retain(|e| !fora.contains(&e.id));
+        }
+        if !voltam.is_empty() {
+            let mut novas: Vec<Entidade> = voltam.into_values().collect();
+            novas.sort_by_key(|e| e.id);
+            let mut novas = novas.into_iter().peekable();
+            let antigas = std::mem::take(&mut self.entidades);
+            self.entidades.reserve(antigas.len() + novas.len());
+            for e in antigas {
+                while let Some(n) = novas.next_if(|n| n.id < e.id) {
+                    self.entidades.push(n);
+                }
+                self.entidades.push(e);
+            }
+            self.entidades.extend(novas);
+        }
+        inversos.reverse();
+        Passo::Lote(inversos)
     }
 }
 
 #[cfg(test)]
 mod testes_do_lote {
     use super::*;
+
+    #[test]
+    fn desfazer_apagar_devolve_na_mesma_ordem_e_cota_desfaz_e_refaz() {
+        let mut d = Documento::default();
+        let ids: Vec<Id> = (0..4).map(|i| d.adicionar_linha(Ponto::novo(0.0, f64::from(i)), Ponto::novo(1.0, f64::from(i)))).collect();
+        d.aplicar_mudancas(vec![Mudanca::Remover(ids[1]), Mudanca::Remover(ids[2]), Mudanca::Trocar(ids[3], Geometria::Ponto { p: Ponto::novo(9.0, 9.0) })]);
+        assert!(d.desfazer());
+        assert_eq!(d.entidades().iter().map(|e| e.id).collect::<Vec<_>>(), ids, "a ordem de desenho volta como era");
+        assert!(matches!(d.entidade(ids[3]).unwrap().geometria, Geometria::Linha { .. }));
+        for _ in 0..3 {
+            assert!(d.refazer());
+            assert_eq!(d.entidades().len(), 2);
+            assert!(d.desfazer());
+            assert_eq!(d.entidades().len(), 4);
+        }
+        let blocos = d.blocos().len();
+        let cota = d.adicionar_cota(vec![Geometria::Ponto { p: Ponto::novo(0.0, 0.0) }], Ponto::novo(0.0, 0.0)).unwrap();
+        assert!(d.desfazer());
+        assert!(d.entidade(cota).is_none() && d.blocos().len() == blocos);
+        assert!(d.refazer());
+        assert!(d.entidade(cota).is_some() && d.blocos().len() == blocos + 1);
+    }
 
     #[test]
     fn juntar_historico_vira_um_passo_e_desfazer_ate_volta_ao_inicio() {

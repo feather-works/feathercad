@@ -278,6 +278,8 @@ pub fn modelo(ag: &mut Agente, fonte: &Fonte, args: &Value) -> Res<Value> {
     }
     let d = args.get("dados").ok_or("falta `dados` (veja o `esquema` em cad_modelos)")?;
     let caminho = texto_opcional(d, "nuvem").ok_or("`dados.nuvem`: caminho do arquivo de pontos")?;
+    // O ferrovia começa com `cad_novo`: a mesma proteção do desenho aberto, conferida aqui (o passo interno já vai liberado).
+    ag.pode_trocar_o_desenho(args)?;
     let anterior = ag.projeto;
     ag.projeto = true;
     let r = ferrovia(ag, fonte, d, caminho);
@@ -306,7 +308,7 @@ struct Calculo {
 /// Nuvem → feições → traçado ajustado → superelevação → greide → análise de criticidade.
 fn calcular_projeto(ag: &mut Agente, fonte: &Fonte, d: &Value, caminho: &str) -> Res<Calculo> {
     let regras_args = json!({ "regras": d.get("regras").cloned().unwrap_or(Value::Null), "V": d.get("V").cloned().unwrap_or(json!(65)) });
-    passo(ag, fonte, "cad_novo", &json!({ "unidade": "m" }))?;
+    passo(ag, fonte, "cad_novo", &json!({ "unidade": "m", "descartar": true }))?;
     let mut sec = json!({ "caminho": caminho });
     for c in ["inicio", "direcao"] {
         if let Some(v) = d.get(c).filter(|v| !v.is_null()) {
@@ -369,7 +371,6 @@ fn montar_folhas(ag: &mut Agente, fonte: &Fonte, d: &Value, c: &Calculo, (eixo, 
     let mut ctx = Contexto { papel: texto_opcional(d, "papel").unwrap_or("A0").to_string(), escala: numero_opcional(d, "escala").unwrap_or(0.0), carimbo, total: n.total() };
     // a superfície da nuvem no desenho (TIN, curvas de nível, borda e pontos), como o leitor de nuvem a gera: a planta geral e os detalhes a mostram
     passo(ag, fonte, "cad_topografia", &json!({ "caminho": caminho, "incluir_faces_3d": false, "incluir_quadro": false, "rotular_pontos": false }))?;
-    ag.arquivo = None;
     let f1 = prancha_planta(ag, fonte, &mut ctx, 1, &c.tabela)?;
     // textos da planta já na escala certa
     let rot = json!({ "pis": eixo["pis"], "curvas": eixo["curvas"], "desenhar": { "estacas": true, "km": true, "notaveis": true, "rotulos": false }, "camada_base": "PROJETO", "escala": f1.escala, "nome": "A1", "altura_texto": 3.0, "rotular_estacas_a_cada": ((35.0 * f1.escala / 1000.0 / 20.0 / 5.0).ceil() * 5.0).max(5.0) });

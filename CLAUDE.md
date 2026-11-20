@@ -38,6 +38,28 @@ por `include_str!("../../../src/idiomas/…")`).
 
 Inventário anterior (abaixo) registra funcionalidades do app Tauri; não presumir que já existem no pelicano.
 
+## Auditoria de 19/11/2026 (corrigido)
+
+- **Arquivos:** HATCH com contagem `79` absurda travava a abertura; handles `330` com letras derrubavam hachura com ilha;
+  POLYLINE 3D (as curvas de nível que o próprio app grava) era descartada ao reabrir; `.fcdz` e DXF agora guardam o
+  espaço de papel (`espaco`, `67 1`) e os `layouts`; `.fcdz` recusa o que passa de 1 GB descompactado; no máximo
+  200 mil inserções por DXF (MINSERT). Gravações: `.parcial` + `sync_all` + rename (app e MCP).
+- **Motor:** aparar polilinha fechada no trecho que passa pelo vértice 0; `2,5` em pt-BR é distância (a vírgula só
+  separa coordenadas quando o decimal não é vírgula); desfazer em lote numa passada só (`aplicar_lote_simples`) e a
+  entidade apagada volta no mesmo lugar da ordem de desenho (a lista fica em ordem de id); cota/bloco/símbolo usam
+  `Passo::AdicionouBloco` em vez de copiar o desenho inteiro; trocar de layout não marca o desenho como alterado.
+  `viewport_inserir` (sem uso) saiu da ponte e do TS. `geom::dentro_do_laco` e `geom::distancia_ao_segmento` são as
+  únicas cópias (o cruzamento de retas segue com 3 versões de tolerâncias diferentes — juntar exige testar cada uso).
+- **MCP:** ao vivo, `cad_novo`/`cad_abrir`/`cad_importar {substituir}`/`cad_modelo ferrovia` recusam com alteração não
+  salva, a menos de `descartar: true`; `cad_modelo` não cabe em `cad_lote` (modelo que chamava a si mesmo estourava a
+  pilha); `arranjo` até 200×200, grade do luminotécnico com teto de ~5·10⁷ contas, `decimais` até 12; `cad_ver
+  {arquivo}` pede `sobrescrever`; `cad_topografia {caminho}` não troca mais o arquivo da aba pelo `.csv`; pedido ao vivo
+  que venceu os 300 s não roda mais depois.
+- **Interface pelicano:** Salvar pela pergunta "Alterações não salvas" grava a aba perguntada (`Doc::id`, não o
+  índice); Descartar ao sair fecha a aba; o aviso "mudou no disco" volta a valer após salvar/recarregar; Ctrl+S sobre
+  DXF não-R12 (ou que perdeu algo ao abrir) vira "Salvar como" (`Doc::dxf_perderia`); arrastar a vista desenha no
+  máximo um quadro a cada 16 ms. O app Tauri não recebeu estes consertos da casca (vai ser apagado).
+
 ## Onde está cada coisa
 
 - `README.md` — o que é, formatos (`.fcdz`, `.dxf`), versões de DXF.
@@ -62,7 +84,7 @@ Inventário anterior (abaixo) registra funcionalidades do app Tauri; não presum
   `cursor` (snap/orto/grade), `vista` (zoom/pan), `sessao` (ferramenta, linha
   de comando, interruptores), `atalhos` (teclas do AutoCAD), `comandos`
   (apelidos por língua), `formato` (número na língua), `quadro` (binário).
-- `crates/feathercad-io` — `dxf::leitor` (só `LINE` e camadas por ora; o resto vira
+- `crates/feathercad-io` — `dxf::leitor` (cerca de 20 tipos de entidade; o que não lê vira
   aviso), `dxf::escritor` (**R12/AC1009**), `fcdz` (ZIP + JSON), `aci`, `inicio`
   (recentes, pastas de projeto, listagem — tudo local). Testado contra as 46
   amostras de `testes/` (todas abrem; o que não é `LINE` é avisado).

@@ -3,7 +3,7 @@
 //! prontas (retângulo, elipse). Aparar, concordância e hachura ficam em `aparar.rs`.
 
 use crate::documento::{cantos_da_imagem, Documento, Entidade, Geometria, Id, LinhaDePadrao, PROFUNDIDADE_MAXIMA};
-use crate::geom::{amostrar_arco, normalizar_graus, segmento_com_bulge, varredura_graus, Ponto, Transf, Vertice};
+use crate::geom::{amostrar_arco, dentro_do_laco, distancia_ao_segmento, normalizar_graus, segmento_com_bulge, varredura_graus, Ponto, Transf, Vertice};
 
 /// Aplica uma transformação de semelhança (deslocar, girar, escalar por igual, espelhar) a uma forma.
 /// Espelhar mantém o texto legível (só a posição reflete), como o `MIRRTEXT = 0` do AutoCAD.
@@ -98,15 +98,6 @@ pub fn esticar(geo: &Geometria, janela: (Ponto, Ponto), dx: f64, dy: f64) -> Opt
     }
 }
 
-fn distancia_ao_segmento(p: Ponto, a: Ponto, b: Ponto) -> f64 {
-    let (dx, dy) = (b.x - a.x, b.y - a.y);
-    let comprimento2 = dx * dx + dy * dy;
-    if comprimento2 < 1e-18 {
-        return p.distancia(a);
-    }
-    let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / comprimento2).clamp(0.0, 1.0);
-    p.distancia(Ponto::novo(a.x + t * dx, a.y + t * dy))
-}
 
 /// A polilinha como pontos (arcos por bulge viram cordas finas, relativas ao tamanho de cada trecho).
 pub fn pontos_da_polilinha(vertices: &[Vertice], fechada: bool) -> Vec<Ponto> {
@@ -127,16 +118,6 @@ pub fn pontos_da_polilinha(vertices: &[Vertice], fechada: bool) -> Vec<Ponto> {
     pts
 }
 
-fn dentro_do_laco(p: Ponto, laco: &[Ponto]) -> bool {
-    let mut dentro = false;
-    for i in 0..laco.len() {
-        let (a, b) = (laco[i], laco[(i + 1) % laco.len()]);
-        if (a.y > p.y) != (b.y > p.y) && p.x < a.x + (p.y - a.y) / (b.y - a.y) * (b.x - a.x) {
-            dentro = !dentro;
-        }
-    }
-    dentro
-}
 
 /// A distância de `p` à entidade (0 = em cima). Inserção: o mais perto entre as formas do bloco.
 pub fn distancia(doc: &Documento, geo: &Geometria, p: Ponto) -> f64 {

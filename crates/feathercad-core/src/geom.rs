@@ -61,6 +61,29 @@ fn cordas_do_arco(raio: f64, varredura: f64, tolerancia: f64) -> usize {
     ((varredura.abs() / passo.max(1e-6)).ceil() as usize).clamp(1, CORDAS_MAX)
 }
 
+/// O ponto está dentro do laço (par-ímpar)? O laço é fechado implicitamente.
+pub fn dentro_do_laco(p: Ponto, laco: &[Ponto]) -> bool {
+    let mut dentro = false;
+    for i in 0..laco.len() {
+        let (a, b) = (laco[i], laco[(i + 1) % laco.len()]);
+        if (a.y > p.y) != (b.y > p.y) && p.x < a.x + (p.y - a.y) / (b.y - a.y) * (b.x - a.x) {
+            dentro = !dentro;
+        }
+    }
+    dentro
+}
+
+/// Distância (2D) de `p` ao segmento `a`–`b`.
+pub fn distancia_ao_segmento(p: Ponto, a: Ponto, b: Ponto) -> f64 {
+    let (dx, dy) = (b.x - a.x, b.y - a.y);
+    let comprimento2 = dx * dx + dy * dy;
+    if comprimento2 < 1e-18 {
+        return p.distancia(a);
+    }
+    let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / comprimento2).clamp(0.0, 1.0);
+    p.distancia(Ponto::novo(a.x + t * dx, a.y + t * dy))
+}
+
 /// Pontos ao longo de um arco de circunferência (inclusive as duas pontas). `inicio` e
 /// `varredura` em radianos; varredura negativa gira no sentido horário.
 pub fn amostrar_arco(centro: Ponto, raio: f64, inicio: f64, varredura: f64, tolerancia: f64) -> Vec<Ponto> {

@@ -27,6 +27,12 @@ impl std::fmt::Debug for PedidoMcp {
 }
 
 impl PedidoMcp {
+    /// A thread do canal desistiu de esperar (e já disse à IA que falhou): rodar agora faria a ferramenta duas
+    /// vezes quando a IA tentasse de novo.
+    fn vencido(&self) -> bool {
+        self.0 .0.get("id").is_some() && self.0 .1.lock().map_or(true, |g| g.is_none())
+    }
+
     fn responder(&self, r: Value) {
         if let Some(tx) = self.0 .1.lock().ok().and_then(|mut g| g.take()) {
             let _ = tx.send(r);
@@ -56,10 +62,17 @@ pub fn ligar() -> String {
     let tratar = |msg: Value| -> Option<Value> {
         let id = msg.get("id").cloned();
         let (rtx, rrx) = mpsc::channel();
-        ENVIO.get()?.lock().ok()?.unbounded_send(PedidoMcp(Arc::new((msg, Mutex::new(Some(rtx)))))).ok()?;
+        let par = Arc::new((msg, Mutex::new(Some(rtx))));
+        ENVIO.get()?.lock().ok()?.unbounded_send(PedidoMcp(Arc::clone(&par))).ok()?;
         // Notificação (sem `id`): ninguém espera resposta.
         let id = id?;
-        Some(rrx.recv_timeout(ESPERA).unwrap_or_else(|_| recusa(id, "O FeatherCAD não respondeu a tempo (ocupado ou com uma caixa de diálogo aberta).")))
+        Some(rrx.recv_timeout(ESPERA).unwrap_or_else(|_| {
+            // Tira o canal de resposta: o pedido que ficou na fila vira "vencido" e não roda mais.
+            if let Ok(mut g) = par.1.lock() {
+                g.take();
+            }
+            recusa(id, "O FeatherCAD não respondeu a tempo (ocupado ou com uma caixa de diálogo aberta).")
+        }))
     };
     match ao_vivo::servir(tratar) {
         Ok(true) => format!("MCP ao vivo escutando em {}", ao_vivo::onde_escuta().display()),
@@ -107,6 +120,9 @@ impl Vivo {
     pub fn atender(&mut self, motor: &mut Motor, pedido: &PedidoMcp, tema_claro: bool) -> Resultado {
         let msg = &pedido.0 .0;
         let mut r = Resultado { mudou_o_desenho: false, arquivo: None, abrir: Vec::new() };
+        if pedido.vencido() {
+            return r;
+        }
         let resposta = match msg.get("method").and_then(Value::as_str) {
             Some(ao_vivo::METODO_INSTANCIA) => {
                 r.abrir = msg.pointer("/params/arquivos").and_then(Value::as_array).into_iter().flatten().filter_map(|a| a.as_str().map(str::to_string)).collect();
@@ -146,6 +162,17 @@ mod testes {
     fn pedido(v: Value) -> (PedidoMcp, mpsc::Receiver<Value>) {
         let (tx, rx) = mpsc::channel();
         (PedidoMcp(Arc::new((v, Mutex::new(Some(tx))))), rx)
+    }
+
+    #[test]
+    fn pedido_que_venceu_nao_roda_mais() {
+        let mut motor = Motor::default();
+        motor.estado_de("documento_novo", json!({ "unidade": "mm" })).unwrap();
+        let antes = motor.estado().unwrap().versao;
+        let (p, _rx) = pedido(json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": { "name": "cad_criar", "arguments": { "formas": [{ "tipo": "linha", "a": [0, 0], "b": [10, 0] }] } } }));
+        p.0 .1.lock().unwrap().take();
+        assert!(!Vivo::default().atender(&mut motor, &p, true).mudou_o_desenho);
+        assert_eq!(motor.estado().unwrap().versao, antes);
     }
 
     #[test]

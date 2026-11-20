@@ -175,12 +175,29 @@ pub fn abrir(motor: &mut Motor, caminho: &Path) -> Result<Estado, String> {
     motor.estado()
 }
 
+/// O `$ACADVER` do cabeçalho não é o do R12 (`AC1009`), que é o único que o app grava. Sem cabeçalho = R12.
+pub fn dxf_mais_novo_que_r12(caminho: &Path) -> bool {
+    use std::io::Read;
+    let mut inicio = vec![0; 16 * 1024];
+    let n = std::fs::File::open(caminho).and_then(|mut f| f.read(&mut inicio)).unwrap_or(0);
+    let texto = String::from_utf8_lossy(&inicio[..n]);
+    let mut linhas = texto.lines().map(str::trim).skip_while(|l| *l != "$ACADVER");
+    linhas.nth(2).is_some_and(|v| v != "AC1009")
+}
+
 /// Grava o desenho em `caminho` (num `.parcial` e renomeia: uma falha no meio não estraga o arquivo que já existia).
 pub fn gravar(motor: &mut Motor, caminho: &Path, formato: Formato) -> Result<Estado, String> {
     let bytes = motor.gravar(formato.extensao())?;
     let parcial = caminho.with_extension("parcial");
-    std::fs::write(&parcial, bytes).map_err(|e| format!("Não consegui gravar \"{}\": {e}", caminho.display()))?;
-    std::fs::rename(&parcial, caminho).map_err(|e| format!("Não consegui gravar \"{}\": {e}", caminho.display()))?;
+    // Força para o disco antes de trocar: sem isso uma queda de energia logo depois pode deixar o arquivo vazio.
+    let r = std::fs::File::create(&parcial).and_then(|mut f| {
+        std::io::Write::write_all(&mut f, &bytes)?;
+        f.sync_all()
+    });
+    if let Err(e) = r.and_then(|()| std::fs::rename(&parcial, caminho)) {
+        let _ = std::fs::remove_file(&parcial);
+        return Err(format!("Não consegui gravar \"{}\": {e}", caminho.display()));
+    }
     let e = motor.estado_de("documento_arquivo_definir", json!({ "caminho": caminho.to_string_lossy(), "formato": formato.extensao(), "salvo": true }))?;
     lembrar(caminho);
     Ok(e)

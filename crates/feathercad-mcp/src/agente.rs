@@ -85,6 +85,25 @@ pub fn gravar_bytes(doc: &Documento, caminho: &Path) -> Res<(Vec<u8>, Vec<String
     }
 }
 
+/// Grava num `.parcial` ao lado, força para o disco e só então troca pelo destino: disco cheio ou queda no
+/// meio não deixam o arquivo da pessoa cortado (o app já gravava assim).
+pub(crate) fn gravar_seguro(destino: &std::path::Path, bytes: &[u8]) -> Res<()> {
+    use std::io::Write;
+    let mut nome = destino.as_os_str().to_owned();
+    nome.push(".parcial");
+    let tmp = PathBuf::from(nome);
+    let r = std::fs::File::create(&tmp).and_then(|mut f| {
+        f.write_all(bytes)?;
+        f.sync_all()
+    });
+    let r = r.and_then(|()| std::fs::rename(&tmp, destino));
+    if let Err(e) = r {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(format!("não consegui gravar `{}`: {e}", destino.display()));
+    }
+    Ok(())
+}
+
 /// Estimativa grosseira de tokens: cerca de 3,5 caracteres por token.
 fn tokens(bytes: usize) -> usize {
     (bytes as f64 / 3.5).round() as usize
@@ -98,13 +117,22 @@ pub fn converter(origem: &str, destino: &str, sobrescrever: bool) -> Res<Value> 
     }
     let (doc, avisos) = carregar(origem)?;
     let (bytes, avisos_da_gravacao) = gravar_bytes(&doc, &d)?;
-    std::fs::write(&d, &bytes).map_err(|e| format!("não consegui gravar `{destino}`: {e}"))?;
+    gravar_seguro(&d, &bytes)?;
     let antes = std::fs::metadata(origem).map_or(0, |m| m.len() as usize);
     let todos_os_avisos: Vec<String> = avisos.into_iter().chain(avisos_da_gravacao).collect();
     Ok(json!({ "ok": true, "entidades": doc.entidades().len(), "bytes_origem": antes, "bytes_destino": bytes.len(), "tokens_estimados_origem": tokens(antes), "tokens_estimados_destino": tokens(bytes.len()), "avisos": todos_os_avisos }))
 }
 
 impl Agente {
+    /// Ao vivo o desenho é o da aba aberta: trocá-lo com alteração não salva só com `descartar: true`
+    /// (antes `cad_novo`/`cad_abrir` jogavam fora o trabalho da pessoa, sem Ctrl+Z).
+    pub(crate) fn pode_trocar_o_desenho(&self, args: &Value) -> Res<()> {
+        if self.tema_claro.is_some() && self.doc.sujo() && !args.get("descartar").and_then(Value::as_bool).unwrap_or(false) {
+            return Err("o desenho aberto na tela tem alterações não salvas: salve antes (`cad_salvar`) ou passe `descartar: true` para jogar fora".into());
+        }
+        Ok(())
+    }
+
     /// Um desenho em branco na unidade pedida (`mm`, `cm`, `m`).
     pub fn novo(&mut self, unidade: &str) -> Res<Value> {
         let u = Unidade::de_nome(unidade).ok_or("a unidade tem que ser `mm`, `cm` ou `m`")?;
@@ -153,9 +181,37 @@ impl Agente {
         }
 
         let (bytes, avisos) = gravar_bytes(&self.doc, &destino)?;
-        std::fs::write(&destino, &bytes).map_err(|e| format!("não consegui gravar `{}`: {e}", destino.display()))?;
+        gravar_seguro(&destino, &bytes)?;
         self.doc.marcar_salvo();
         self.arquivo = Some(destino.clone());
         Ok(json!({ "ok": true, "arquivo": destino.display().to_string(), "bytes": bytes.len(), "avisos": avisos }))
+    }
+}
+
+#[cfg(test)]
+mod testes_ao_vivo {
+    use super::*;
+
+    #[test]
+    fn ao_vivo_nao_troca_desenho_com_alteracao_sem_descartar() {
+        let mut ag = Agente { tema_claro: Some(true), ..Agente::default() };
+        ag.doc.adicionar_linha(feathercad_core::geom::Ponto::novo(0.0, 0.0), feathercad_core::geom::Ponto::novo(1.0, 0.0));
+        assert!(ag.pode_trocar_o_desenho(&json!({})).is_err(), "a aba tem trabalho não salvo");
+        assert!(ag.pode_trocar_o_desenho(&json!({ "descartar": true })).is_ok());
+        ag.tema_claro = None;
+        assert!(ag.pode_trocar_o_desenho(&json!({})).is_ok(), "fora do modo ao vivo o desenho é só do MCP");
+    }
+
+    #[test]
+    fn gravar_seguro_troca_o_arquivo_inteiro_e_nao_deixa_parcial() {
+        let dir = std::env::temp_dir().join(format!("feathercad_gravar_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let alvo = dir.join("a.dxf");
+        std::fs::write(&alvo, "antigo").unwrap();
+        gravar_seguro(&alvo, b"novo").unwrap();
+        assert_eq!(std::fs::read(&alvo).unwrap(), b"novo");
+        assert!(!dir.join("a.dxf.parcial").exists());
+        assert!(gravar_seguro(&dir.join("nao/existe.dxf"), b"x").is_err());
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

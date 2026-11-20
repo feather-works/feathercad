@@ -104,7 +104,7 @@ pub fn pdf(ag: &Agente, args: &Value) -> Res<Value> {
     let indices: Option<Vec<usize>> = args.get("folhas").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_u64).map(|n| n as usize).collect());
     let opcoes = feathercad_io::pdf::Opcoes { papel, orientacao, modo_papel: !args.get("cores").and_then(Value::as_bool).unwrap_or(false) };
     let bytes = feathercad_io::pdf::exportar_folhas_escolhidas(&ag.doc, indices.as_deref(), &opcoes)?;
-    std::fs::write(caminho, &bytes).map_err(|e| format!("não consegui gravar `{caminho}`: {e}"))?;
+    crate::agente::gravar_seguro(std::path::Path::new(caminho), &bytes)?;
     Ok(json!({ "caminho": caminho, "bytes": bytes.len(), "paginas": indices.as_ref().map_or_else(|| feathercad_io::pdf::descrever_folhas(&ag.doc).len(), Vec::len), "papel": papel_nome }))
 }
 

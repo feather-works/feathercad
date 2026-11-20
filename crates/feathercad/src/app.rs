@@ -77,6 +77,8 @@ pub enum Msg {
     Mcp(PedidoMcp),
     Monitor(monitor::Evento),
     Tique,
+    /// O arrasto da vista tem quadro atrasado (ver `Doc::em_dia`).
+    QuadroDoArrasto,
     Imagem(String, Option<(u32, u32, Vec<u8>)>),
     Tema,
     Vista(f64, f64),
@@ -123,6 +125,8 @@ pub struct App {
     pub imagens: HashMap<String, Option<Image>>,
     /// O que continua depois de salvar (fechar aba ou sair, vindo do "Salvar alterações?").
     pendente: Option<Depois>,
+    /// A aba (`Doc::id`) cuja caixa "Salvar como" está aberta: o arquivo escolhido é dela, não da aba ativa.
+    salvando: Option<u64>,
     pdf: Option<Vec<u8>>,
     pub claro: bool,
     pub angulos: Vec<String>,
@@ -173,6 +177,7 @@ impl App {
             },
             imagens: HashMap::new(),
             pendente: None,
+            salvando: None,
             pdf: None,
             claro,
             fita: Propriedades::vazia(),
@@ -238,7 +243,7 @@ impl App {
         match self.docs.get(i) {
             Some(d) if d.estado.sujo => {
                 self.ativar(Some(i));
-                self.caixa = Some(Caixa::Confirmar { nome: self.docs[i].nome(), depois: Depois::FecharAba(i) });
+                self.caixa = Some(Caixa::Confirmar { nome: self.docs[i].nome(), depois: Depois::FecharAba(self.docs[i].id) });
             }
             Some(_) => self.remover_aba(i),
             None => {}
@@ -250,7 +255,7 @@ impl App {
         match self.docs.iter().position(|d| d.estado.sujo) {
             Some(i) => {
                 self.ativar(Some(i));
-                self.caixa = Some(Caixa::Confirmar { nome: self.docs[i].nome(), depois: Depois::Sair });
+                self.caixa = Some(Caixa::Confirmar { nome: self.docs[i].nome(), depois: Depois::Sair(self.docs[i].id) });
                 Task::none()
             }
             None => {
@@ -261,34 +266,36 @@ impl App {
         }
     }
 
+    fn indice_do(&self, id: u64) -> Option<usize> {
+        self.docs.iter().position(|d| d.id == id)
+    }
+
     fn confirmado(&mut self, depois: Depois, salvar: bool) -> Task<Msg> {
         self.caixa = None;
+        let (Depois::FecharAba(id) | Depois::Sair(id)) = depois;
+        let Some(i) = self.indice_do(id) else { return Task::none() };
         if salvar {
             self.pendente = Some(depois);
-            return self.salvar(false, None);
+            return self.salvar_aba(i, false, None);
         }
+        // Descartar fecha a aba na hora: só marcar como salva deixava a aba aberta (se a saída fosse cancelada
+        // na aba seguinte) pronta para fechar depois sem perguntar.
+        self.remover_aba(i);
         match depois {
-            Depois::FecharAba(i) => {
-                self.remover_aba(i);
-                Task::none()
-            }
-            Depois::Sair => {
-                // Descartar: o desenho sai da conta dos "com alterações" (vai fechar sem gravar).
-                if let Some(d) = self.doc_mut() {
-                    d.estado.sujo = false;
-                }
-                self.continuar_saida()
-            }
+            Depois::FecharAba(_) => Task::none(),
+            Depois::Sair(_) => self.continuar_saida(),
         }
     }
 
     fn depois_de_salvar(&mut self) -> Task<Msg> {
         match self.pendente.take() {
-            Some(Depois::FecharAba(i)) => {
-                self.remover_aba(i);
+            Some(Depois::FecharAba(id)) => {
+                if let Some(i) = self.indice_do(id) {
+                    self.remover_aba(i);
+                }
                 Task::none()
             }
-            Some(Depois::Sair) => self.continuar_saida(),
+            Some(Depois::Sair(_)) => self.continuar_saida(),
             None => Task::none(),
         }
     }
@@ -324,6 +331,7 @@ impl App {
         match arquivos::abrir(&mut d.motor, &caminho) {
             Ok(e) => {
                 d.visto = std::fs::metadata(&caminho).and_then(|m| m.modified()).ok();
+                d.dxf_perderia = arquivos::formato_do_caminho(&caminho) == Some(Formato::Dxf) && (!e.avisos_do_arquivo.is_empty() || arquivos::dxf_mais_novo_que_r12(&caminho));
                 let avisos: Vec<String> = e.avisos_do_arquivo.iter().map(|m| texto_com(&m.chave, &m.vars)).collect();
                 d.aplicar(e);
                 d.ajustar();
@@ -347,29 +355,44 @@ impl App {
     }
 
     fn salvar(&mut self, como: bool, formato: Option<Formato>) -> Task<Msg> {
+        match self.ativa {
+            Some(i) => self.salvar_aba(i, como, formato),
+            None => {
+                self.pendente = None;
+                Task::none()
+            }
+        }
+    }
+
+    fn salvar_aba(&mut self, i: usize, como: bool, formato: Option<Formato>) -> Task<Msg> {
         let padrao_config = Formato::da_extensao(&self.config.formato).unwrap_or(Formato::Dxf);
-        let Some(d) = self.doc() else {
+        let Some(d) = self.docs.get(i) else {
             self.pendente = None;
             return Task::none();
         };
         let atual = d.estado.arquivo.clone();
         let padrao = formato.or_else(|| atual.as_ref().and_then(|a| Formato::da_extensao(&a.formato))).unwrap_or(padrao_config);
-        if let (false, Some(a)) = (como, &atual) {
+        // Ctrl+S sobre um DXF que não é R12 (ou que perdeu algo ao abrir) vira "Salvar como": gravar R12 por cima
+        // jogaria fora para sempre o que o app não lê.
+        if let (false, Some(a), false) = (como, &atual, d.dxf_perderia) {
             let caminho = PathBuf::from(&a.caminho);
             let f = arquivos::formato_do_caminho(&caminho).unwrap_or(padrao);
-            return self.gravar_em(caminho, f);
+            return self.gravar_em(i, caminho, f);
         }
+        self.salvando = Some(d.id);
         let base = atual.as_ref().map_or_else(|| d.nome(), |a| std::path::Path::new(&a.nome).file_stem().map_or_else(|| "desenho".into(), |s| s.to_string_lossy().into_owned()));
         let nome = format!("{base}.{}", padrao.extensao());
         let pasta = atual.map(|a| PathBuf::from(a.caminho)).or_else(|| arquivos::pasta_padrao().map(|p| p.join("x")));
         Task::perform(arquivos::escolher_para_salvar(pasta, nome, padrao), Msg::Destino)
     }
 
-    fn gravar_em(&mut self, caminho: PathBuf, formato: Formato) -> Task<Msg> {
-        let Some(d) = self.doc_mut() else { return Task::none() };
+    fn gravar_em(&mut self, i: usize, caminho: PathBuf, formato: Formato) -> Task<Msg> {
+        let Some(d) = self.docs.get_mut(i) else { return Task::none() };
         match arquivos::gravar(&mut d.motor, &caminho, formato) {
             Ok(e) => {
                 d.visto = std::fs::metadata(&caminho).and_then(|m| m.modified()).ok();
+                d.avisou_conflito = false;
+                d.dxf_perderia = false;
                 let avisos: Vec<String> = e.avisos_do_arquivo.iter().map(|m| texto_com(&m.chave, &m.vars)).collect();
                 d.aplicar(e);
                 if !avisos.is_empty() {
@@ -408,6 +431,7 @@ impl App {
             return;
         }
         d.visto = Some(agora);
+        d.avisou_conflito = false;
         let r = std::fs::read(&caminho).map_err(|e| e.to_string()).and_then(|b| d.motor.abrir(&b)).and_then(|_| {
             d.motor.estado_de("documento_arquivo_definir", json!({ "caminho": a.caminho, "formato": a.formato, "salvo": false }))
         });
@@ -883,7 +907,11 @@ impl pelicano::App for App {
     }
 
     fn subscription(&self) -> Subscription<Msg> {
-        Subscription::batch([mcp_vivo::assinatura(Msg::Mcp), Subscription::every(Duration::from_secs(1)).map(|_| Msg::Tique)])
+        let mut s = vec![mcp_vivo::assinatura(Msg::Mcp), Subscription::every(Duration::from_secs(1)).map(|_| Msg::Tique)];
+        if self.doc().is_some_and(|d| d.pan_pendente) {
+            s.push(Subscription::every(crate::doc::QUADRO_DO_ARRASTO).map(|_| Msg::QuadroDoArrasto));
+        }
+        Subscription::batch(s)
     }
 
     fn on_event(&self, ev: &Event) -> Option<Msg> {
@@ -997,8 +1025,14 @@ impl App {
                 });
             }
             Msg::Salvar { como, formato } => return self.salvar(como, formato),
-            Msg::Destino(Some((c, f))) => return self.gravar_em(c, f),
-            Msg::Destino(None) => self.pendente = None,
+            Msg::Destino(Some((c, f))) => match self.salvando.take().and_then(|id| self.indice_do(id)) {
+                Some(i) => return self.gravar_em(i, c, f),
+                None => self.pendente = None,
+            },
+            Msg::Destino(None) => {
+                self.pendente = None;
+                self.salvando = None;
+            }
             Msg::PdfDestino(destino) => {
                 if let (Some(mut c), Some(bytes)) = (destino, self.pdf.take()) {
                     if c.extension().is_none() {
@@ -1047,6 +1081,11 @@ impl App {
             Msg::Mcp(p) => return self.mcp(p),
             Msg::Monitor(e) => return self.monitor.atualizar(e),
             Msg::Tique => self.tique(),
+            Msg::QuadroDoArrasto => {
+                if let Some(d) = self.doc_mut() {
+                    d.em_dia();
+                }
+            }
             Msg::Imagem(c, img) => {
                 let img = img.and_then(|(w, h, rgba)| Image::from_rgba(w, h, rgba));
                 if img.is_none() {

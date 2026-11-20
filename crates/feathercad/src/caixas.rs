@@ -48,11 +48,12 @@ impl Folhas {
     }
 }
 
-/// O que fazer depois do "Salvar alterações?".
+/// O que fazer depois do "Salvar alterações?", com o `Doc::id` da aba perguntada (não o índice: a pessoa pode
+/// trocar ou fechar abas enquanto a caixa de salvar está aberta).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Depois {
-    FecharAba(usize),
-    Sair,
+    FecharAba(u64),
+    Sair(u64),
 }
 
 pub enum Caixa {
