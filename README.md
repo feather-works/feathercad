@@ -1,5 +1,7 @@
 # FeatherCAD
 
+[![Discord](https://img.shields.io/badge/Discord-Maragon.Dev-5865F2?logo=discord&logoColor=white)](https://discord.gg/b4Epb4eSSH)
+
 **2D CAD of the FeatherWorks suite, with the engine written in Rust.** Alpha: still in development.
 
 ## Download
